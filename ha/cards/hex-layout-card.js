@@ -1,5 +1,5 @@
 /* hex-layout-card v1 - honeycomb layout for Hex lights. No build step. */
-const HLC_VERSION = "6";
+const HLC_VERSION = "7";
 const SQ3 = Math.sqrt(3);
 
 class HexLayoutCard extends HTMLElement {
@@ -104,8 +104,7 @@ class HexLayoutCard extends HTMLElement {
         <div class="row"><b>Tray</b> ${unplaced.length ? unplaced.map(e => `<span class="tray" data-tray="${e}">${this._name(e)}</span>`).join("") : "<i>All lights placed</i>"}</div>
         <div class="row hint">Drag a light from the tray or a placed hex onto a cell. Tap placed hexes to select.</div>
         <div class="row"><button class="btn" id="rot" ${this._sel.size ? "" : "disabled"}>Rotate</button>
-        <button class="btn" id="rem" ${this._sel.size ? "" : "disabled"}>Remove</button>
-        <input id="gname" placeholder="Group name"/><button class="btn" id="gadd" ${this._sel.size ? "" : "disabled"}>Save group</button></div>
+        <button class="btn" id="rem" ${this._sel.size ? "" : "disabled"}>Remove</button></div>
         ${groups.length ? `<div class="row">${groups.map((g, i) => `<span class="gl">${g.name} (${g.entities.length}) <a data-gdel="${i}">✕</a></span>`).join("")}</div>` : ""}
         <div class="row status">${this._status || (this._dirty ? "Unsaved changes – press Done to save" : "")}</div></div>`;
     }
@@ -181,12 +180,6 @@ class HexLayoutCard extends HTMLElement {
     if (!this._edit) return;
     $("rot").onclick = () => { this._sel.forEach(e => { const t = this._layout.tiles[e]; t.rot = ((t.rot || 0) + 60) % 360; }); this._dirty = true; this._render(); };
     $("rem").onclick = () => { this._sel.forEach(e => { delete this._layout.tiles[e]; this._layout.groups.forEach(g => g.entities = g.entities.filter(x => x !== e)); }); this._sel.clear(); this._dirty = true; this._render(); };
-    $("gadd").onclick = () => {
-      const n = $("gname").value.trim(); if (!n) { this._status = "Name the group first"; return this._render(); }
-      const ex = this._layout.groups.find(g => g.name.toLowerCase() === n.toLowerCase());
-      if (ex) ex.entities = [...this._sel]; else this._layout.groups.push({ name: n, entities: [...this._sel] });
-      this._sel.clear(); this._dirty = true; this._render();
-    };
     this.shadowRoot.querySelectorAll("[data-gdel]").forEach(a => a.onclick = () => { this._layout.groups.splice(+a.dataset.gdel, 1); this._dirty = true; this._render(); });
   }
 
