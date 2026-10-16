@@ -52,6 +52,14 @@
         {
          "entity": "switch.hex_01_current_limit",
          "name": "Limit"
+        },
+        {
+         "entity": "sensor.hex_01_displayed_color",
+         "name": "Shown"
+        },
+        {
+         "entity": "sensor.hex_01_light_rgb",
+         "name": "Light RGB"
         }
        ]
       },
@@ -83,6 +91,14 @@
         {
          "entity": "switch.hex_02_current_limit",
          "name": "Limit"
+        },
+        {
+         "entity": "sensor.hex_02_displayed_color",
+         "name": "Shown"
+        },
+        {
+         "entity": "sensor.hex_02_light_rgb",
+         "name": "Light RGB"
         }
        ]
       },
@@ -114,6 +130,14 @@
         {
          "entity": "switch.hex_03_current_limit",
          "name": "Limit"
+        },
+        {
+         "entity": "sensor.hex_03_displayed_color",
+         "name": "Shown"
+        },
+        {
+         "entity": "sensor.hex_03_light_rgb",
+         "name": "Light RGB"
         }
        ]
       },
@@ -145,6 +169,14 @@
         {
          "entity": "switch.hex_04_current_limit",
          "name": "Limit"
+        },
+        {
+         "entity": "sensor.hex_04_displayed_color",
+         "name": "Shown"
+        },
+        {
+         "entity": "sensor.hex_04_light_rgb",
+         "name": "Light RGB"
         }
        ]
       },
@@ -176,6 +208,14 @@
         {
          "entity": "switch.hex_05_current_limit",
          "name": "Limit"
+        },
+        {
+         "entity": "sensor.hex_05_displayed_color",
+         "name": "Shown"
+        },
+        {
+         "entity": "sensor.hex_05_light_rgb",
+         "name": "Light RGB"
         }
        ]
       },
@@ -207,6 +247,14 @@
         {
          "entity": "switch.hex_06_current_limit",
          "name": "Limit"
+        },
+        {
+         "entity": "sensor.hex_06_displayed_color",
+         "name": "Shown"
+        },
+        {
+         "entity": "sensor.hex_06_light_rgb",
+         "name": "Light RGB"
         }
        ]
       },
@@ -238,6 +286,14 @@
         {
          "entity": "switch.hex_07_current_limit",
          "name": "Limit"
+        },
+        {
+         "entity": "sensor.hex_07_displayed_color",
+         "name": "Shown"
+        },
+        {
+         "entity": "sensor.hex_07_light_rgb",
+         "name": "Light RGB"
         }
        ]
       },
@@ -269,6 +325,14 @@
         {
          "entity": "switch.hex_08_current_limit",
          "name": "Limit"
+        },
+        {
+         "entity": "sensor.hex_08_displayed_color",
+         "name": "Shown"
+        },
+        {
+         "entity": "sensor.hex_08_light_rgb",
+         "name": "Light RGB"
         }
        ]
       },
@@ -300,6 +364,14 @@
         {
          "entity": "switch.hex_09_current_limit",
          "name": "Limit"
+        },
+        {
+         "entity": "sensor.hex_09_displayed_color",
+         "name": "Shown"
+        },
+        {
+         "entity": "sensor.hex_09_light_rgb",
+         "name": "Light RGB"
         }
        ]
       },
@@ -331,6 +403,14 @@
         {
          "entity": "switch.hex_10_current_limit",
          "name": "Limit"
+        },
+        {
+         "entity": "sensor.hex_10_displayed_color",
+         "name": "Shown"
+        },
+        {
+         "entity": "sensor.hex_10_light_rgb",
+         "name": "Light RGB"
         }
        ]
       },
@@ -362,6 +442,14 @@
         {
          "entity": "switch.hex_11_current_limit",
          "name": "Limit"
+        },
+        {
+         "entity": "sensor.hex_11_displayed_color",
+         "name": "Shown"
+        },
+        {
+         "entity": "sensor.hex_11_light_rgb",
+         "name": "Light RGB"
         }
        ]
       },
@@ -393,6 +481,14 @@
         {
          "entity": "switch.hex_12_current_limit",
          "name": "Limit"
+        },
+        {
+         "entity": "sensor.hex_12_displayed_color",
+         "name": "Shown"
+        },
+        {
+         "entity": "sensor.hex_12_light_rgb",
+         "name": "Light RGB"
         }
        ]
       },
@@ -424,6 +520,14 @@
         {
          "entity": "switch.hex_13_current_limit",
          "name": "Limit"
+        },
+        {
+         "entity": "sensor.hex_13_displayed_color",
+         "name": "Shown"
+        },
+        {
+         "entity": "sensor.hex_13_light_rgb",
+         "name": "Light RGB"
         }
        ]
       },
@@ -455,6 +559,14 @@
         {
          "entity": "switch.hex_14_current_limit",
          "name": "Limit"
+        },
+        {
+         "entity": "sensor.hex_14_displayed_color",
+         "name": "Shown"
+        },
+        {
+         "entity": "sensor.hex_14_light_rgb",
+         "name": "Light RGB"
         }
        ]
       },
@@ -486,6 +598,14 @@
         {
          "entity": "switch.hex_15_current_limit",
          "name": "Limit"
+        },
+        {
+         "entity": "sensor.hex_15_displayed_color",
+         "name": "Shown"
+        },
+        {
+         "entity": "sensor.hex_15_light_rgb",
+         "name": "Light RGB"
         }
        ]
       },
@@ -517,6 +637,14 @@
         {
          "entity": "switch.hex_16_current_limit",
          "name": "Limit"
+        },
+        {
+         "entity": "sensor.hex_16_displayed_color",
+         "name": "Shown"
+        },
+        {
+         "entity": "sensor.hex_16_light_rgb",
+         "name": "Light RGB"
         }
        ]
       },
@@ -548,6 +676,14 @@
         {
          "entity": "switch.hex_17_current_limit",
          "name": "Limit"
+        },
+        {
+         "entity": "sensor.hex_17_displayed_color",
+         "name": "Shown"
+        },
+        {
+         "entity": "sensor.hex_17_light_rgb",
+         "name": "Light RGB"
         }
        ]
       },
@@ -579,6 +715,14 @@
         {
          "entity": "switch.hex_18_current_limit",
          "name": "Limit"
+        },
+        {
+         "entity": "sensor.hex_18_displayed_color",
+         "name": "Shown"
+        },
+        {
+         "entity": "sensor.hex_18_light_rgb",
+         "name": "Light RGB"
         }
        ]
       },
@@ -610,6 +754,14 @@
         {
          "entity": "switch.hex_19_current_limit",
          "name": "Limit"
+        },
+        {
+         "entity": "sensor.hex_19_displayed_color",
+         "name": "Shown"
+        },
+        {
+         "entity": "sensor.hex_19_light_rgb",
+         "name": "Light RGB"
         }
        ]
       },
@@ -641,6 +793,14 @@
         {
          "entity": "switch.hex_20_current_limit",
          "name": "Limit"
+        },
+        {
+         "entity": "sensor.hex_20_displayed_color",
+         "name": "Shown"
+        },
+        {
+         "entity": "sensor.hex_20_light_rgb",
+         "name": "Light RGB"
         }
        ]
       }

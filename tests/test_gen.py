@@ -304,3 +304,20 @@ def test_brightness_and_current_limit():
         assert "name: Current limit" in tpl
     for f in ("esphome/generated",):
         pass
+
+def test_displayed_color_editor_and_recorder():
+    import yaml
+    h = yaml.safe_load(open(os.path.join(ROOT, "ha/hex_wall.generated.yaml")))
+    grp = h["group"]["hex_wall_displayed_colors"]["entities"]
+    assert len(grp) == 20 and grp[0] == "sensor.hex_01_displayed_color" and grp[-1] == "sensor.hex_20_displayed_color"
+    assert h["group"]["hex_wall_light_rgb"]["entities"][4] == "sensor.hex_05_light_rgb"
+    dash = open(os.path.join(ROOT, "ha/hex_wall_dashboard.generated.yaml")).read()
+    assert "sensor.hex_12_displayed_color" in dash and "sensor.hex_12_light_rgb" in dash
+    ent = json.load(open(os.path.join(ROOT, "out/ha_entities.json")))
+    assert ent["tiles"]["r1-e"]["displayedColor"] == "sensor.hex_02_displayed_color" and ent["tiles"]["c0"]["hexNN"] == "01"
+    assert ent["groups"]["displayedColor"] == "group.hex_wall_displayed_colors"
+    rec = yaml.safe_load(open(os.path.join(ROOT, "ha/packages/hex_wall_recorder.yaml")))
+    assert rec == {"recorder": {"exclude": {"entity_globs": ["sensor.hex_*_displayed_color", "sensor.hex_*_light_rgb"]}}}
+    # main packages must not also define recorder (duplicate-key conflict in HA packages)
+    for f in ("ha/hex_wall.generated.yaml", "ha/packages/hex_wall.yaml"):
+        assert "recorder" not in yaml.safe_load(open(os.path.join(ROOT, f)))

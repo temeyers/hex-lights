@@ -304,6 +304,8 @@ def build_outputs(lay, tile_yaml_out=False, pin_leader=False):
     import gen_ha
     files["ha/hex_wall.generated.yaml"] = gen_ha.render(d, node, light_entity)
     files["ha/hex_wall_dashboard.generated.yaml"] = gen_ha.render_dashboard(d, node)
+    files["ha/packages/hex_wall_recorder.yaml"] = gen_ha.render_recorder(d, node)
+    files["out/ha_entities.json"] = gen_ha.render_editor_entities(d, node)
     return files
 
 
