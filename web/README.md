@@ -12,7 +12,7 @@ panels, preview), `layout-format.js` (ONLY place that serializes/parses/validate
 ```
 { "version": 1, "name": "Living room",
   "hex":  { "orientation": "pointy" | "flat", "sizeMm": 100 },
-  "led":  { "pin": "GPIO4", "type": "WS2812", "order": "GRB", "count": 36 },
+  "led":  { "pin": "GPIO13", "type": "WS2812", "order": "GRB", "count": 44 },
   "master": "<tile id>",
   "tiles": [ { "id": "hex-01", "name": "Centre"?, "mac": "aa:bb:cc:dd:ee:01"?, "q": 0, "r": 0, "rot": 0-5, "ledCount": 42? } ] }
 ```

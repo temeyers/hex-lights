@@ -4,7 +4,7 @@
   var TYPES = ['WS2812'], ORDERS = ['GRB', 'RGB', 'BRG', 'RBG', 'GBR', 'BGR'];
   function defaults() {
     return { version: 1, name: 'Hex wall', hex: { orientation: 'pointy', sizeMm: 100 },
-      led: { pin: 'GPIO4', type: 'WS2812', order: 'GRB', count: 44 }, master: null, tiles: [] };
+      led: { pin: 'GPIO13', type: 'WS2812', order: 'GRB', count: 44 }, master: null, tiles: [] };
   }
   function pin(v) { if (typeof v === 'number' || /^\d+$/.test(str(v))) return 'GPIO' + parseInt(v, 10); return str(v).toUpperCase(); }
   function extras(src, known) { var o = {}; for (var k in src) if (src.hasOwnProperty(k) && known.indexOf(k) < 0) o[k] = src[k]; return o; }
