@@ -12,12 +12,13 @@ panels, preview), `layout-format.js` (ONLY place that serializes/parses/validate
 ```
 { "version": 1, "name": "Living room",
   "hex":  { "orientation": "pointy" | "flat", "sizeMm": 100 },
-  "led":  { "pin": 5, "type": "WS2812", "order": "GRB", "count": 36 },
+  "led":  { "pin": "GPIO4", "type": "WS2812", "order": "GRB", "count": 36 },
   "master": "<tile id>",
   "tiles": [ { "id": "hex-01", "name": "Centre"?, "mac": "aa:bb:cc:dd:ee:01"?, "q": 0, "r": 0, "rot": 0-5, "ledCount": 42? } ] }
 ```
 - Axial coords (q,r). `id` is a slug (`a-z0-9-_`) or a MAC. Tile `ledCount` overrides `led.count`.
 - ids and (q,r) pairs must be unique; master must be an existing id. The editor flags these, plus missing IDs and bad MACs.
+- `led.pin` is a string `GPIO<n>` (a bare number is converted). Unknown keys Back End uses (e.g. `led.budgetMa`, `led.maxScale`, tile `pin`/`priority`) are preserved on import/export; derived out/ fields are dropped.
 - Export writes exactly these keys (optional ones omitted when empty). No derived fields.
 - Autosave: localStorage key `hexlights.layout.v1` (same JSON).
 
@@ -26,7 +27,8 @@ Loads `../effects.json` (params with type/min/max/default; accepts `{effects:{na
 `[{name,params}]`) and `../tools/effects.js` (CommonJS, `module.exports.frame`). If missing, falls back to `effects.js` here.
 Signature: `frame(effect, params, tiles, tMs) -> {tileId:[r,g,b]}`. Effects: solid{color}, breathe{color,periodS},
 rainbow_sweep{speed,axis}, ripple{color,speed,origin}, spiral{speed}, sparkle{color,density}.
-Tiles passed to frame carry derived fields: `x,y` (hex centre normalised 0..1 over the wall's bounding box), `ring`
-(hex distance from the master, or the first tile when none), `angle` (around the master, 0..1 of a turn, atan2 in screen
-coords where y points down, 0 = to the right), `index` (array order), and `ledCount` resolved. Back End's derivation should match;
-`angle` units are an assumption. Brightness and preview speed are applied by the page, not by frame().
+Tiles passed to frame carry the same derived fields as `tools/gen_tiles.py` (verified equal to out/layout.json for the 20-tile
+reference layout): unit-hex pixel math (pointy x=√3(q+r/2), y=1.5r; flat x=1.5q, y=√3(q/2+r)); `x,y` normalised 0..1 per axis
+(single row/column = 0.5); `ring` = hex distance from master; `angle` = degrees 0-360 from master, 0 = right, clockwise on
+screen (y down), master 0; `index`; `isMaster`; `leds`. Back End's `tools/effects.js` is an ES module and is loaded with dynamic
+`import()`; colour params are `[r,g,b]` arrays. Brightness and preview speed are applied by the page, not by frame().

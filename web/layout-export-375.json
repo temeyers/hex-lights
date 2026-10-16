@@ -6,7 +6,7 @@
     "sizeMm": 100
   },
   "led": {
-    "pin": 5,
+    "pin": "GPIO5",
     "type": "WS2812",
     "order": "RGB",
     "count": 36

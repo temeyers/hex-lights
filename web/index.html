@@ -18,7 +18,8 @@
  <label>Name (optional)<input id="tName"></label>
  <label>MAC (optional)<input id="tMac" autocapitalize="off" placeholder="aa:bb:cc:dd:ee:ff"></label>
  <div class="row2"><label>Rotation<select id="tRot"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
- <label>LED count<input id="tLed" type="number" min="1" inputmode="numeric" placeholder="default"></label></div>
+ <label>LED count<input id="tLed" type="number" min="1" max="300" step="1" inputmode="numeric" placeholder="default"></label></div>
+ <button class="btn" id="tLedDef">Use default LED count</button>
  <p class="mu small" id="tPos"></p>
  <div class="row2"><button class="btn" id="tMaster">Make master</button><button class="btn danger" id="tDel">Delete</button></div>
 </div>
@@ -27,7 +28,7 @@
  <div class="row2"><label>Orientation<select id="lOri"><option value="pointy">Pointy top</option><option value="flat">Flat top</option></select></label>
  <label>Hex size (mm)<input id="lSize" type="number" min="1" inputmode="decimal"></label></div>
  <h3>LEDs</h3>
- <div class="row2"><label>Data pin<input id="lPin" type="number" min="0" inputmode="numeric"></label>
+ <div class="row2"><label>Data pin<input id="lPin" placeholder="GPIO4" autocapitalize="characters"></label>
  <label>LEDs per tile<input id="lCount" type="number" min="1" inputmode="numeric"></label></div>
  <div class="row2"><label>Type<select id="lType"></select></label><label>Colour order<select id="lOrder"></select></label></div>
  <label>Master tile<select id="lMaster"></select></label>

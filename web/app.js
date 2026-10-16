@@ -23,15 +23,18 @@
   function at(q, r, skip) { for (var i = 0; i < st.tiles.length; i++) if (i !== skip && st.tiles[i].q === q && st.tiles[i].r === r) return i; return -1; }
   function masterIdx() { for (var i = 0; i < st.tiles.length; i++) if (st.tiles[i].id && st.tiles[i].id === st.master) return i; return -1; }
 
-  /* derived tile info passed to frame(): x,y normalised 0..1, ring = hex distance from master, angle = turn 0..1 around master, index */
+  /* derived fields, same as Back End tools/gen_tiles.py derive(): unit-hex pixel math (pointy x=√3(q+r/2), y=1.5r; flat x=1.5q, y=√3(q/2+r)),
+     x/y normalised per axis (single row/col -> 0.5), ring = hex distance from master, angle = degrees 0-360 from master
+     (0 = right, clockwise on screen since y grows downward; master 0), index = layout order. */
+  function upx(q, r) { return st.hex.orientation === 'flat' ? [1.5 * q, S3 * (q / 2 + r)] : [S3 * (q + r / 2), 1.5 * r]; }
   function derived() {
-    var T = st.tiles, out = [], mn = [1e9, 1e9], mx = [-1e9, -1e9], i, p, mi = masterIdx(), m = T[mi >= 0 ? mi : 0], mp = m ? px(m.q, m.r) : [0, 0];
-    for (i = 0; i < T.length; i++) { p = px(T[i].q, T[i].r); mn = [Math.min(mn[0], p[0]), Math.min(mn[1], p[1])]; mx = [Math.max(mx[0], p[0]), Math.max(mx[1], p[1])]; }
+    var T = st.tiles, out = [], mn = [1e9, 1e9], mx = [-1e9, -1e9], i, p, mi = masterIdx(), m = T[mi >= 0 ? mi : 0], mp = m ? upx(m.q, m.r) : [0, 0];
+    for (i = 0; i < T.length; i++) { p = upx(T[i].q, T[i].r); mn = [Math.min(mn[0], p[0]), Math.min(mn[1], p[1])]; mx = [Math.max(mx[0], p[0]), Math.max(mx[1], p[1])]; }
     for (i = 0; i < T.length; i++) {
-      var t = T[i]; p = px(t.q, t.r); var a = Math.atan2(p[1] - mp[1], p[0] - mp[0]) / (2 * Math.PI); if (a < 0) a += 1;
-      out.push({ id: t.id || ('#' + i), name: t.name, mac: t.mac, q: t.q, r: t.r, rot: t.rot, ledCount: t.ledCount === '' ? st.led.count : t.ledCount,
-        x: mx[0] > mn[0] ? (p[0] - mn[0]) / (mx[0] - mn[0]) : 0.5, y: mx[1] > mn[1] ? (p[1] - mn[1]) / (mx[1] - mn[1]) : 0.5,
-        ring: m ? dist(t, m) : 0, angle: (t === m) ? 0 : a, index: i });
+      var t = T[i]; p = upx(t.q, t.r); var a = Math.atan2(p[1] - mp[1], p[0] - mp[0]) * 180 / Math.PI; a = ((a % 360) + 360) % 360;
+      out.push({ id: t.id || ('#' + i), name: t.name, mac: t.mac, q: t.q, r: t.r, rot: t.rot, ledCount: t.ledCount === '' ? undefined : t.ledCount,
+        x: mx[0] - mn[0] > 1e-9 ? (p[0] - mn[0]) / (mx[0] - mn[0]) : 0.5, y: mx[1] - mn[1] > 1e-9 ? (p[1] - mn[1]) / (mx[1] - mn[1]) : 0.5,
+        ring: m ? dist(t, m) : 0, angle: (t === m || (t.q === m.q && t.r === m.r)) ? 0 : a, index: i, isMaster: t === m, leds: t.ledCount === '' ? st.led.count : t.ledCount });
     }
     return out;
   }
@@ -79,7 +82,7 @@
   function syncPanels() {
     if (cur === 'tile' && st.tiles[sel]) {
       var t = st.tiles[sel], e = [];
-      setv($('tId'), t.id); setv($('tName'), t.name); setv($('tMac'), t.mac); $('tRot').value = t.rot; setv($('tLed'), t.ledCount);
+      setv($('tId'), t.id); setv($('tName'), t.name); setv($('tMac'), t.mac); $('tRot').value = t.rot; setv($('tLed'), t.ledCount); $('tLed').placeholder = 'default (' + st.led.count + ')'; $('tLedDef').disabled = t.ledCount === '';
       for (var i = 0; i < errs.length; i++) if (errs[i].tile === sel) e.push(errs[i].msg);
       $('tIdErr').textContent = e.join(' · ');
       $('tPos').textContent = 'q ' + t.q + ', r ' + t.r + (t.id && t.id === st.master ? ' · master' : '');
@@ -99,13 +102,14 @@
   bind('tName', 'input', function () { tset('name', this.value); });
   bind('tMac', 'input', function () { tset('mac', this.value.trim()); });
   bind('tRot', 'change', function () { tset('rot', +this.value); });
-  bind('tLed', 'input', function () { tset('ledCount', this.value === '' ? '' : Math.max(1, parseInt(this.value, 10) || 1)); });
+  bind('tLed', 'input', function () { tset('ledCount', this.value === '' ? '' : Math.max(1, Math.min(300, parseInt(this.value, 10) || 1))); });
+  bind('tLedDef', 'click', function () { $('tLed').value = ''; tset('ledCount', ''); });
   bind('tMaster', 'click', function () { var t = st.tiles[sel]; if (!t) return; if (!t.id) { $('tIdErr').textContent = 'Give the tile an ID first'; return; } st.master = t.id; refresh(); });
   bind('tDel', 'click', function () { if (sel < 0) return; if (st.tiles[sel].id === st.master) st.master = null; st.tiles.splice(sel, 1); sel = -1; show(null); refresh(); });
   bind('lName', 'input', function () { st.name = this.value; refresh(); });
   bind('lOri', 'change', function () { st.hex.orientation = this.value; drawGrid(); refresh(); fit(); });
   bind('lSize', 'input', function () { st.hex.sizeMm = parseFloat(this.value) || 0; refresh(); });
-  bind('lPin', 'input', function () { st.led.pin = parseInt(this.value, 10) || 0; refresh(); });
+  bind('lPin', 'input', function () { st.led.pin = this.value.trim(); refresh(); });
   bind('lCount', 'input', function () { st.led.count = parseInt(this.value, 10) || 0; refresh(); });
   bind('lType', 'change', function () { st.led.type = this.value; refresh(); });
   bind('lOrder', 'change', function () { st.led.order = this.value; refresh(); });
@@ -218,10 +222,17 @@
     fetch('../effects.json', { cache: 'no-store' }).then(function (r) { if (!r.ok) throw 0; return r.json(); }).then(function (j) {
       var defs = normDefs(j);
       return fetch('../tools/effects.js', { cache: 'no-store' }).then(function (r) { if (!r.ok) throw 0; return r.text(); }).then(function (src) {
-        var m = { exports: {} }; (new Function('module', 'exports', src))(m, m.exports);
-        var f = m.exports.frame || (m.exports.default && m.exports.default.frame); if (typeof f !== 'function') throw 0;
+        var f = null;
+        if (/^\s*export\s|\nexport\s/.test(src)) { // ES module -> dynamic import (wrapped so this file still parses as ES5)
+          return (new Function('u', 'return import(u)'))(new URL('../tools/effects.js', location.href).href).then(function (m) {
+            f = m.frame || (m['default'] && m['default'].frame); if (typeof f !== 'function') throw 0;
+            FX = { defs: defs, frame: f, src: 'Back End effects.json + tools/effects.js' };
+          });
+        }
+        var mo = { exports: {} }; (new Function('module', 'exports', src))(mo, mo.exports);
+        f = mo.exports.frame || (mo.exports['default'] && mo.exports['default'].frame); if (typeof f !== 'function') throw 0;
         FX = { defs: defs, frame: f, src: 'Back End effects.json + tools/effects.js' };
-      }, function () { FX = { defs: defs, frame: LocalEffects.frame, src: 'Back End effects.json + local frame() fallback' }; });
+      }).then(null, function () { FX = { defs: defs, frame: LocalEffects.frame, src: 'Back End effects.json + local frame() fallback' }; });
     }).then(done, done);
   }
   function setOrigin(id) { fx.params.origin = id; var el = $('fxp-origin'); if (el) el.value = id; if (!fx.play) startFx(); }
@@ -231,9 +242,9 @@
     var p = paramList(FX.defs[fx.name].params), h = '', k; fx.params = {};
     for (k in p) if (p.hasOwnProperty(k)) {
       var d = p[k] || {}, v = d['default'], ty = d.type || (typeof v === 'number' ? 'number' : 'string');
-      if (k === 'origin' || ty === 'tile') { v = st.master || (st.tiles[0] && st.tiles[0].id) || ''; var tl = []; for (var i = 0; i < st.tiles.length; i++) if (st.tiles[i].id) tl.push(st.tiles[i].id);
+      if (k === 'origin' || ty === 'tile' || ty === 'tileId') { v = st.master || (st.tiles[0] && st.tiles[0].id) || ''; var tl = []; for (var i = 0; i < st.tiles.length; i++) if (st.tiles[i].id) tl.push(st.tiles[i].id);
         h += '<label>' + k + '<select id="fxp-origin" data-k="' + k + '">' + tl.map(function (x) { return '<option' + (x === v ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('') + '</select></label>'; }
-      else if (ty === 'color') h += '<label>' + k + '<input type="color" data-k="' + k + '" value="' + esc(v || '#ffffff') + '"></label>';
+      else if (ty === 'color') { var arr = Object.prototype.toString.call(v) === '[object Array]'; h += '<label>' + k + '<input type="color" data-k="' + k + '"' + (arr ? ' data-rgb="1"' : '') + ' value="' + esc(toHex(v)) + '"></label>'; }
       else if (d.options || d['enum'] || ty === 'enum') { var op = d.options || d['enum'] || []; h += '<label>' + k + '<select data-k="' + k + '">' + op.map(function (x) { return '<option' + (x === v ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('') + '</select></label>'; }
       else if (ty === 'number' || ty === 'int' || ty === 'float') { var mn = d.min != null ? d.min : 0, mx = d.max != null ? d.max : 10, stp = ty === 'int' ? 1 : (mx - mn) / 100;
         h += '<label>' + k + ' <span class="num" id="fxv-' + k + '">' + v + '</span><input type="range" data-k="' + k + '" data-num="1" min="' + mn + '" max="' + mx + '" step="' + stp + '" value="' + v + '"></label>'; }
@@ -242,8 +253,10 @@
     }
     $('fxParams').innerHTML = h;
   }
-  $('fxParams').addEventListener('input', function (e) { var k = e.target.getAttribute('data-k'); if (!k) return; var v = e.target.getAttribute('data-num') ? parseFloat(e.target.value) : e.target.value; fx.params[k] = v; var s = $('fxv-' + k); if (s) s.textContent = v; });
-  $('fxParams').addEventListener('change', function (e) { var k = e.target.getAttribute('data-k'); if (k) fx.params[k] = e.target.getAttribute('data-num') ? parseFloat(e.target.value) : e.target.value; });
+  function toHex(v) { if (Object.prototype.toString.call(v) === '[object Array]') return '#' + v.map(function (n) { return ('0' + (Math.max(0, Math.min(255, n | 0))).toString(16)).slice(-2); }).join(''); return v || '#ffffff'; }
+  function pval(el) { if (el.getAttribute('data-num')) return parseFloat(el.value); if (el.getAttribute('data-rgb')) { var n = parseInt(el.value.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; } return el.value; }
+  $('fxParams').addEventListener('input', function (e) { var k = e.target.getAttribute('data-k'); if (!k) return; var v = pval(e.target); fx.params[k] = v; var s = $('fxv-' + k); if (s) s.textContent = v; });
+  $('fxParams').addEventListener('change', function (e) { var k = e.target.getAttribute('data-k'); if (k) fx.params[k] = pval(e.target); });
   bind('fxSel', 'change', function () { fx.name = this.value; buildFx(); });
   function lbl() { $('briV').textContent = $('bri').value + '%'; $('spdV').textContent = ($('spd').value / 100).toFixed(1) + '×'; }
   bind('bri', 'input', function () { lbl(); if (fx.colors) render(); }); bind('spd', 'input', lbl);
