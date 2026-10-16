@@ -73,3 +73,12 @@ console.log("wall effects: all tests passed");
   assert.deepEqual(ringF["r1-e"], ringF["r1-w"]);                // same ring -> same colour
   console.log("order/axis: all tests passed");
 }
+// --- light color palette (Hardware PAL_LIGHT, id 6) ---
+{
+  assert.deepEqual(pal("light color", 0, [200, 100, 40]), [200, 100, 40]);     // u=0 -> 100 %
+  assert.deepEqual(pal("light color", 0.5, [200, 100, 40]), [50, 25, 10]);     // u=0.5 -> 25 %
+  const c = cat.palettes["light color"]; assert.equal(c.id, 6);
+  const f = frame("rainbow_flow", { palette: "light color", color: [0, 255, 0] }, tiles, 1000);
+  for (const v of Object.values(f)) assert.ok(v[0] === 0 && v[2] === 0 && v[1] >= 63 && v[1] <= 255);
+  console.log("light color palette: all tests passed");
+}

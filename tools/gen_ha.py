@@ -49,7 +49,7 @@ WALL_FX = {"solid": 0, "ripple": 1, "rainbow_sweep": 2, "breathe": 3,
            "chase": 4, "wipe": 5, "rainbow_flow": 6, "random_ripple": 7,
            "twinkle": 8, "color_cycle": 9, "snake": 10}
 AXES = ["x", "y", "ring", "angle"]
-PALETTES = ["rainbow", "ocean", "sunset", "forest", "fire", "mono"]
+PALETTES = ["rainbow", "ocean", "sunset", "forest", "fire", "mono", "light color"]  # ids 0-6 (Hardware 7dfa536)
 
 
 def render(d, node, light_entity):

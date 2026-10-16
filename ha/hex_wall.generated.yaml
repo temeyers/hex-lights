@@ -254,7 +254,7 @@ script:
     mode: restart
     variables:
       fx_ids: {"solid": 0, "ripple": 1, "rainbow_sweep": 2, "breathe": 3, "chase": 4, "wipe": 5, "rainbow_flow": 6, "random_ripple": 7, "twinkle": 8, "color_cycle": 9, "snake": 10}
-      pal_ids: {"rainbow": 0, "ocean": 1, "sunset": 2, "forest": 3, "fire": 4, "mono": 5}
+      pal_ids: {"rainbow": 0, "ocean": 1, "sunset": 2, "forest": 3, "fire": 4, "mono": 5, "light color": 6}
       fx: "{{ states('input_select.hex_wall_fx') }}"
     sequence:
       - if: "{{ fx == 'off' }}"
@@ -303,7 +303,7 @@ input_select:
     initial: "off"
   hex_wall_palette:
     name: Hex wall palette
-    options: ["rainbow", "ocean", "sunset", "forest", "fire", "mono"]
+    options: ["rainbow", "ocean", "sunset", "forest", "fire", "mono", "light color"]
     initial: rainbow
   hex_wall_axis:
     name: Hex wall wipe/sweep axis

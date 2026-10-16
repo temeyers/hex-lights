@@ -324,3 +324,12 @@ def test_displayed_color_editor_and_recorder():
     # main packages must not also define recorder (duplicate-key conflict in HA packages)
     for f in ("ha/hex_wall.generated.yaml", "ha/packages/hex_wall.yaml"):
         assert "recorder" not in yaml.safe_load(open(os.path.join(ROOT, f)))
+
+def test_light_color_palette():
+    import yaml, gen_ha
+    assert gen_ha.PALETTES.index("light color") == 6
+    h = yaml.safe_load(open(os.path.join(ROOT, "ha/hex_wall.generated.yaml")))
+    assert h["input_select"]["hex_wall_palette"]["options"][-1] == "light color"
+    tpl = open(os.path.join(ROOT, "esphome/templates/tile-common.yaml")).read()
+    if "light color]" in tpl:
+        assert "options: [rainbow, ocean, sunset, forest, fire, mono, light color]" in tpl

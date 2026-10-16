@@ -70,7 +70,8 @@
       "sunset",
       "forest",
       "fire",
-      "mono"
+      "mono",
+      "light color"
      ],
      "default": "rainbow"
     }
@@ -110,7 +111,8 @@
       "sunset",
       "forest",
       "fire",
-      "mono"
+      "mono",
+      "light color"
      ],
      "default": "mono"
     }
@@ -138,7 +140,8 @@
       "sunset",
       "forest",
       "fire",
-      "mono"
+      "mono",
+      "light color"
      ],
      "default": "rainbow"
     }
@@ -193,7 +196,8 @@
       "sunset",
       "forest",
       "fire",
-      "mono"
+      "mono",
+      "light color"
      ],
      "default": "rainbow"
     },
@@ -238,7 +242,8 @@
       "sunset",
       "forest",
       "fire",
-      "mono"
+      "mono",
+      "light color"
      ],
      "default": "rainbow"
     },
@@ -280,7 +285,8 @@
       "sunset",
       "forest",
       "fire",
-      "mono"
+      "mono",
+      "light color"
      ],
      "default": "rainbow"
     },
@@ -316,7 +322,8 @@
       "sunset",
       "forest",
       "fire",
-      "mono"
+      "mono",
+      "light color"
      ],
      "default": "rainbow"
     }
@@ -344,7 +351,8 @@
       "sunset",
       "forest",
       "fire",
-      "mono"
+      "mono",
+      "light color"
      ],
      "default": "rainbow"
     }
@@ -372,7 +380,8 @@
       "sunset",
       "forest",
       "fire",
-      "mono"
+      "mono",
+      "light color"
      ],
      "default": "rainbow"
     }
@@ -400,7 +409,8 @@
       "sunset",
       "forest",
       "fire",
-      "mono"
+      "mono",
+      "light color"
      ],
      "default": "rainbow"
     }
@@ -516,8 +526,12 @@
   "mono": {
    "id": 5,
    "stops": "color param (or [255,140,40])"
+  },
+  "light color": {
+   "id": 6,
+   "stops": "color param (HA/master light colour) * (0.625 + 0.375*cos(2*pi*u))"
   }
  },
- "paletteFormula": "pal(name,u): u = frac(u); rainbow -> hsv(u*360); mono -> color; else stops are evenly spaced at k/(n-1) and linearly interpolated, rounded.",
+ "paletteFormula": "pal(name,u): u = frac(u); rainbow -> hsv(u*360); mono -> color; else stops are evenly spaced at k/(n-1) and linearly interpolated, rounded. 'light color' -> color * (0.625 + 0.375*cos(2*pi*u)) (Hardware PAL_LIGHT).",
  "perLed": "frameLeds(effect, params, tiles, tMs) -> {tileId: [[r,g,b] x leds]}; leds = tile.leds or 44; every LED of a tile gets the tile colour (v1)."
 }
