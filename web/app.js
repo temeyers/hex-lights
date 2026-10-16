@@ -34,7 +34,7 @@
       var t = T[i]; p = upx(t.q, t.r); var a = Math.atan2(p[1] - mp[1], p[0] - mp[0]) * 180 / Math.PI; a = ((a % 360) + 360) % 360;
       out.push({ id: t.id || ('#' + i), name: t.name, mac: t.mac, q: t.q, r: t.r, rot: t.rot, ledCount: t.ledCount === '' ? undefined : t.ledCount,
         x: mx[0] - mn[0] > 1e-9 ? (p[0] - mn[0]) / (mx[0] - mn[0]) : 0.5, y: mx[1] - mn[1] > 1e-9 ? (p[1] - mn[1]) / (mx[1] - mn[1]) : 0.5,
-        ring: m ? dist(t, m) : 0, angle: (t === m || (t.q === m.q && t.r === m.r)) ? 0 : a, index: i, isMaster: t === m, leds: t.ledCount === '' ? st.led.count : t.ledCount });
+        ring: m ? dist(t, m) : 0, angle: (t === m || (t.q === m.q && t.r === m.r)) ? 0 : a, index: i, order: LF.order(t, i), rotation: LF.rotDeg(t), isMaster: t === m, leds: t.ledCount === '' ? st.led.count : t.ledCount });
     }
     return out;
   }
@@ -51,14 +51,22 @@
   function render() {
     errs = LF.validate(st); var bad = {}, i, h = '';
     for (i = 0; i < errs.length; i++) if (errs[i].tile != null) bad[errs[i].tile] = 1;
-    var mi = masterIdx(), D = fx.colors ? derived() : null, bri = $('bri').value / 100;
+    var mi = masterIdx(), D = fx.colors ? derived() : null, bri = $('bri').value / 100, ledR = R * 0.74, dotR = Math.max(1.2, Math.min(3.2, R * 2.6 / 44));
     for (i = 0; i < st.tiles.length; i++) {
       var t = st.tiles[i], p = px(t.q, t.r), lab = t.name || t.id || '?', fill = '';
-      if (D) { var c = fx.colors[D[i].id] || [0, 0, 0]; fill = ' style="fill:rgb(' + (c[0] * bri | 0) + ',' + (c[1] * bri | 0) + ',' + (c[2] * bri | 0) + ')"'; }
-      var a = Math.PI / 180 * (60 * t.rot + (st.hex.orientation === 'flat' ? 30 : 0) - 90);
+      var dots = '', deg = LF.rotDeg(t);
+      if (D) {
+        var c = fx.colors[D[i].id] || [0, 0, 0], L = fx.leds && fx.leds[D[i].id], n = L ? L.length : D[i].leds;
+        fill = ' style="fill:rgb(' + (c[0] * bri * 0.3 | 0) + ',' + (c[1] * bri * 0.3 | 0) + ',' + (c[2] * bri * 0.3 | 0) + ')"';
+        for (var k = 0; k < n; k++) { // LEDs evenly around the edge, offset by rotation (DESIGN.md: radius 0.45, offset by rotation)
+          var lc = L ? L[k] : c, la = Math.PI / 180 * (deg + 360 * k / n);
+          dots += '<circle class="led" cx="' + (p[0] + Math.cos(la) * ledR).toFixed(1) + '" cy="' + (p[1] + Math.sin(la) * ledR).toFixed(1) + '" r="' + dotR.toFixed(1) + '" fill="rgb(' + (lc[0] * bri | 0) + ',' + (lc[1] * bri | 0) + ',' + (lc[2] * bri | 0) + ')"/>';
+        }
+      }
+      var a = Math.PI / 180 * (deg + (st.hex.orientation === 'flat' ? 30 : 0) - 90);
       h += '<g class="hx' + (i === sel ? ' sel' : '') + (bad[i] ? ' bad' : '') + '" data-i="' + i + '"><path d="' + corners(p[0], p[1], R - 2) + '"' + fill + '/>' +
         '<line class="rotmark" x1="' + (p[0] + Math.cos(a) * R * 0.55).toFixed(1) + '" y1="' + (p[1] + Math.sin(a) * R * 0.55).toFixed(1) + '" x2="' + (p[0] + Math.cos(a) * R * 0.8).toFixed(1) + '" y2="' + (p[1] + Math.sin(a) * R * 0.8).toFixed(1) + '"/>' +
-        (D ? '' : '<text x="' + p[0] + '" y="' + p[1] + '">' + esc(lab.length > 9 ? lab.slice(0, 8) + '…' : lab) + '</text>') +
+        dots + (D ? '' : '<text x="' + p[0] + '" y="' + p[1] + '">' + esc(lab.length > 9 ? lab.slice(0, 8) + '…' : lab) + '</text>') +
         (i === mi ? '<text class="star" x="' + p[0] + '" y="' + (p[1] - R * 0.5) + '">★</text>' : '') + '</g>';
     }
     gT.innerHTML = h;
@@ -68,12 +76,12 @@
   function refresh() { render(); save(); syncPanels(); }
 
   /* ---- panels ---- */
-  var panes = { tile: 'pTile', layout: 'pLayout', fx: 'pFx', file: 'pFile' }, cur = null;
+  var panes = { tile: 'pTile', layout: 'pLayout', fx: 'pFx', file: 'pFile', hw: 'pHw' }, cur = null;
   function show(p) {
     var wasOpen = !$('sheet').hidden; cur = p; $('sheet').hidden = !p;
     for (var k in panes) $(panes[k]).className = 'pane' + (k === p ? ' show' : '');
-    $('shTitle').textContent = { tile: 'Tile', layout: 'Layout & LEDs', fx: 'Effect preview', file: 'Import / export' }[p] || '';
-    $('tabLayout').className = 'btn' + (p === 'layout' ? ' on' : ''); $('tabFx').className = 'btn' + (p === 'fx' ? ' on' : ''); $('tabFile').className = 'btn' + (p === 'file' ? ' on' : '');
+    $('shTitle').textContent = { tile: 'Tile', layout: 'Layout & LEDs', fx: 'Effect preview', file: 'Import / export', hw: 'Hardware push' }[p] || '';
+    $('tabLayout').className = 'btn' + (p === 'layout' ? ' on' : ''); $('tabFx').className = 'btn' + (p === 'fx' ? ' on' : ''); $('tabFile').className = 'btn' + (p === 'file' ? ' on' : ''); $('tabHw').className = 'btn' + (p === 'hw' ? ' on' : '');
     syncPanels(); if (wasOpen !== !!p) { clearTimeout(fitTimer); fitTimer = setTimeout(function () { fitTimer = 0; fit(); }, 0); } // refit only when the panel opens/closes
   }
   var fitTimer = 0;
@@ -82,12 +90,13 @@
   function syncPanels() {
     if (cur === 'tile' && st.tiles[sel]) {
       var t = st.tiles[sel], e = [];
-      setv($('tId'), t.id); setv($('tName'), t.name); setv($('tMac'), t.mac); $('tRot').value = t.rot; setv($('tLed'), t.ledCount); $('tLed').placeholder = 'default (' + st.led.count + ')'; $('tLedDef').disabled = t.ledCount === '';
+      setv($('tId'), t.id); setv($('tName'), t.name); setv($('tMac'), t.mac); setv($('tQ'), t.q); setv($('tR'), t.r); setv($('tDeg'), LF.rotDeg(t)); setv($('tOrd'), t.order == null || t.order === '' ? '' : t.order); $('tOrd').placeholder = 'default (' + sel + ')'; $('tOrdDef').disabled = t.order == null || t.order === ''; setv($('tLed'), t.ledCount); $('tLed').placeholder = 'default (' + st.led.count + ')'; $('tLedDef').disabled = t.ledCount === '';
       for (var i = 0; i < errs.length; i++) if (errs[i].tile === sel) e.push(errs[i].msg);
       $('tIdErr').textContent = e.join(' · ');
       $('tPos').textContent = 'q ' + t.q + ', r ' + t.r + (t.id && t.id === st.master ? ' · master' : '');
       $('tMaster').textContent = t.id && t.id === st.master ? 'Is master ★' : 'Make master';
     } else if (cur === 'tile') show(null);
+    if (cur === 'hw') hwSync();
     if (cur === 'layout') {
       setv($('lName'), st.name); $('lOri').value = st.hex.orientation; setv($('lSize'), st.hex.sizeMm); setv($('lPin'), st.led.pin); setv($('lCount'), st.led.count);
       opts($('lType'), LF.TYPES, st.led.type); opts($('lOrder'), LF.ORDERS, st.led.order);
@@ -101,7 +110,13 @@
   bind('tId', 'input', function () { tset('id', this.value.trim()); });
   bind('tName', 'input', function () { tset('name', this.value); });
   bind('tMac', 'input', function () { tset('mac', this.value.trim()); });
-  bind('tRot', 'change', function () { tset('rot', +this.value); });
+  function rotSet(d) { d = parseInt(d, 10); if (isNaN(d)) return; if (st.tiles[sel]) { st.tiles[sel].rot = LF.rotFromDeg(d); tset('rotDeg', d); } }
+  bind('tDeg', 'input', function () { rotSet(this.value); });
+  bind('tRotStep', 'click', function () { if (st.tiles[sel]) { var d = (LF.rotDeg(st.tiles[sel]) + 60) % 360; $('tDeg').value = d; rotSet(d); } });
+  bind('tQ', 'input', function () { var v = parseInt(this.value, 10); if (!isNaN(v)) tset('q', v); });
+  bind('tR', 'input', function () { var v = parseInt(this.value, 10); if (!isNaN(v)) tset('r', v); });
+  bind('tOrd', 'input', function () { tset('order', this.value === '' ? null : parseInt(this.value, 10)); });
+  bind('tOrdDef', 'click', function () { $('tOrd').value = ''; tset('order', null); });
   bind('tLed', 'input', function () { tset('ledCount', this.value === '' ? '' : Math.max(1, Math.min(300, parseInt(this.value, 10) || 1))); });
   bind('tLedDef', 'click', function () { $('tLed').value = ''; tset('ledCount', ''); });
   bind('tMaster', 'click', function () { var t = st.tiles[sel]; if (!t) return; if (!t.id) { $('tIdErr').textContent = 'Give the tile an ID first'; return; } st.master = t.id; refresh(); });
@@ -118,6 +133,7 @@
   bind('shClose', 'click', function () { sel = -1; show(null); render(); });
   bind('tabLayout', 'click', function () { show(cur === 'layout' ? null : 'layout'); });
   bind('tabFx', 'click', function () { show(cur === 'fx' ? null : 'fx'); });
+  bind('tabHw', 'click', function () { show(cur === 'hw' ? null : 'hw'); });
   bind('tabFile', 'click', function () { show(cur === 'file' ? null : 'file'); if (cur) $('json').value = LF.serialize(st); });
 
   /* add tile: next free cell nearest the master (or first tile / view centre) -> compact cluster */
@@ -226,12 +242,12 @@
         if (/^\s*export\s|\nexport\s/.test(src)) { // ES module -> dynamic import (wrapped so this file still parses as ES5)
           return (new Function('u', 'return import(u)'))(new URL('../tools/effects.js', location.href).href).then(function (m) {
             f = m.frame || (m['default'] && m['default'].frame); if (typeof f !== 'function') throw 0;
-            FX = { defs: defs, frame: f, src: 'Back End effects.json + tools/effects.js' };
+            FX = { defs: defs, frame: f, frameLeds: m.frameLeds, pal: m.pal, src: 'Back End effects.json + tools/effects.js' };
           });
         }
         var mo = { exports: {} }; (new Function('module', 'exports', src))(mo, mo.exports);
         f = mo.exports.frame || (mo.exports['default'] && mo.exports['default'].frame); if (typeof f !== 'function') throw 0;
-        FX = { defs: defs, frame: f, src: 'Back End effects.json + tools/effects.js' };
+        FX = { defs: defs, frame: f, frameLeds: mo.exports.frameLeds, pal: mo.exports.pal, src: 'Back End effects.json + tools/effects.js' };
       }).then(null, function () { FX = { defs: defs, frame: LocalEffects.frame, src: 'Back End effects.json + local frame() fallback' }; });
     }).then(done, done);
   }
@@ -245,6 +261,8 @@
       if (k === 'origin' || ty === 'tile' || ty === 'tileId') { v = st.master || (st.tiles[0] && st.tiles[0].id) || ''; var tl = []; for (var i = 0; i < st.tiles.length; i++) if (st.tiles[i].id) tl.push(st.tiles[i].id);
         h += '<label>' + k + '<select id="fxp-origin" data-k="' + k + '">' + tl.map(function (x) { return '<option' + (x === v ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('') + '</select></label>'; }
       else if (ty === 'color') { var arr = Object.prototype.toString.call(v) === '[object Array]'; h += '<label>' + k + '<input type="color" data-k="' + k + '"' + (arr ? ' data-rgb="1"' : '') + ' value="' + esc(toHex(v)) + '"></label>'; }
+      else if (k === 'palette' && (d.options || d['enum'])) { var po = d.options || d['enum'];
+        h += '<label>palette</label><div class="sw" role="radiogroup" aria-label="palette">' + po.map(function (x) { return '<button type="button" role="radio" class="swb' + (x === v ? ' on' : '') + '" aria-checked="' + (x === v) + '" data-pal="' + esc(x) + '" style="background:' + palCss(x) + '">' + esc(x) + '</button>'; }).join('') + '</div>'; }
       else if (d.options || d['enum'] || ty === 'enum') { var op = d.options || d['enum'] || []; h += '<label>' + k + '<select data-k="' + k + '">' + op.map(function (x) { return '<option' + (x === v ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('') + '</select></label>'; }
       else if (ty === 'number' || ty === 'int' || ty === 'float') { var mn = d.min != null ? d.min : 0, mx = d.max != null ? d.max : 10, stp = ty === 'int' ? 1 : (mx - mn) / 100;
         h += '<label>' + k + ' <span class="num" id="fxv-' + k + '">' + v + '</span><input type="range" data-k="' + k + '" data-num="1" min="' + mn + '" max="' + mx + '" step="' + stp + '" value="' + v + '"></label>'; }
@@ -253,6 +271,10 @@
     }
     $('fxParams').innerHTML = h;
   }
+  function palFn() { return FX.pal || LocalEffects.pal; }
+  function palCss(name) { var st2 = [], col = fx.params.color || [255, 140, 40]; for (var i = 0; i <= 8; i++) { var c = palFn()(name, i / 8.0001, col); st2.push('rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')'); } return 'linear-gradient(90deg,' + st2.join(',') + ')'; }
+  $('fxParams').addEventListener('click', function (e) { var b = e.target.closest ? e.target.closest('[data-pal]') : null; if (!b) return; fx.params.palette = b.getAttribute('data-pal');
+    var bs = $('fxParams').querySelectorAll('[data-pal]'); for (var i = 0; i < bs.length; i++) { var on = bs[i] === b; bs[i].className = 'swb' + (on ? ' on' : ''); bs[i].setAttribute('aria-checked', on); } });
   function toHex(v) { if (Object.prototype.toString.call(v) === '[object Array]') return '#' + v.map(function (n) { return ('0' + (Math.max(0, Math.min(255, n | 0))).toString(16)).slice(-2); }).join(''); return v || '#ffffff'; }
   function pval(el) { if (el.getAttribute('data-num')) return parseFloat(el.value); if (el.getAttribute('data-rgb')) { var n = parseInt(el.value.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; } return el.value; }
   $('fxParams').addEventListener('input', function (e) { var k = e.target.getAttribute('data-k'); if (!k) return; var v = pval(e.target); fx.params[k] = v; var s = $('fxv-' + k); if (s) s.textContent = v; });
@@ -262,13 +284,56 @@
   bind('bri', 'input', function () { lbl(); if (fx.colors) render(); }); bind('spd', 'input', lbl);
   function tick(now) {
     if (!fx.play) return; var dt = now - (fx.last || now); fx.last = now; fx.tAcc += dt * $('spd').value / 100;
-    try { fx.colors = FX.frame(fx.name, fx.params, derived(), fx.tAcc); } catch (e) { $('fxSrc').textContent = 'Effect error: ' + e.message; fx.play = false; }
+    try { var D = derived(), t = fx.tAcc;
+      if (typeof FX.frameLeds === 'function') { fx.leds = FX.frameLeds(fx.name, fx.params, D, t); fx.colors = {}; for (var id in fx.leds) if (fx.leds.hasOwnProperty(id)) fx.colors[id] = fx.leds[id][0] || [0, 0, 0]; fx.mode = 'frameLeds'; }
+      else { fx.leds = null; fx.colors = FX.frame(fx.name, fx.params, D, t); fx.mode = 'frame'; } } catch (e) { $('fxSrc').textContent = 'Effect error: ' + e.message; fx.play = false; }
     render(); requestAnimationFrame(tick);
   }
   function startFx() { if (fx.play) return; fx.play = true; fx.last = 0; requestAnimationFrame(tick); }
   bind('fxPlay', 'click', startFx);
-  bind('fxStop', 'click', function () { fx.play = false; fx.colors = null; render(); });
+  bind('fxStop', 'click', function () { fx.play = false; fx.colors = null; fx.leds = null; render(); });
 
-  window.HexApp = { state: function () { return st; }, derived: derived, fx: fx, FX: function () { return FX; } }; // test hook
+  /* ---- Hardware push (generate only; nothing is sent) ---- */
+  var csv = null; // {rows:[{id,mac}], src}
+  function normMac(m) { return String(m || '').toLowerCase().replace(/[^0-9a-f]/g, ''); }
+  function parseCsv(text, src) {
+    var lines = String(text).replace(/\r/g, '').split('\n').filter(function (l) { return l.trim(); }); if (!lines.length) throw new Error('empty');
+    var hd = lines[0].split(',').map(function (x) { return x.trim().toLowerCase(); }), ii = hd.indexOf('id'), mi = hd.indexOf('mac'); if (ii < 0) throw new Error('tiles.csv needs an id column');
+    return { rows: lines.slice(1).map(function (l) { var c = l.split(','); return { id: (c[ii] || '').trim(), mac: mi >= 0 ? (c[mi] || '').trim() : '' }; }), src: src };
+  }
+  function nodeName() { var m = st.master || 'c0'; return 'hex_' + (/^([0-9a-f]{2}[:-]){5}[0-9a-f]{2}$/i.test(m) ? normMac(m) : m.replace(/-/g, '_')); }
+  /* tile_id = 1-based row in esphome/tiles.csv, matched by tile id, then by mac (tile mac or a MAC-style id) */
+  function hwBuild() {
+    var out = { entries: [], problems: [], perTile: [] }, i, t, v = LF.validate(st);
+    for (i = 0; i < v.length; i++) if (/^(pos|rotDeg|order)$/.test(v[i].field)) out.problems.push((v[i].tile != null ? (st.tiles[v[i].tile].id || 'tile ' + v[i].tile) + ': ' : '') + v[i].msg);
+    if (!csv) { out.problems.push('tiles.csv not loaded'); return out; }
+    for (i = 0; i < st.tiles.length; i++) {
+      t = st.tiles[i]; var num = -1, k;
+      for (k = 0; k < csv.rows.length && num < 0; k++) if (t.id && csv.rows[k].id === t.id) num = k + 1;
+      for (k = 0; k < csv.rows.length && num < 0; k++) { var cm = normMac(csv.rows[k].mac || csv.rows[k].id), tm = normMac(t.mac) || normMac(t.id); if (cm.length === 12 && cm === tm) num = k + 1; }
+      if (num < 0) { out.problems.push((t.id || 'tile at ' + t.q + ',' + t.r) + ' is not in tiles.csv'); continue; }
+      if (num > 250) { out.problems.push(t.id + ': tile_id ' + num + ' > 250'); continue; }
+      var e = { tile_id: num, q: t.q, r: t.r, rotation: LF.rotDeg(t), order: LF.order(t, i), id: t.id };
+      out.entries.push(e);
+    }
+    out.bulk = out.entries.map(function (e) { return e.tile_id + ':' + e.q + ':' + e.r + ':' + e.rotation + ':' + e.order; }).join(';');
+    return out;
+  }
+  function hwSync() {
+    var b = hwBuild(), nn = nodeName();
+    $('hwSrc').textContent = csv ? 'tiles.csv: ' + csv.src + ' (' + csv.rows.length + ' rows) · service node: ' + nn + ' (master)' : 'tiles.csv not loaded yet.';
+    $('hwErr').innerHTML = b.problems.map(function (p) { return '<li>' + esc(p) + '</li>'; }).join('') + (b.problems.length ? '<li><b>Fix these first: one bad entry makes the tile reject the whole string.</b></li>' : '');
+    $('hwBulk').value = b.problems.length ? '' : b.bulk; $('hwCopy').disabled = !!b.problems.length; $('hwCopyYaml').disabled = !!b.problems.length;
+    $('hwYaml').value = b.problems.length ? '' : '# Bulk (all tiles)\naction: esphome.' + nn + '_set_layout_bulk\ndata:\n  layout: "' + b.bulk + '"\n\n# Per tile (resend one that did not ack)\n' +
+      b.entries.map(function (e) { return '# ' + e.id + '\naction: esphome.' + nn + '_set_tile_layout\ndata: {tile_id: ' + e.tile_id + ', q: ' + e.q + ', r: ' + e.r + ', rotation: ' + e.rotation + ', order: ' + e.order + '}'; }).join('\n---\n');
+    $('hwCsvBox').open = !csv; return b;
+  }
+  function copyText(el, msg) { el.select(); try { navigator.clipboard.writeText(el.value); } catch (e) { document.execCommand('copy'); } $('hwMsg').textContent = msg; }
+  bind('hwCopy', 'click', function () { copyText($('hwBulk'), 'Bulk string copied.'); });
+  bind('hwCopyYaml', 'click', function () { copyText($('hwYaml'), 'YAML copied.'); });
+  bind('hwCsvLoad', 'click', function () { try { csv = parseCsv($('hwCsv').value, 'pasted'); $('hwMsg').textContent = ''; } catch (e) { $('hwMsg').textContent = 'tiles.csv: ' + e.message; } hwSync(); });
+  if (window.fetch && location.protocol !== 'file:') fetch('../esphome/tiles.csv', { cache: 'no-store' }).then(function (r) { if (!r.ok) throw 0; return r.text(); }).then(function (t) { csv = parseCsv(t, 'esphome/tiles.csv'); if (cur === 'hw') hwSync(); }, function () {});
+
+  window.HexApp = { state: function () { return st; }, derived: derived, fx: fx, FX: function () { return FX; }, hw: hwBuild }; // test hook
   lbl(); setVB(); fit(); render(); loadRemote(buildFx);
 })();

@@ -10,6 +10,7 @@
 <button class="btn" id="tabLayout">Layout</button>
 <button class="btn" id="tabFx">Preview</button>
 <button class="btn" id="tabFile">File</button>
+<button class="btn" id="tabHw">Push</button>
 </nav>
 <section id="sheet" class="sheet" hidden>
 <div class="sh-head"><h2 id="shTitle">Tile</h2><button class="iconbtn" id="shClose" aria-label="Close">✕</button></div>
@@ -17,8 +18,12 @@
  <label>Tile ID (slug or MAC)<input id="tId" autocomplete="off" autocapitalize="off" spellcheck="false"></label><p id="tIdErr" class="err"></p>
  <label>Name (optional)<input id="tName"></label>
  <label>MAC (optional)<input id="tMac" autocapitalize="off" placeholder="aa:bb:cc:dd:ee:ff"></label>
- <div class="row2"><label>Rotation<select id="tRot"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
- <label>LED count<input id="tLed" type="number" min="1" max="300" step="1" inputmode="numeric" placeholder="default"></label></div>
+ <div class="row2"><label>Grid q<input id="tQ" type="number" min="-50" max="50" step="1" inputmode="numeric"></label>
+ <label>Grid r<input id="tR" type="number" min="-50" max="50" step="1" inputmode="numeric"></label></div>
+ <div class="row2"><label>Rotation (°)<input id="tDeg" type="number" min="0" max="359" step="1" inputmode="numeric"></label>
+ <label>Chase order<input id="tOrd" type="number" min="0" max="254" step="1" inputmode="numeric"></label></div>
+ <div class="row2"><button class="btn" id="tRotStep">Rotate +60°</button><button class="btn" id="tOrdDef">Default order</button></div>
+ <div class="row2"><label>LED count<input id="tLed" type="number" min="1" max="300" step="1" inputmode="numeric" placeholder="default"></label></div>
  <button class="btn" id="tLedDef">Use default LED count</button>
  <p class="mu small" id="tPos"></p>
  <div class="row2"><button class="btn" id="tMaster">Make master</button><button class="btn danger" id="tDel">Delete</button></div>
@@ -42,6 +47,17 @@
  <label>Preview speed <span id="spdV" class="num"></span><input id="spd" type="range" min="0" max="300" value="100"></label>
  <div class="row2"><button class="btn pr" id="fxPlay">Play</button><button class="btn" id="fxStop">Stop</button></div>
  <p class="mu small">Local simulation only. Tap a tile to set the ripple origin.</p>
+</div>
+<div id="pHw" class="pane">
+ <p class="small mu">Hardware push string for the master's <span class="mono">set_layout_bulk</span> service. Nothing is sent from here; copy it into Home Assistant yourself.</p>
+ <p id="hwSrc" class="small mu"></p>
+ <ul id="hwErr" class="errlist"></ul>
+ <label>Bulk layout (tile_id:q:r:rotation:order;…)<textarea id="hwBulk" rows="4" readonly class="mono"></textarea></label>
+ <button class="btn pr" id="hwCopy">Copy bulk string</button>
+ <label>Service calls (YAML)<textarea id="hwYaml" rows="10" readonly class="mono"></textarea></label>
+ <button class="btn" id="hwCopyYaml">Copy YAML</button>
+ <details id="hwCsvBox"><summary class="small">Paste tiles.csv (if it didn't load)</summary><textarea id="hwCsv" rows="5" class="mono"></textarea><button class="btn" id="hwCsvLoad">Use this tiles.csv</button></details>
+ <p id="hwMsg" class="small mu"></p>
 </div>
 <div id="pFile" class="pane">
  <div class="row2"><button class="btn pr" id="exp">Export JSON</button><button class="btn" id="impBtn">Import JSON</button></div>

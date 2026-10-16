@@ -17,7 +17,17 @@ const OUT = __dirname + '/screenshots/'; const URL = 'http://localhost:8411/web/
     for (let i = 0; i < n; i++) {
       await tap(i);
       await p.fill('#tId', 'hex-' + String(i + 1).padStart(2, '0'));
-      if (i === 0) { await p.fill('#tName', 'Centre'); await p.fill('#tMac', 'aa:bb:cc:dd:ee:01'); await p.selectOption('#tRot', '3'); await p.fill('#tLed', '42'); await p.click('#tMaster'); }
+      if (i === 0) { await p.fill('#tName', 'Centre'); await p.fill('#tMac', 'aa:bb:cc:dd:ee:01'); await p.fill('#tDeg', '180'); await p.fill('#tLed', '42'); await p.click('#tMaster'); }
+      if (i === 1) { await p.fill('#tDeg', '45'); await p.fill('#tOrd', '7');
+        ok(await p.evaluate(() => { const t = HexApp.state().tiles[1]; return t.rot === 1 && t.rotDeg === 45 && t.order === 7; }), w + ' rotation 45° -> rot 1, order 7');
+        await p.click('#tRotStep'); ok(await p.inputValue('#tDeg') === '105', w + ' rotate +60 step');
+        await p.fill('#tOrd', '300'); ok((await p.textContent('#tIdErr')).includes('Chase order must be 0-254'), w + ' order range flagged');
+        await p.fill('#tOrd', '7'); }
+      if (i === 7) { ok((await p.textContent('#tIdErr')).includes('Duplicate chase order 7'), w + ' duplicate order flagged');
+        await p.fill('#tQ', '60'); ok((await p.textContent('#tIdErr')).includes('-50..50'), w + ' q range flagged'); await p.fill('#tQ', String(await p.evaluate(() => 0)));
+        const free = await p.evaluate(() => { const s = HexApp.state(); for (let q = -6; q < 6; q++) for (let r = -6; r < 6; r++) if (!s.tiles.some(t => t.q === q && t.r === r)) return [q, r]; });
+        await p.fill('#tQ', String(free[0])); await p.fill('#tR', String(free[1]));
+        await p.fill('#tDeg', '400'); ok((await p.textContent('#tIdErr')).includes('0-359'), w + ' rotation range flagged'); await p.fill('#tDeg', '0');  await p.fill('#tOrd', '1'); }
       if (i === 2) { await p.fill('#tLed', '999'); ok(await p.evaluate(() => HexApp.state().tiles[2].ledCount) === 300, w + ' ledCount clamped to 300');
         await p.click('#tLedDef'); ok(await p.evaluate(() => HexApp.state().tiles[2].ledCount) === '' && (await p.inputValue('#tLed')) === '', w + ' use default clears override'); }
     }
@@ -40,7 +50,7 @@ const OUT = __dirname + '/screenshots/'; const URL = 'http://localhost:8411/web/
     // export
     await p.click('#tabFile'); const [dl] = await Promise.all([p.waitForEvent('download'), p.click('#exp')]);
     const file = OUT + '../layout-export-' + w + '.json'; await dl.saveAs(file); const exp = fs.readFileSync(file, 'utf8'); const o = JSON.parse(exp);
-    ok(o.version === 1 && o.tiles.length === 20 && o.master === 'hex-01' && o.led.pin === 'GPIO5' && o.led.order === 'RGB' && o.tiles[0].ledCount === 42 && o.tiles[0].mac, w + ' export content');
+    ok(o.version === 1 && o.tiles.length === 20 && o.master === 'hex-01' && o.led.pin === 'GPIO5' && o.led.order === 'RGB' && o.tiles[0].ledCount === 42 && o.tiles[0].mac && o.tiles[0].rot === 3 && !('rotationDeg' in o.tiles[0]) && o.tiles[1].rot === 2 && o.tiles[1].rotationDeg === 105 && o.tiles[1].order === 7 && !('order' in o.tiles[2]), w + ' export content (rot/rotationDeg/order)');
     ok(JSON.stringify(Object.keys(o)) === '["version","name","hex","led","master","tiles"]' && !('x' in o.tiles[0]) && !('ring' in o.tiles[0]), w + ' export has no derived fields');
     // reimport after clearing
     await p.evaluate(() => { localStorage.clear(); }); await p.reload();
@@ -57,18 +67,28 @@ const OUT = __dirname + '/screenshots/'; const URL = 'http://localhost:8411/web/
     // effects
     await p.click('#tabFx');
     const names = await p.$$eval('#fxSel option', os => os.map(o => o.value));
-    ok(names.join() === 'solid,breathe,rainbow_sweep,ripple,spiral,sparkle', w + ' effect list');
+    const EJ = JSON.parse(fs.readFileSync('/workspace/hex-lights/effects.json', 'utf8')).effects;
+    ok(names.join() === EJ.map(e => e.name).join() && ['chase', 'wipe', 'rainbow_flow'].every(n => names.includes(n)), w + ' effect list ' + names.join());
     ok((await p.textContent('#fxSrc')).includes('Back End effects.json + tools/effects.js'), w + ' using Back End effects (' + await p.textContent('#fxSrc') + ')');
-    const ctl = {}; for (const e of names) { await p.selectOption('#fxSel', e); ctl[e] = await p.$$eval('#fxParams [data-k]', xs => xs.map(x => x.dataset.k + ':' + (x.type || x.tagName)).join(',')); }
+    const ctl = {}; for (const e of names) { await p.selectOption('#fxSel', e); ctl[e] = await p.$$eval('#fxParams [data-k], #fxParams .sw', xs => xs.map(x => x.classList.contains('sw') ? 'palette:swatch' : x.dataset.k + ':' + (x.type || x.tagName)).join(',')); }
     console.log('controls', JSON.stringify(ctl));
-    ok(ctl.solid === 'color:color' && ctl.breathe === 'color:color,periodS:range' && ctl.rainbow_sweep === 'speed:range,axis:select-one' && ctl.ripple === 'color:color,speed:range,origin:select-one' && ctl.spiral === 'speed:range' && ctl.sparkle === 'color:color,density:range', w + ' controls built from effects.json');
+    const want = {}; for (const e of EJ) want[e.name] = Object.entries(e.params).map(([k, d]) => k + ':' + (k === 'palette' ? 'swatch' : d.type === 'color' ? 'color' : d.type === 'number' ? 'range' : 'select-one')).map(x => x === 'palette:swatch' ? x : x).join(',');
+    const order = o => o.split(',').sort().join(); const bad = names.filter(n => order(ctl[n]) !== order(want[n]));
+    ok(bad.length === 0, w + ' controls built from effects.json ' + bad.map(n => n + '=' + ctl[n] + ' want ' + want[n]).join(' '));
+    await p.selectOption('#fxSel', 'wipe'); ok((await p.$$eval('#fxParams select[data-k=axis] option', os => os.map(o => o.value))).join('|') === 'x|y|ring|angle', w + ' wipe axis x|y|ring|angle');
+    const sw = await p.$$eval('#fxParams .swb', b => b.map(x => [x.dataset.pal, x.style.background.includes('gradient'), x.getBoundingClientRect().height]));
+    ok(sw.length === 6 && sw.every(x => x[1] && x[2] >= 44), w + ' palette swatches (6, gradient, >=44px)');
+    await p.click('#fxParams .swb[data-pal=ocean]'); ok(await p.evaluate(() => HexApp.fx.params.palette) === 'ocean', w + ' palette picker sets param');
+    await p.click('#fxPlay'); await p.waitForTimeout(300);
+    const lm = await p.evaluate(() => [HexApp.fx.mode, document.querySelectorAll('.hx .led').length, HexApp.derived().reduce((a, t) => a + t.leds, 0)]);
+    ok(lm[0] === 'frameLeds' && lm[1] === lm[2] && lm[1] > 0, w + ' per-LED dots via frameLeds (' + lm.join(',') + ')'); await p.click('#fxStop');
     for (const e of names) { await p.selectOption('#fxSel', e); await p.click('#fxPlay'); await p.waitForTimeout(250);
       const c = await p.evaluate(() => HexApp.fx.colors); ok(c && Object.keys(c).length === 20 && Object.values(c).every(v => v.length === 3), w + ' effect ' + e + ' produced 20 colours'); if (e !== 'sparkle' && e !== 'ripple' && e !== 'breathe') ok(Object.values(c).some(v => v[0] + v[1] + v[2] > 0), w + ' effect ' + e + ' lit'); await p.click('#fxStop'); }
     await p.selectOption('#fxSel', 'rainbow_sweep'); await p.click('#fxPlay'); await p.waitForTimeout(600);
     await p.screenshot({ path: OUT + 'preview-rainbow-' + w + '.png' }); await p.click('#fxStop');
-    await p.selectOption('#fxSel', 'ripple'); const top = await p.evaluate(() => { let best = null; document.querySelectorAll('.hx').forEach(g => { const r = g.getBoundingClientRect(); if (r.top > 60 && (!best || r.top < best.t)) best = { t: r.top, i: +g.dataset.i, x: r.x + r.width / 2, y: r.y + r.height / 2 }; }); return best; });
+    await p.selectOption('#fxSel', 'ripple'); const top = await p.evaluate(() => { let best = null; document.querySelectorAll('.hx').forEach(g => { const r = g.getBoundingClientRect(); const sh = document.getElementById('sheet').getBoundingClientRect(); if (r.top > 60 && r.x + r.width / 2 > 80 && (getComputedStyle(document.getElementById('sheet')).position !== 'fixed' || r.right < sh.left) && (!best || r.top < best.t)) best = { t: r.top, i: +g.dataset.i, x: r.x + r.width / 2, y: r.y + r.height / 2 }; }); return best; });
     await p.mouse.click(top.x, top.y);
-    ok(await p.evaluate(() => HexApp.fx.params.origin) === 'hex-' + String(top.i + 1).padStart(2, '0'), w + ' tap sets ripple origin');
+    ok(await p.evaluate(() => HexApp.fx.params.origin) === 'hex-' + String(top.i + 1).padStart(2, '0'), w + ' tap sets ripple origin ' + JSON.stringify(top) + ' got ' + await p.evaluate(() => HexApp.fx.params.origin));
     await p.waitForTimeout(500); await p.screenshot({ path: OUT + 'preview-ripple-' + w + '.png' }); await p.click('#fxStop');
     // flat toggle
     await p.click('#tabLayout'); await p.selectOption('#lOri', 'flat'); await p.screenshot({ path: OUT + 'flat-' + w + '.png' });
@@ -95,9 +115,19 @@ const OUT = __dirname + '/screenshots/'; const URL = 'http://localhost:8411/web/
     await p.evaluate(t => { document.getElementById('json').value = t; }, JSON.stringify(imp)); await p.click('#loadTxt');
     const dd = await p.evaluate(() => [HexApp.state().led.count, HexApp.derived().map(t => t.leds)]);
     ok(dd[0] === 60 && dd[1][1] === 12 && dd[1][0] === 60, 'import keeps led.count (60) and per-tile override; leds passed to frame');
-    let seen = null; await p.evaluate(() => { const F = HexApp.FX(); const orig = F.frame; F.frame = function (e, pr, tiles, t) { window.__seen = tiles.map(x => x.leds); return orig(e, pr, tiles, t); }; });
+    let seen = null; await p.evaluate(() => { const F = HexApp.FX(); const k = F.frameLeds ? 'frameLeds' : 'frame', orig = F[k]; F[k] = function (e, pr, tiles, t) { window.__seen = tiles.map(x => x.leds); return orig(e, pr, tiles, t); }; });
     await p.click('#tabFx'); await p.click('#fxPlay'); await p.waitForTimeout(200); seen = await p.evaluate(() => window.__seen); await p.click('#fxStop');
     ok(seen && seen[1] === 12 && seen[0] === 60, 'frame() receives effective leds');
+    // hardware push vs esphome/layout_bulk.txt
+    await p.click('#tabHw'); await p.waitForTimeout(300);
+    const exp = fs.readFileSync('/workspace/hex-lights/esphome/layout_bulk.txt', 'utf8').trim();
+    await p.evaluate(t => { document.getElementById('json').value = t; }, fs.readFileSync('/workspace/hex-lights/layout.json', 'utf8')); await p.click('#tabFile'); await p.click('#loadTxt'); await p.click('#tabHw');
+    const bulk = await p.inputValue('#hwBulk'); ok(bulk === exp, 'bulk string == esphome/layout_bulk.txt (' + bulk.length + ' chars)');
+    const yaml = await p.inputValue('#hwYaml'); ok(yaml.includes('action: esphome.hex_c0_set_layout_bulk') && yaml.includes('action: esphome.hex_c0_set_tile_layout\ndata: {tile_id: 20, q: 3, r: -1, rotation: 0, order: 19}') && !(await p.isDisabled('#hwCopy')), 'YAML snippets + copy enabled');
+    await p.click('#hwCopy'); ok((await p.textContent('#hwMsg')).includes('copied'), 'copy bulk');
+    await p.evaluate(() => { const s = HexApp.state(); s.tiles.push({ id: 'ghost', name: '', mac: '', q: 9, r: 9, rot: 0, ledCount: '', order: null, rotDeg: null }); }); await p.click('#tabHw'); await p.click('#tabHw');
+    ok((await p.textContent('#hwErr')).includes('ghost is not in tiles.csv') && await p.isDisabled('#hwCopy') && (await p.inputValue('#hwBulk')) === '', 'unknown tile flagged, push blocked');
+    await p.screenshot({ path: OUT + 'hw-push-1280-blocked.png' });
     // flat orientation sanity vs Back End formula
     const fl = await p.evaluate(() => { HexApp.state().hex.orientation = 'flat'; return HexApp.derived(); });
     console.log('flat sample', JSON.stringify(fl.slice(0, 3).map(t => [t.id, +t.x.toFixed(4), +t.y.toFixed(4), +t.angle.toFixed(2)])));

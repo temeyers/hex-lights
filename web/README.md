@@ -32,3 +32,29 @@ reference layout): unit-hex pixel math (pointy x=√3(q+r/2), y=1.5r; flat x=1.5
 (single row/column = 0.5); `ring` = hex distance from master; `angle` = degrees 0-360 from master, 0 = right, clockwise on
 screen (y down), master 0; `index`; `isMaster`; `leds`. Back End's `tools/effects.js` is an ES module and is loaded with dynamic
 `import()`; colour params are `[r,g,b]` arrays. Brightness and preview speed are applied by the page, not by frame().
+
+## Hardware runtime layout (DESIGN.md "Runtime layout")
+Per tile in the Tile panel: **Grid q / r** (−50..50; this *is* the axial position), **Rotation (°)** 0–359,
+**Chase order** 0–254 (default = tile index). Ranges, duplicate (q,r) and duplicate effective chase orders are flagged.
+
+**Rotation mapping (layout.json stays compatible):** `rot` (0–5) is unchanged and always written as
+the nearest 60° step (`rot = round(deg/60) mod 6`). Degrees = `rot × 60` unless the tile has the optional
+`rotationDeg` (0–359), which is written only when the degrees are not exactly `rot × 60`. `order` is written
+only when set explicitly. Both are extra tile keys that `gen_tiles.py` passes through without complaint.
+Note: `gen_tiles.py` currently feeds `rot` (0–5) straight into the firmware's degree substitution `rotation`;
+it should send `rotationDeg` if present, else `rot*60`. Harmless today because every default tile has rot 0.
+
+## Hardware push panel (generate only — nothing is sent)
+Builds `tile_id:q:r:rotation:order;…` where `tile_id` = 1-based row in `../esphome/tiles.csv`, matched by tile id,
+then by MAC (a `mac` column if tiles.csv has one, or a MAC-style id). Unknown tiles, out-of-range values or
+duplicate orders block the string and the Copy buttons, because a single bad entry makes the tile reject it all.
+YAML snippets for `esphome.hex_<master>_set_layout_bulk` and per-tile `..._set_tile_layout` (node name from the
+master id, `hex_c0` for the default layout). If tiles.csv can't be fetched, paste it into the panel.
+For Back End's default layout, the output equals `esphome/layout_bulk.txt`.
+
+## Effects (wall effects, 5dd5427)
+Controls are built from effects.json: colour → colour picker, number → slider, enum → menu (wipe's axis x|y|ring|angle),
+`palette` → swatch picker with gradients sampled from Back End's `pal()`, tileId → tile menu. The preview uses `frameLeds()`
+when exported and draws each tile's `leds` as dots around the edge, offset by its rotation. Otherwise it falls back to `frame()`.
+Tiles passed in also carry `order` and `rotation` (degrees). The local `effects.js` fallback mirrors chase, wipe,
+rainbow_flow and the palettes.

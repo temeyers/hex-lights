@@ -9,7 +9,7 @@
   function pin(v) { if (typeof v === 'number' || /^\d+$/.test(str(v))) return 'GPIO' + parseInt(v, 10); return str(v).toUpperCase(); }
   function extras(src, known) { var o = {}; for (var k in src) if (src.hasOwnProperty(k) && known.indexOf(k) < 0) o[k] = src[k]; return o; }
   function merge(o, x) { for (var k in x) if (x.hasOwnProperty(k) && !(k in o)) o[k] = x[k]; return o; }
-  var TOP = ['version', 'name', 'hex', 'led', 'master', 'tiles'], LEDK = ['pin', 'type', 'order', 'count'], TK = ['id', 'name', 'mac', 'q', 'r', 'rot', 'ledCount'],
+  var TOP = ['version', 'name', 'hex', 'led', 'master', 'tiles'], LEDK = ['pin', 'type', 'order', 'count'], TK = ['id', 'name', 'mac', 'q', 'r', 'rot', 'ledCount', 'rotationDeg', 'order'],
     DERIVED = ['s', 'ring', 'x', 'y', 'angle', 'index', 'isMaster', 'leds', 'neighbors'];
   function int(v, d) { v = parseInt(v, 10); return isNaN(v) ? d : v; }
   function str(v) { return v == null ? '' : String(v).trim(); }
@@ -24,6 +24,8 @@
       if (str(t.mac)) x.mac = str(t.mac);
       x.q = t.q; x.r = t.r; x.rot = ((int(t.rot, 0) % 6) + 6) % 6;
       if (t.ledCount !== '' && t.ledCount != null && !isNaN(parseInt(t.ledCount, 10))) x.ledCount = int(t.ledCount, 0);
+      if (t.rotDeg != null && t.rotDeg !== '' && int(t.rotDeg, 0) !== x.rot * 60) x.rotationDeg = int(t.rotDeg, 0);
+      if (t.order != null && t.order !== '') x.order = int(t.order, 0);
       o.tiles.push(merge(x, t._x || {}));
     }
     return merge(o, s._x || {});
@@ -43,14 +45,19 @@
     for (var i = 0; i < ts.length; i++) {
       var t = ts[i];
       s.tiles.push({ id: str(t.id), name: str(t.name), mac: str(t.mac), q: int(t.q, 0), r: int(t.r, 0),
-        rot: ((int(t.rot, 0) % 6) + 6) % 6, ledCount: t.ledCount == null ? '' : int(t.ledCount, ''), _x: extras(t, TK.concat(DERIVED)) });
+        rot: ((int(t.rot, 0) % 6) + 6) % 6, ledCount: t.ledCount == null ? '' : int(t.ledCount, ''), rotDeg: t.rotationDeg == null ? null : int(t.rotationDeg, null), order: t.order == null ? null : int(t.order, null), _x: extras(t, TK.concat(DERIVED)) });
     }
     return { layout: s, errors: validate(s) };
   }
+  /* Hardware runtime layout. rotationDeg (0-359) is optional; absent => rot*60. rot (0-5) stays the canonical
+     coarse value and is always written as the nearest 60° step, so tools that only know rot still work. */
+  function rotDeg(t) { return t.rotDeg != null && t.rotDeg !== '' ? int(t.rotDeg, 0) : (int(t.rot, 0) % 6) * 60; }
+  function order(t, i) { return t.order != null && t.order !== '' ? int(t.order, 0) : i; }
+  function rotFromDeg(d) { return Math.round((((d % 360) + 360) % 360) / 60) % 6; }
   var SLUG = /^[a-z0-9][a-z0-9_-]*$/, MAC = /^([0-9a-f]{2}[:-]){5}[0-9a-f]{2}$/i;
   /* errors: [{tile:index|null, field, msg}] */
   function validate(s) {
-    var e = [], ids = {}, pos = {}, i, t;
+    var e = [], ids = {}, pos = {}, ords = {}, i, t;
     for (i = 0; i < s.tiles.length; i++) {
       t = s.tiles[i];
       if (!t.id) e.push({ tile: i, field: 'id', msg: 'Missing ID' });
@@ -60,6 +67,11 @@
         else ids[t.id] = i;
       }
       if (t.ledCount !== '' && t.ledCount != null && !(t.ledCount >= 1 && t.ledCount <= 300)) e.push({ tile: i, field: 'ledCount', msg: 'LED count must be 1-300' });
+      if (!(t.q >= -50 && t.q <= 50 && t.r >= -50 && t.r <= 50)) e.push({ tile: i, field: 'pos', msg: 'Grid q/r must be -50..50' });
+      var dg = rotDeg(t); if (!(dg >= 0 && dg <= 359) || dg % 1) e.push({ tile: i, field: 'rotDeg', msg: 'Rotation must be 0-359°' });
+      var od = order(t, i); if (!(od >= 0 && od <= 254) || od % 1) e.push({ tile: i, field: 'order', msg: 'Chase order must be 0-254' });
+      else if (ords[od] != null) { e.push({ tile: i, field: 'order', msg: 'Duplicate chase order ' + od }); if (!ords['d' + od]) e.push({ tile: ords[od], field: 'order', msg: 'Duplicate chase order ' + od }); ords['d' + od] = 1; }
+      else ords[od] = i;
       if (t.mac && !MAC.test(t.mac)) e.push({ tile: i, field: 'mac', msg: 'MAC looks wrong' });
       var k = t.q + ',' + t.r;
       if (pos[k] != null) e.push({ tile: i, field: 'pos', msg: 'Two tiles at ' + k });
@@ -72,5 +84,5 @@
     if (ORDERS.indexOf(s.led.order) < 0) e.push({ tile: null, field: 'led', msg: 'Unknown colour order' });
     return e;
   }
-  g.LayoutFormat = { defaults: defaults, toObject: toObject, serialize: serialize, parse: parse, validate: validate, TYPES: TYPES, ORDERS: ORDERS };
+  g.LayoutFormat = { defaults: defaults, toObject: toObject, serialize: serialize, parse: parse, validate: validate, rotDeg: rotDeg, order: order, rotFromDeg: rotFromDeg, TYPES: TYPES, ORDERS: ORDERS };
 })(this);
