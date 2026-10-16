@@ -5,6 +5,7 @@ substitutions:
   q: "-1"
   r: "0"
   rotation: "0"
+  wall_controls_internal: "true"
 
 packages:
   tile: !include ../templates/tile-common.yaml

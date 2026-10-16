@@ -7,8 +7,11 @@
 
 substitutions:
   rotation: "0"
+  order: "-1"               # chase index; -1 = tile_num - 1
   led_pin: GPIO4            # S3 Super Mini: avoid 0/3/45/46 (strapping), 19/20 (USB), 48 (onboard RGB LED)
-  num_leds: "44"
+  num_leds: "60"            # pixels allocated (layout.json led.maxCount)
+  led_count: "44"           # pixels rendered by default; runtime number "LED count"
+  wall_controls_internal: "true"   # generator sets "false" on the master tile
   leader_priority: ${tile_num}
   static_leader: "0"        # 0 = automatic failover; set to a tile_num to pin the leader
   max_scale: "0.55"         # hard per-channel ceiling: 44 x 60 mA x 0.55 ~= 1.45 A per tile (ESTIMATE)
@@ -53,6 +56,41 @@ api:
         - light.turn_on:
             id: tile_leds
             effect: HexSync
+    # Layout editor: call on the master tile (hex-c0). Entries for other tiles
+    # go out as an ESP-NOW HX_LAYOUT broadcast; each tile applies its own and saves it.
+    # v2 wall effect (Back End interface): call on the master -> esphome.hex_c0_set_wall_fx
+    - action: set_wall_fx
+      variables:
+        effect: int          # 0..10, see DESIGN.md
+        palette: int         # 0 rainbow 1 ocean 2 sunset 3 forest 4 fire 5 mono
+        speed: int           # milli-cycles/s
+        scale: int           # x100
+        hue: int             # 0-255
+        saturation: int      # 0-255
+        value: int           # 0-255
+        start_delay_ms: int  # leader start_ms = clock + delay
+      then:
+        - lambda: 'id(hex_sync).set_wall_fx(effect, palette, speed, scale, hue, saturation, value, start_delay_ms);'
+        - light.turn_on:
+            id: tile_leds
+            effect: HexSync
+    - action: set_tile_layout
+      variables:
+        tile_id: int       # tile_num 1..N (row order of tiles.csv)
+        q: int
+        r: int
+        rotation: int      # degrees
+        order: int         # chase index 0..254
+      then:
+        - lambda: 'id(hex_sync).send_tile_layout(tile_id, q, r, rotation, order);'
+    - action: set_layout_bulk
+      variables:
+        layout: string     # "id:q:r:rot:order;id:q:r:rot:order;..."
+      then:
+        - lambda: |-
+            int n = id(hex_sync).send_layout_bulk(layout);
+            if (n < 0) ESP_LOGW("hexsync", "set_layout_bulk: parse error");
+            else ESP_LOGI("hexsync", "set_layout_bulk: sent %d entries", n);
 
 ota:
   - platform: esphome
@@ -73,6 +111,8 @@ hexsync:
   q: ${q}
   r: ${r}
   rotation: ${rotation}
+  order: ${order}
+  led_count: ${led_count}
   leader_priority: ${leader_priority}
   static_leader: ${static_leader}
   tile_budget_ma: ${tile_budget_ma}
@@ -117,9 +157,135 @@ sensor:
     accuracy_decimals: 0
     update_interval: 10s
     lambda: 'return id(hex_sync).leader_id();'
+  - platform: template
+    name: Layout generation
+    entity_category: diagnostic
+    accuracy_decimals: 0
+    update_interval: 5s
+    lambda: 'return id(hex_sync).layout_gen();'
+  - platform: template
+    name: Peers seen
+    entity_category: diagnostic
+    accuracy_decimals: 0
+    update_interval: 10s
+    lambda: 'return id(hex_sync).peer_count();'
   - platform: wifi_signal
     name: Wi-Fi signal
     update_interval: 60s
+
+# Runtime layout. Values persist in flash inside hexsync (template numbers can't
+# use restore_value together with a lambda), so the effect is the same:
+# compile-time substitutions are first-boot defaults, later changes survive reboot.
+number:
+  - platform: template
+    name: LED count
+    id: led_count_number
+    entity_category: config
+    min_value: 1
+    max_value: ${num_leds}
+    step: 1
+    update_interval: 2s
+    lambda: 'return id(hex_sync).led_count();'
+    set_action:
+      - lambda: 'id(hex_sync).set_led_count((int) x);'
+  # Shared wall controls; visible in HA only on the master (internal elsewhere).
+  - platform: template
+    name: Wall speed
+    internal: ${wall_controls_internal}
+    unit_of_measurement: "mc/s"
+    min_value: 0
+    max_value: 10000
+    step: 10
+    update_interval: 2s
+    lambda: 'return id(hex_sync).wall_speed();'
+    set_action:
+      - lambda: 'id(hex_sync).set_wall_speed((int) x);'
+  - platform: template
+    name: Grid q
+    entity_category: config
+    min_value: -50
+    max_value: 50
+    step: 1
+    update_interval: 2s
+    lambda: 'return id(hex_sync).q();'
+    set_action:
+      - lambda: 'id(hex_sync).set_q((int) x);'
+  - platform: template
+    name: Grid r
+    entity_category: config
+    min_value: -50
+    max_value: 50
+    step: 1
+    update_interval: 2s
+    lambda: 'return id(hex_sync).r();'
+    set_action:
+      - lambda: 'id(hex_sync).set_r((int) x);'
+  - platform: template
+    name: Rotation
+    entity_category: config
+    unit_of_measurement: "°"
+    min_value: 0
+    max_value: 359
+    step: 1
+    update_interval: 2s
+    lambda: 'return id(hex_sync).rotation();'
+    set_action:
+      - lambda: 'id(hex_sync).set_rotation((int) x);'
+  - platform: template
+    name: Chase order
+    entity_category: config
+    min_value: 0
+    max_value: 254
+    step: 1
+    update_interval: 2s
+    lambda: 'return id(hex_sync).order();'
+    set_action:
+      - lambda: 'id(hex_sync).set_order((int) x);'
+
+select:
+  - platform: template
+    name: Wall effect
+    internal: ${wall_controls_internal}
+    options: [solid, radial_wave, rainbow_sweep, pulse, chase, wipe, rainbow_flow, random_ripple, twinkle, color_cycle, snake]
+    update_interval: 2s
+    lambda: 'return std::string(hexsync::HexSync::effect_name(id(hex_sync).wall_effect()));'
+    set_action:
+      - lambda: 'id(hex_sync).set_wall_effect_id(hexsync::HexSync::effect_id(x));'
+      - light.turn_on:
+          id: tile_leds
+          effect: HexSync
+  - platform: template
+    name: Wall palette
+    internal: ${wall_controls_internal}
+    options: [rainbow, ocean, sunset, forest, fire, mono]
+    update_interval: 2s
+    lambda: 'return std::string(hexsync::HexSync::palette_name(id(hex_sync).wall_palette()));'
+    set_action:
+      - lambda: 'id(hex_sync).set_wall_palette(hexsync::HexSync::palette_id(x));'
+  - platform: template
+    name: Wall wipe axis
+    internal: ${wall_controls_internal}
+    options: [x, y, ring, angle]
+    update_interval: 2s
+    lambda: |-
+      static const char *const ax[4] = {"x", "y", "ring", "angle"};
+      return std::string(ax[id(hex_sync).wall_axis() & 3]);
+    set_action:
+      - lambda: |-
+          int v = x == "y" ? 1 : x == "ring" ? 2 : x == "angle" ? 3 : 0;
+          id(hex_sync).set_wall_axis(v);
+
+text_sensor:
+  - platform: template
+    name: Layout
+    entity_category: diagnostic
+    update_interval: 5s
+    lambda: 'return id(hex_sync).layout_string();'
+  - platform: template
+    name: Neighbors
+    entity_category: diagnostic
+    update_interval: 5s
+    lambda: 'return id(hex_sync).neighbor_list();'
 
 binary_sensor:
   - platform: template

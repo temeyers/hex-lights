@@ -28,9 +28,14 @@ substitutions:
   q: "{q}"
   r: "{r}"
   rotation: "{rot}"
+  wall_controls_internal: "{'false' if n == 1 else 'true'}"
 
 packages:
   tile: !include ../templates/tile-common.yaml
 """
     )
-print(f"wrote {len(rows)} tiles to {out}")
+bulk = ";".join(
+    f"{n}:{int(r['q'])}:{int(r['r'])}:{int(r.get('rot') or 0)}:{n - 1}" for n, r in enumerate(rows, 1)
+)
+(here / "layout_bulk.txt").write_text(bulk + "\n")
+print(f"wrote {len(rows)} tiles to {out}; set_layout_bulk string in layout_bulk.txt ({len(bulk)} chars)")

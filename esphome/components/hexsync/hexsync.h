@@ -1,5 +1,8 @@
 #pragma once
 #include "esphome/core/component.h"
+#include "esphome/core/preferences.h"
+#include <string>
+#include <vector>
 #include "esphome/components/light/addressable_light.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
@@ -8,13 +11,22 @@
 namespace esphome {
 namespace hexsync {
 
-// ---- Wire format (little-endian, packed, 28 bytes) ----
+// ---- Wire format v2 (little-endian, packed). HxPacket = 36 bytes ----
 // Every packet is a full state snapshot, so a lost packet costs nothing:
 // the next beacon (default every 100 ms) repairs it.
 static const uint16_t HX_MAGIC = 0x5848;  // "HX"
-static const uint8_t HX_VERSION = 1;
-enum HxType : uint8_t { HX_BEACON = 1, HX_SET = 2 };
-enum HxEffect : uint8_t { FX_SOLID = 0, FX_RADIAL_WAVE = 1, FX_RAINBOW_SWEEP = 2, FX_PULSE = 3 };
+static const uint8_t HX_VERSION = 2;  // v1 packets are ignored (logged)
+enum HxType : uint8_t { HX_BEACON = 1, HX_SET = 2, HX_LAYOUT = 3, HX_STATUS = 4 };
+static const int HX_MAX_LEN = 250;  // ESP-NOW v1 payload limit
+// Ids 0-6 match Back End effects.json / tools/gen_ha.py WALL_FX.
+enum HxEffect : uint8_t {
+  FX_SOLID = 0, FX_RADIAL_WAVE = 1, FX_RAINBOW_SWEEP = 2, FX_PULSE = 3, FX_CHASE = 4,
+  FX_WIPE = 5, FX_RAINBOW_FLOW = 6, FX_RIPPLE = 7, FX_TWINKLE = 8, FX_COLOR_CYCLE = 9, FX_SNAKE = 10,
+  FX_COUNT = 11
+};
+enum HxPalette : uint8_t { PAL_RAINBOW = 0, PAL_OCEAN = 1, PAL_SUNSET = 2, PAL_FOREST = 3, PAL_FIRE = 4, PAL_MONO = 5, PAL_COUNT = 6 };
+enum HxAxis : uint8_t { AX_X = 0, AX_Y = 1, AX_RING = 2, AX_ANGLE = 3 };
+static const int HX_MAX_LEDS = 60;
 
 struct __attribute__((packed)) HxPacket {
   uint16_t magic;
@@ -32,20 +44,120 @@ struct __attribute__((packed)) HxPacket {
   uint16_t speed;      // effect-specific, ~"milli-cycles per second"
   uint16_t scale;      // spatial scale x100 (tiles per cycle)
   uint8_t channel;     // sender's Wi-Fi channel (diagnostic / mismatch check)
-  uint8_t reserved[3];
+  uint8_t palette;     // v2: HxPalette
+  uint8_t axis;        // v2: wipe axis HxAxis
+  uint8_t flags;       // v2: reserved, 0
+  uint32_t start_ms;   // v2: effect phase origin on the shared clock; t = clock - start_ms
+  uint32_t seed;       // v2: leader random seed (ripple origin, twinkle)
 };
-static_assert(sizeof(HxPacket) == 28, "HxPacket size");
+static_assert(sizeof(HxPacket) == 36, "HxPacket size");
+
+// Layout entry, 6 bytes. rotation in degrees 0..359, order = chase index 0..254.
+struct __attribute__((packed)) HxLayoutEntry {
+  uint8_t tile_id;
+  int8_t q;
+  int8_t r;
+  uint16_t rotation;
+  uint8_t order;
+};
+// HX_LAYOUT: 12-byte header + count*6 bytes (count <= 39 -> 246 bytes).
+struct __attribute__((packed)) HxLayoutPacket {
+  uint16_t magic;
+  uint8_t version;
+  uint8_t type;      // HX_LAYOUT
+  uint8_t sender;
+  uint8_t count;
+  uint16_t seq;
+  uint32_t gen;      // layout generation (sender effect clock ms)
+  HxLayoutEntry e[39];
+};
+static const int HX_LAYOUT_HDR = 12;
+static const int HX_LAYOUT_MAX = 39;
+// HX_STATUS: every tile, every 2 s and right after a layout change (= the ack).
+struct __attribute__((packed)) HxStatusPacket {
+  uint16_t magic;
+  uint8_t version;
+  uint8_t type;      // HX_STATUS
+  uint8_t sender;    // tile_id
+  int8_t q;
+  int8_t r;
+  uint8_t order;
+  uint16_t rotation;
+  uint16_t seq;
+  uint32_t layout_gen;  // gen of the last layout applied (0 = compile/number defaults)
+  uint8_t leader;
+  uint8_t neighbors;    // live neighbor count
+  uint8_t reserved[2];  // v2: [0] = LED count
+};
+static_assert(sizeof(HxStatusPacket) == 20, "status size");
+
+struct HxLayout {
+  int8_t q, r;
+  uint16_t rotation;
+  uint8_t order;
+  uint32_t gen;
+  uint8_t led_count;
+};
+
+struct HxPeer {
+  uint8_t id;
+  int8_t q, r;
+  uint16_t rotation;
+  uint8_t order;
+  uint32_t layout_gen;
+  uint32_t last_seen;
+};
 
 struct HxParams {
   uint32_t gen{0};
   uint8_t effect{FX_RADIAL_WAVE};
   uint8_t hue{160}, sat{255}, value{180};
   uint16_t speed{500}, scale{300};
+  uint8_t palette{PAL_RAINBOW}, axis{AX_X};
+  uint32_t start_ms{0};
 };
 
 class HexSync : public Component {
  public:
-  void set_tile(int id, int q, int r, int rot) { tile_id_ = id; q_ = q; r_ = r; rot_deg_ = rot; }
+  void set_tile(int id, int q, int r, int rot, int order) {
+    tile_id_ = id; q_ = q; r_ = r; rot_deg_ = rot; order_ = order;
+  }
+  // Runtime layout (HA number entities / layout packets). Saved to flash.
+  void set_q(int v) { q_ = v; layout_changed_(0); }
+  void set_r(int v) { r_ = v; layout_changed_(0); }
+  void set_rotation(int v) { rot_deg_ = ((v % 360) + 360) % 360; layout_changed_(0); }
+  void set_order(int v) { order_ = v; layout_changed_(0); }
+  void set_led_count(int v) { led_count_ = v < 1 ? 1 : (v > HX_MAX_LEDS ? HX_MAX_LEDS : v); layout_changed_(0); }
+  void set_default_led_count(int v) { led_count_ = v; }
+  int led_count() const { return led_count_; }
+  // v2 wall effect. start_delay_ms > 0 lets every tile receive it before it starts.
+  void set_wall_fx(int effect, int palette, int speed, int scale, int hue, int sat, int value, int start_delay_ms);
+  // Change one shared control, keep the rest (Wall speed / palette / effect / axis entities).
+  void set_wall_speed(int v);
+  void set_wall_palette(int v);
+  void set_wall_effect_id(int v);
+  void set_wall_axis(int v);
+  int wall_effect() const { return params_.effect; }
+  int wall_palette() const { return params_.palette; }
+  int wall_speed() const { return params_.speed; }
+  int wall_axis() const { return params_.axis; }
+  static const char *effect_name(int id);
+  static int effect_id(const std::string &name);
+  static const char *palette_name(int id);
+  static int palette_id(const std::string &name);
+  int q() const { return q_; }
+  int r() const { return r_; }
+  int rotation() const { return rot_deg_; }
+  int order() const { return order_; }
+  uint32_t layout_gen() const { return layout_gen_; }
+  // Broadcast layout entries. Entries for this tile are applied locally too.
+  void send_tile_layout(int tile_id, int q, int r, int rotation, int order);
+  // "id:q:r:rot:order;id:q:r:rot:order;..." Returns entries parsed, -1 on error.
+  int send_layout_bulk(const std::string &s);
+  int neighbor_count() const;
+  std::string neighbor_list() const;  // "2,3,7"
+  std::string layout_string() const;  // this tile, same format as bulk entry
+  int peer_count() const { return peers_.size(); }
   void set_priority(int p) { priority_ = p; }
   void set_static_leader(int id) { static_leader_ = id; }
   void set_budget(int ma, float ma_led, float max_scale) { budget_ma_ = ma; ma_led_ = ma_led; max_scale_ = max_scale; }
@@ -60,6 +172,9 @@ class HexSync : public Component {
   void set_effect(int effect, int hue, int sat, int value, int speed, int scale);
   // Called from an addressable_lambda effect every frame.
   void render(light::AddressableLight &it);
+  // Pure tile/LED colour, exposed so it can be unit-tested against tools/effects-ref.js.
+  Color pixel_(int led, int n, float t_s, int index, int count, float xn, float yn, int ring, int max_ring,
+               float angle, int origin_d, int max_d, int head_d);
 
   bool is_leader() const { return leader_id_ == tile_id_; }
   int leader_id() const { return leader_id_; }
@@ -73,9 +188,28 @@ class HexSync : public Component {
   static void on_recv_(const uint8_t *mac, const uint8_t *data, int len);
 
  protected:
+  void layout_changed_(uint32_t gen);
+  void apply_layout_(const HxLayoutEntry &e, uint32_t gen);
+  void send_layout_(const std::vector<HxLayoutEntry> &v);
+  void send_status_();
+  void handle_layout_(const HxLayoutPacket &p, int len);
+  void handle_status_(const HxStatusPacket &p);
+  HxPeer *peer_(uint8_t id);
+  ESPPreferenceObject pref_;
+  int order_{0};
+  int led_count_{44};
+  uint32_t seed_{0};
+  uint32_t last_v1_log_{0};
+  uint32_t layout_gen_{0};
+  bool save_pending_{false};
+  uint32_t save_at_{0};
+  bool status_pending_{false};
+  uint32_t last_status_{0};
+  std::vector<HxPeer> peers_;
   bool init_espnow_();
   void send_(uint8_t type);
   void handle_(const HxPacket &p, uint32_t rx_local_ms);
+  void dispatch_(const uint8_t *buf, int len, uint32_t t);
   bool i_should_lead_() const;
 
   static QueueHandle_t queue_;

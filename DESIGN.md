@@ -41,7 +41,10 @@ ESP-NOW) was rejected: ~158 kB/s of broadcast on a shared channel is fragile.
 | Sync component | `esphome/components/hexsync/{__init__.py,hexsync.h,hexsync.cpp}` |
 | Secrets template | `esphome/templates/secrets.yaml.example` (real `secrets.yaml` is gitignored) |
 
-### Packet format (`HxPacket`, 28 bytes, little-endian, packed)
+### Packet format v2 (`HxPacket`, 36 bytes, little-endian, packed)
+`HX_VERSION = 2`. Packets with any other version (incl. v1) are ignored with a
+rate-limited log line (`ignoring hexsync v1 packet`). All tiles must run v2 firmware.
+
 | off | field | notes |
 |---|---|---|
 | 0 | `magic` u16 `0x5848` "HX" | |
@@ -56,7 +59,11 @@ ESP-NOW) was rejected: ~158 kB/s of broadcast on a shared channel is fragile.
 | 20 | `speed` u16 | milli-cycles/s |
 | 22 | `scale` u16 | tiles per cycle ×100 |
 | 24 | `channel` u8 | sender Wi-Fi channel (mismatch warning) |
-| 25 | reserved ×3 | |
+| 25 | `palette` u8 | v2: 0 rainbow 1 ocean 2 sunset 3 forest 4 fire 5 mono |
+| 26 | `axis` u8 | v2: wipe/sweep axis 0 x 1 y 2 ring 3 angle |
+| 27 | `flags` u8 | v2: 0 |
+| 28 | `start_ms` u32 | v2: phase origin on the shared clock; `t = clock_ms − start_ms` (held at 0 until reached) |
+| 32 | `seed` u32 | v2: leader's random seed (random_ripple origin, twinkle); followers adopt the leader's |
 
 Every packet carries the full parameter set, so tiles that boot late catch up
 within one beacon.
@@ -88,12 +95,104 @@ tiles join different APs on different channels **will break sync** — pin the
 tiles to one AP/BSSID or use a single channel across APs. `power_save_mode: none`
 is set because modem sleep drops broadcasts.
 
-### Spatial effects (in `hexsync.cpp`)
+### Runtime layout (no reflash) – interface for Back End / Front End
+q, r, rotation and chase order are **live values** inside hexsync, saved to flash
+(NVS, debounced 1 s). The compile-time substitutions (`q`, `r`, `rotation`,
+`order`, default order = tile_num − 1) are only first-boot defaults.
+
+**Tile identity:** `tile_id` = `tile_num` = 1-based row in `esphome/tiles.csv`
+(c0 = 1, r1-e = 2 … r3-a = 20). It's fixed at compile time; position is not.
+
+**HA entities per tile** (node `hex-<id>`, e.g. `hex-c0`):
+- `number.hex_<id>_grid_q`, `number.hex_<id>_grid_r` (−50..50),
+  `number.hex_<id>_rotation` (0..359 °), `number.hex_<id>_chase_order` (0..254), entity_category config.
+  Writing one changes and saves that tile only. They're template numbers polled
+  every 2 s; persistence is done in hexsync rather than `restore_value`
+  (ESPHome doesn't allow `restore_value` with a lambda) – same behaviour.
+- Ack/diagnostics: `sensor.hex_<id>_layout` text `"id:q:r:rot:order"`,
+  `sensor.hex_<id>_layout_generation`, `sensor.hex_<id>_neighbors` text `"2,7,19"`,
+  `sensor.hex_<id>_peers_seen`.
+
+**Services** (exposed on every tile; call them on the master `hex-c0`):
+```yaml
+action: esphome.hex_c0_set_tile_layout
+data: {tile_id: 5, q: -1, r: 0, rotation: 60, order: 4}
+
+action: esphome.hex_c0_set_layout_bulk
+data: {layout: "1:0:0:0:0;2:1:0:0:1;3:1:-1:0:2"}
+```
+Bulk grammar: `entry (";" entry)*`, `entry = tile_id ":" q ":" r ":" rotation ":" order`,
+decimal ints, whitespace and a trailing `;` allowed. Ranges: tile_id 1..250, q/r
+−50..50, order 0..254, rotation taken mod 360. Any bad entry rejects the whole
+string (nothing sent; logged warning). `tools/gen_tiles.py` writes the full
+default string to `esphome/layout_bulk.txt` (235 chars for 20 tiles).
+
+**HX_LAYOUT packet** (type 3): 12-byte header + `count` × 6-byte entries, max 39
+entries per packet (larger bulks are split). Sent 3× (broadcast has no retries).
+| off | field |
+|---|---|
+| 0 | magic u16 0x5848, 2 version u8 =1, 3 type u8 =3 |
+| 4 | sender u8, 5 count u8, 6 seq u16, 8 gen u32 (layout generation = sender effect clock ms) |
+| 12+6k | tile_id u8, q i8, r i8, rotation u16 (deg), order u8 |
+
+Each tile applies only the entry with its own tile_id, saves it, and sets
+`layout_gen = gen`. Re-sending identical values is harmless (idempotent).
+
+**HX_STATUS packet** (type 4, 20 bytes, every ~2 s + immediately after a layout
+change = the **ack**): magic u16, version u8, type u8 =4, sender u8, q i8, r i8,
+order u8, rotation u16, seq u16, layout_gen u32, leader u8, neighbors u8, led_count u8 (v2), reserved u8.
+Tiles use it to keep a live peer table (dropped after 10 s of silence).
+
+**How the editor confirms:** after pushing, read each tile's `Layout` text sensor
+(or `Layout generation`) via HA/API; it updates within ~5 s **[EST, sensor poll
+interval]**. If a tile still shows old values after ~10 s, resend its entry with
+`set_tile_layout` (ESP-NOW broadcast can drop packets). HA sees the ack through
+each tile's own API; tiles don't relay other tiles' status to HA.
+
+**Neighbors** are recomputed from live (q,r): a peer is a neighbor if its
+position is one of the 6 axial offsets (+1,0) (+1,−1) (0,−1) (−1,0) (−1,+1) (0,+1).
+There are no compile-time neighbor lists anywhere.
+
+### Wall effects v2 (matches Back End `effects.json` / `tools/gen_ha.py`)
+Service on the master: `esphome.hex_c0_set_wall_fx(effect, palette, speed, scale, hue, saturation, value, start_delay_ms)`
+(speed milli-cycles/s, scale ×100, hue/sat/value 0–255, start_delay_ms 0–10000 → `start_ms = clock + delay`).
+Legacy `esphome.hex_c0_set_wall_effect` still works (keeps palette, starts now).
+
+| id | name | notes |
+|---|---|---|
+| 0 | solid | hsv(hue,sat) × value |
+| 1 | radial_wave | = effects.json "ripple" from the master (q,r = 0,0) |
+| 2 | rainbow_sweep | palette over normalized x (or y) |
+| 3 | pulse | = effects.json "breathe" |
+| 4 | chase | tile-to-tile by chase order, tail = scale/100 tiles |
+| 5 | wipe | axis x / y / ring / angle (Wall wipe axis select) |
+| 6 | rainbow_flow | u = ((x+y)/2)·scale − t·speed |
+| 7 | random_ripple | ring from a random tile each period; origin = tiles sorted by id [hash01(seed,k)·N] |
+| 8 | twinkle | per-LED, deterministic from seed; density = scale/1000 |
+| 9 | color_cycle | each tile = pal(order/N + t·speed) |
+| 10 | snake | chase + the head's live neighbours glow at 25 % |
+
+All tiles compute from the **live** layout (self + peers heard in 10 s): N, x/y normalized to
+the live bounding box of tile centres, ring/angle from (0,0). Effects 0–7, 9, 10 are tile-level
+(every LED the same, as effects.json v1); twinkle is per-LED. Exact math: `esphome/tools/effects-ref.js`.
+Assumption **[verify with Back End]**: their `x,y` in out/layout.json are normalized centre
+coordinates of the same pointy-top layout; if not, previews differ slightly.
+
+**Shared controls on the master** (internal on other tiles): `number.hex_c0_wall_speed`,
+`select.hex_c0_wall_effect` (names above), `select.hex_c0_wall_palette`,
+`select.hex_c0_wall_wipe_axis`. They call the same `set_wall_fx` path.
+
+**LED count:** `number.hex_<id>_led_count` ("LED count", 1..60, default 44, saved in flash).
+The strip allocates 60 pixels; only the first N render, the rest stay black; the current
+budget counts only N.
+
+### Older per-LED notes
 Tile centre: `x = √3·(q + r/2)`, `y = 1.5·r` (tile units). The 44 LEDs are assumed
 evenly spaced around the tile edge at radius 0.45, offset by `rotation`.
 - `1` **Radial wave** – brightness `sin(2π(d/scale − t·speed))`, d = distance from centre.
 - `2` **Rainbow sweep** – hue follows `x/scale − t·speed`, sweeping left→right.
 - `3` **Pulse** – whole wall breathes in unison (sync test).
+- `4` **Chase** – one lit tile walks the wall in `order`, `speed` = tiles/s ×1000.
 - `0` **Solid**.
 
 ### HA integration
@@ -156,7 +255,7 @@ sync is the pragmatic choice and is the fallback if hexsync misbehaves on hardwa
 | Full white, uncapped (60 mA/LED **[EST, datasheet-typical]**) | 2.64 A | **52.8 A / 264 W** |
 | Hard firmware cap `color_correct 55%` | 1.45 A | 29 A |
 | hexsync effect budget (`tile_budget_ma 1200`) | ≤1.2 A | ≤24 A |
-| Typical radial wave / rainbow at value ~180 **[EST 15–30 % of full white]** | 0.4–0.8 A | 8–16 A |
+| Typical radial wave / rainbow (44 LEDs) at value ~180 **[EST 15–30 % of full white]** | 0.4–0.8 A | 8–16 A |
 | LED idle quiescent ~0.6–1 mA/LED **[EST]** | ~40 mA | ~0.9 A (even when "off") |
 | ESP32-S3, Wi-Fi on, no power save: ~100 mA avg, ~350 mA peaks **[EST]** | 0.1–0.35 A | 2–7 A peak |
 

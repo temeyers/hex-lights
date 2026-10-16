@@ -14,6 +14,8 @@ CONF_TILE_ID = "tile_id"
 CONF_Q = "q"
 CONF_R = "r"
 CONF_ROTATION = "rotation"
+CONF_ORDER = "order"
+CONF_LED_COUNT = "led_count"
 CONF_PRIORITY = "leader_priority"
 CONF_STATIC_LEADER = "static_leader"
 CONF_BUDGET = "tile_budget_ma"
@@ -30,6 +32,8 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Required(CONF_R): cv.int_range(min=-50, max=50),
         cv.Optional(CONF_ROTATION, default=0): cv.int_range(min=0, max=359),
         # Lower number wins leader election. Default = tile_id.
+        cv.Optional(CONF_ORDER, default=-1): cv.int_range(min=-1, max=254),
+        cv.Optional(CONF_LED_COUNT, default=44): cv.int_range(min=1, max=60),
         cv.Optional(CONF_PRIORITY): cv.int_range(min=1, max=250),
         # If set, only this tile_id may lead (no failover).
         cv.Optional(CONF_STATIC_LEADER, default=0): cv.int_range(min=0, max=250),
@@ -56,7 +60,9 @@ FINAL_VALIDATE_SCHEMA = _final
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
-    cg.add(var.set_tile(config[CONF_TILE_ID], config[CONF_Q], config[CONF_R], config[CONF_ROTATION]))
+    cg.add(var.set_tile(config[CONF_TILE_ID], config[CONF_Q], config[CONF_R], config[CONF_ROTATION],
+                          config[CONF_ORDER] if config[CONF_ORDER] >= 0 else config[CONF_TILE_ID] - 1))
+    cg.add(var.set_default_led_count(config[CONF_LED_COUNT]))
     cg.add(var.set_priority(config.get(CONF_PRIORITY, config[CONF_TILE_ID])))
     cg.add(var.set_static_leader(config[CONF_STATIC_LEADER]))
     cg.add(var.set_budget(config[CONF_BUDGET], config[CONF_MA_PER_LED], config[CONF_MAX_SCALE]))

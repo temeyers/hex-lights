@@ -35,9 +35,27 @@ HA → Developer tools → Actions:
 action: esphome.hex_c0_set_wall_effect
 data: {effect: 1, hue: 160, saturation: 255, value: 200, speed: 400, scale: 300}
 ```
-Effects: 0 solid, 1 radial wave, 2 rainbow sweep, 3 pulse. Then turn the 20 lights on with effect **HexSync**.
+Effects (v2): 0 solid, 1 radial_wave, 2 rainbow_sweep, 3 pulse, 4 chase, 5 wipe,
+6 rainbow_flow, 7 random_ripple, 8 twinkle, 9 color_cycle, 10 snake.
+Preferred service:
+```yaml
+action: esphome.hex_c0_set_wall_fx
+data: {effect: 5, palette: 2, speed: 300, scale: 100, hue: 18, saturation: 215, value: 255, start_delay_ms: 300}
+```
+Or use the master's Wall effect / Wall palette / Wall speed / Wall wipe axis entities.
+Each tile's **LED count** number (1-60, default 44) changes the active LEDs without reflashing. Then turn the 20 lights on with effect **HexSync**.
 
 ## Tuning
 Per-tile substitutions (in tiles.csv → generator, or the shared defaults in `templates/tile-common.yaml`):
 `led_pin` (GPIO4), `num_leds` (44), `max_scale`/`max_scale_pct` (0.55 hard ceiling),
 `tile_budget_ma` (1200), `static_leader` (0 = auto failover), `rotation`.
+
+## Changing the layout without reflashing
+Each tile has Grid q / Grid r / Rotation / Chase order number entities. Or push the
+whole wall from the master:
+```yaml
+action: esphome.hex_c0_set_layout_bulk
+data: {layout: "<contents of layout_bulk.txt>"}
+```
+Check each tile's **Layout** sensor to confirm; resend single tiles with
+`esphome.hex_c0_set_tile_layout`. Details: DESIGN.md → Runtime layout.
