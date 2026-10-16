@@ -117,7 +117,7 @@
   bind('tR', 'input', function () { var v = parseInt(this.value, 10); if (!isNaN(v)) tset('r', v); });
   bind('tOrd', 'input', function () { tset('order', this.value === '' ? null : parseInt(this.value, 10)); });
   bind('tOrdDef', 'click', function () { $('tOrd').value = ''; tset('order', null); });
-  bind('tLed', 'input', function () { tset('ledCount', this.value === '' ? '' : Math.max(1, Math.min(300, parseInt(this.value, 10) || 1))); });
+  bind('tLed', 'input', function () { tset('ledCount', this.value === '' ? '' : Math.max(1, parseInt(this.value, 10) || 1)); });
   bind('tLedDef', 'click', function () { $('tLed').value = ''; tset('ledCount', ''); });
   bind('tMaster', 'click', function () { var t = st.tiles[sel]; if (!t) return; if (!t.id) { $('tIdErr').textContent = 'Give the tile an ID first'; return; } st.master = t.id; refresh(); });
   bind('tDel', 'click', function () { if (sel < 0) return; if (st.tiles[sel].id === st.master) st.master = null; st.tiles.splice(sel, 1); sel = -1; show(null); refresh(); });
@@ -228,7 +228,7 @@
   /* ---- effects: prefer Back End's ../effects.json + ../tools/effects.js, else local fallback ---- */
   function normDefs(j) { // accepts {effects:{name:{params}}}, {name:{params}} or [{name,params}]
     var e = j && j.effects ? j.effects : j, o = {};
-    if (Object.prototype.toString.call(e) === '[object Array]') { for (var i = 0; i < e.length; i++) o[e[i].name || e[i].id] = { params: e[i].params || {} }; return o; }
+    if (Object.prototype.toString.call(e) === '[object Array]') { for (var i = 0; i < e.length; i++) o[e[i].name || e[i].id] = { params: e[i].params || {}, hexsyncId: e[i].hexsyncId, firmwareOnly: !!e[i].firmwareOnly }; return o; }
     for (var k in e) if (e.hasOwnProperty(k)) o[k] = { params: (e[k] && e[k].params) || e[k] || {} };
     return o;
   }
@@ -250,6 +250,23 @@
         FX = { defs: defs, frame: f, frameLeds: mo.exports.frameLeds, pal: mo.exports.pal, src: 'Back End effects.json + tools/effects.js' };
       }).then(null, function () { FX = { defs: defs, frame: LocalEffects.frame, src: 'Back End effects.json + local frame() fallback' }; });
     }).then(done, done);
+  }
+  var FWREF = null; // esphome/tools/effects-ref.js (plain script, module.exports = {frame,...})
+  if (window.fetch && location.protocol !== 'file:') fetch('../esphome/tools/effects-ref.js', { cache: 'no-store' }).then(function (r) { if (!r.ok) throw 0; return r.text(); }).then(function (src) {
+    var mo = { exports: {} }; (new Function('module', 'exports', src))(mo, mo.exports); if (typeof mo.exports.frame === 'function') FWREF = mo.exports;
+  }).then(null, function () {}).then(function () { if (!FWREF) { $('fxSrcSel').value = 'be'; $('fxSrcSel').options[1].disabled = true; $('fxSrcSel').options[1].text = 'Firmware reference (not found)'; } });
+  bind('fxSrcSel', 'change', function () { fx.fw = this.value === 'fw'; $('fxFwMsg').textContent = ''; });
+  /* firmware ref wants numeric ids (tile_id from tiles.csv, else index+1), q, r, order; one ledCount -> use max, slice per tile */
+  function fwFrame(D, tMs) {
+    var r = fwParams(); if (r.error) throw new Error(r.error);
+    var P = { effect: r.P.effect, palette: r.P.palette, speed: r.P.speed, scale: r.P.scale, hue: r.P.hue, sat: r.P.saturation, value: r.P.value,
+      axis: { x: 0, y: 1, ring: 2, angle: 3 }[fx.params.axis] || 0, seed: 1 };
+    var num = {}, i, k; if (csv) for (k = 0; k < csv.rows.length; k++) num[csv.rows[k].id] = k + 1;
+    var tl = [], back = {}, maxL = 1;
+    for (i = 0; i < D.length; i++) { var nid = num[D[i].id] || (1000 + i); tl.push({ id: nid, q: D[i].q, r: D[i].r, order: D[i].order }); back[nid] = D[i]; if (D[i].leds > maxL) maxL = D[i].leds; }
+    var o = FWREF.frame(P, tl, tMs, maxL), out = {};
+    for (k in o) if (o.hasOwnProperty(k)) out[back[k].id] = o[k].slice(0, back[k].leds);
+    return out;
   }
   function setOrigin(id) { fx.params.origin = id; var el = $('fxp-origin'); if (el) el.value = id; if (!fx.play) startFx(); }
   function buildFx() {
@@ -279,14 +296,16 @@
   function pval(el) { if (el.getAttribute('data-num')) return parseFloat(el.value); if (el.getAttribute('data-rgb')) { var n = parseInt(el.value.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; } return el.value; }
   $('fxParams').addEventListener('input', function (e) { var k = e.target.getAttribute('data-k'); if (!k) return; var v = pval(e.target); fx.params[k] = v; var s = $('fxv-' + k); if (s) s.textContent = v; });
   $('fxParams').addEventListener('change', function (e) { var k = e.target.getAttribute('data-k'); if (k) fx.params[k] = pval(e.target); });
-  bind('fxSel', 'change', function () { fx.name = this.value; buildFx(); });
+  bind('fxSel', 'change', function () { fx.name = this.value; buildFx(); $('fxFwMsg').textContent = FX.defs[fx.name].firmwareOnly ? 'Firmware-only effect: previewed with the firmware reference.' : ''; });
   function lbl() { $('briV').textContent = $('bri').value + '%'; $('spdV').textContent = ($('spd').value / 100).toFixed(1) + '×'; }
   bind('bri', 'input', function () { lbl(); if (fx.colors) render(); }); bind('spd', 'input', lbl);
   function tick(now) {
     if (!fx.play) return; var dt = now - (fx.last || now); fx.last = now; fx.tAcc += dt * $('spd').value / 100;
     try { var D = derived(), t = fx.tAcc;
-      if (typeof FX.frameLeds === 'function') { fx.leds = FX.frameLeds(fx.name, fx.params, D, t); fx.colors = {}; for (var id in fx.leds) if (fx.leds.hasOwnProperty(id)) fx.colors[id] = fx.leds[id][0] || [0, 0, 0]; fx.mode = 'frameLeds'; }
-      else { fx.leds = null; fx.colors = FX.frame(fx.name, fx.params, D, t); fx.mode = 'frame'; } } catch (e) { $('fxSrc').textContent = 'Effect error: ' + e.message; fx.play = false; }
+      var fo = FX.defs[fx.name] && FX.defs[fx.name].firmwareOnly; if (fo && !FWREF) throw new Error(fx.name + ' is firmware-only and esphome/tools/effects-ref.js is not available');
+      if ((fx.fw || fo) && FWREF) { fx.leds = fwFrame(D, t); fx.colors = {}; for (var id2 in fx.leds) if (fx.leds.hasOwnProperty(id2)) fx.colors[id2] = fx.leds[id2][0] || [0, 0, 0]; fx.mode = 'firmware'; }
+      else if (typeof FX.frameLeds === 'function') { fx.leds = FX.frameLeds(fx.name, fx.params, D, t); fx.colors = {}; for (var id in fx.leds) if (fx.leds.hasOwnProperty(id)) fx.colors[id] = fx.leds[id][0] || [0, 0, 0]; fx.mode = 'frameLeds'; }
+      else { fx.leds = null; fx.colors = FX.frame(fx.name, fx.params, D, t); fx.mode = 'frame'; } } catch (e) { $('fxFwMsg').textContent = e.message; fx.play = false; fx.colors = null; fx.leds = null; }
     render(); requestAnimationFrame(tick);
   }
   function startFx() { if (fx.play) return; fx.play = true; fx.last = 0; requestAnimationFrame(tick); }
@@ -326,14 +345,47 @@
     $('hwBulk').value = b.problems.length ? '' : b.bulk; $('hwCopy').disabled = !!b.problems.length; $('hwCopyYaml').disabled = !!b.problems.length;
     $('hwYaml').value = b.problems.length ? '' : '# Bulk (all tiles)\naction: esphome.' + nn + '_set_layout_bulk\ndata:\n  layout: "' + b.bulk + '"\n\n# Per tile (resend one that did not ack)\n' +
       b.entries.map(function (e) { return '# ' + e.id + '\naction: esphome.' + nn + '_set_tile_layout\ndata: {tile_id: ' + e.tile_id + ', q: ' + e.q + ', r: ' + e.r + ', rotation: ' + e.rotation + ', order: ' + e.order + '}'; }).join('\n---\n');
-    $('hwCsvBox').open = !csv; return b;
+    $('hwCsvBox').open = !csv; hwFxSync(); return b;
   }
+  /* ---- Wall effect snippet (esphome.hex_<master>_set_wall_fx), built from the preview ---- */
+  // fallback only; effects.json hexsyncId wins. spiral and sparkle have no firmware id.
+  var FW_ID = { solid: 0, ripple: 1, rainbow_sweep: 2, breathe: 3, chase: 4, wipe: 5, rainbow_flow: 6, random_ripple: 7, twinkle: 8, color_cycle: 9, snake: 10 };
+  var FW_PAL = ['rainbow', 'ocean', 'sunset', 'forest', 'fire', 'mono'];
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function rgbToHsv255(c) { c = Object.prototype.toString.call(c) === '[object Array]' ? c : (function (h) { var n = parseInt(String(h || '#ffffff').slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; })(c);
+    var r = c[0] / 255, g = c[1] / 255, b = c[2] / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn, h = 0;
+    if (d) h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h = (h * 60 + 360) % 360;
+    return [Math.round(h * 255 / 360) % 256, Math.round(mx ? d / mx * 255 : 0), Math.round(mx * 255)]; }
+  /* returns {P, note} or {error}. speed in milli-cycles/s (0-10000), scale x100 */
+  function fwParams() {
+    var n = fx.name, p = fx.params, df = FX.defs[n] || {}, id = df.hexsyncId != null ? df.hexsyncId : (FX.defs[n] && 'hexsyncId' in FX.defs[n] ? null : FW_ID[n]);
+    if (id == null) return { error: 'The preview effect "' + n + '" has no firmware id, so it can\'t be sent as a wall effect.' };
+    var sp = n === 'breathe' ? 1 / (p.periodS || 4) : (p.speed != null ? p.speed : 1), sc = 100, notes = [];
+    if (n === 'chase') sc = (p.tail || 3) * 100; else if (n === 'rainbow_flow') sc = (p.scale || 1) * 100;
+    if (n === 'ripple' && p.origin && p.origin !== st.master) notes.push('firmware radial_wave always starts at q,r = 0,0, not the chosen origin');
+    if (n === 'wipe' || n === 'rainbow_sweep') notes.push('axis is not a service field: set select.' + nodeName() + '_wall_wipe_axis to ' + (p.axis || 'x') + (n === 'rainbow_sweep' ? ' (assumed shared with rainbow_sweep; firmware sweep supports x/y only)' : ''));
+    var hsv = p.color ? rgbToHsv255(p.color) : [0, 255, 255], pi = FW_PAL.indexOf(p.palette);
+    var P = { effect: id, palette: pi < 0 ? (p.color ? 5 : 0) : pi, speed: clamp(Math.round(sp * 1000), 0, 10000), scale: clamp(Math.round(sc), 0, 65535),
+      hue: hsv[0], saturation: hsv[1], value: hsv[2], start_delay_ms: clamp(parseInt($('hwDelay').value, 10) || 0, 0, 10000) };
+    if (sp * 1000 > 10000) notes.push('speed capped at 10000 mc/s');
+    return { P: P, note: notes.join('; ') };
+  }
+  function hwFxSync() {
+    var r = fwParams(), nn = nodeName();
+    $('hwCopyFx').disabled = !!r.error; $('hwFx').disabled = !!r.error;
+    if (r.error) { $('hwFx').value = ''; $('hwFxMsg').textContent = r.error; return r; }
+    var P = r.P; $('hwFxMsg').textContent = 'Effect ' + fx.name + ' → firmware id ' + P.effect + '. Wipe axis is select.' + nn + '_wall_wipe_axis (not a service field).' + (r.note ? ' Note: ' + r.note + '.' : '');
+    $('hwFx').value = 'action: esphome.' + nn + '_set_wall_fx\ndata:\n  effect: ' + P.effect + '\n  palette: ' + P.palette + '\n  speed: ' + P.speed + '\n  scale: ' + P.scale + '\n  hue: ' + P.hue + '\n  saturation: ' + P.saturation + '\n  value: ' + P.value + '\n  start_delay_ms: ' + P.start_delay_ms;
+    return r;
+  }
+  bind('hwDelay', 'input', function () { if (+this.value > 10000) this.value = 10000; hwFxSync(); });
+  bind('hwCopyFx', 'click', function () { copyText($('hwFx'), 'Wall effect YAML copied.'); });
   function copyText(el, msg) { el.select(); try { navigator.clipboard.writeText(el.value); } catch (e) { document.execCommand('copy'); } $('hwMsg').textContent = msg; }
   bind('hwCopy', 'click', function () { copyText($('hwBulk'), 'Bulk string copied.'); });
   bind('hwCopyYaml', 'click', function () { copyText($('hwYaml'), 'YAML copied.'); });
   bind('hwCsvLoad', 'click', function () { try { csv = parseCsv($('hwCsv').value, 'pasted'); $('hwMsg').textContent = ''; } catch (e) { $('hwMsg').textContent = 'tiles.csv: ' + e.message; } hwSync(); });
   if (window.fetch && location.protocol !== 'file:') fetch('../esphome/tiles.csv', { cache: 'no-store' }).then(function (r) { if (!r.ok) throw 0; return r.text(); }).then(function (t) { csv = parseCsv(t, 'esphome/tiles.csv'); if (cur === 'hw') hwSync(); }, function () {});
 
-  window.HexApp = { state: function () { return st; }, derived: derived, fx: fx, FX: function () { return FX; }, hw: hwBuild }; // test hook
+  window.HexApp = { state: function () { return st; }, derived: derived, fx: fx, FX: function () { return FX; }, hw: hwBuild, fwParams: fwParams, fwRef: function () { return FWREF; } }; // test hook
   lbl(); setVB(); fit(); render(); loadRemote(buildFx);
 })();

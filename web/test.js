@@ -28,7 +28,8 @@ const OUT = __dirname + '/screenshots/'; const URL = 'http://localhost:8411/web/
         const free = await p.evaluate(() => { const s = HexApp.state(); for (let q = -6; q < 6; q++) for (let r = -6; r < 6; r++) if (!s.tiles.some(t => t.q === q && t.r === r)) return [q, r]; });
         await p.fill('#tQ', String(free[0])); await p.fill('#tR', String(free[1]));
         await p.fill('#tDeg', '400'); ok((await p.textContent('#tIdErr')).includes('0-359'), w + ' rotation range flagged'); await p.fill('#tDeg', '0');  await p.fill('#tOrd', '1'); }
-      if (i === 2) { await p.fill('#tLed', '999'); ok(await p.evaluate(() => HexApp.state().tiles[2].ledCount) === 300, w + ' ledCount clamped to 300');
+      if (i === 2) { await p.fill('#tLed', '61'); ok(await p.evaluate(() => HexApp.state().tiles[2].ledCount) === 61 && (await p.textContent('#tIdErr')).includes('1-60'), w + ' ledCount > 60 flagged');
+        await p.fill('#tLed', '60'); ok(!(await p.textContent('#tIdErr')).includes('1-60'), w + ' ledCount 60 ok');
         await p.click('#tLedDef'); ok(await p.evaluate(() => HexApp.state().tiles[2].ledCount) === '' && (await p.inputValue('#tLed')) === '', w + ' use default clears override'); }
     }
     console.log(JSON.stringify(await p.evaluate(() => LayoutFormat.validate(HexApp.state())))); ok(await p.locator('#errs').isHidden(), w + ' no validation issues after IDs');
@@ -68,7 +69,7 @@ const OUT = __dirname + '/screenshots/'; const URL = 'http://localhost:8411/web/
     await p.click('#tabFx');
     const names = await p.$$eval('#fxSel option', os => os.map(o => o.value));
     const EJ = JSON.parse(fs.readFileSync('/workspace/hex-lights/effects.json', 'utf8')).effects;
-    ok(names.join() === EJ.map(e => e.name).join() && ['chase', 'wipe', 'rainbow_flow'].every(n => names.includes(n)), w + ' effect list ' + names.join());
+    ok(names.join() === EJ.map(e => e.name).join() && ['chase', 'wipe', 'rainbow_flow', 'snake'].every(n => names.includes(n)), w + ' effect list ' + names.join());
     ok((await p.textContent('#fxSrc')).includes('Back End effects.json + tools/effects.js'), w + ' using Back End effects (' + await p.textContent('#fxSrc') + ')');
     const ctl = {}; for (const e of names) { await p.selectOption('#fxSel', e); ctl[e] = await p.$$eval('#fxParams [data-k], #fxParams .sw', xs => xs.map(x => x.classList.contains('sw') ? 'palette:swatch' : x.dataset.k + ':' + (x.type || x.tagName)).join(',')); }
     console.log('controls', JSON.stringify(ctl));
@@ -83,7 +84,7 @@ const OUT = __dirname + '/screenshots/'; const URL = 'http://localhost:8411/web/
     const lm = await p.evaluate(() => [HexApp.fx.mode, document.querySelectorAll('.hx .led').length, HexApp.derived().reduce((a, t) => a + t.leds, 0)]);
     ok(lm[0] === 'frameLeds' && lm[1] === lm[2] && lm[1] > 0, w + ' per-LED dots via frameLeds (' + lm.join(',') + ')'); await p.click('#fxStop');
     for (const e of names) { await p.selectOption('#fxSel', e); await p.click('#fxPlay'); await p.waitForTimeout(250);
-      const c = await p.evaluate(() => HexApp.fx.colors); ok(c && Object.keys(c).length === 20 && Object.values(c).every(v => v.length === 3), w + ' effect ' + e + ' produced 20 colours'); if (e !== 'sparkle' && e !== 'ripple' && e !== 'breathe') ok(Object.values(c).some(v => v[0] + v[1] + v[2] > 0), w + ' effect ' + e + ' lit'); await p.click('#fxStop'); }
+      const c = await p.evaluate(() => HexApp.fx.colors); const fo = EJ.find(x => x.name === e).firmwareOnly; if (fo) ok(await p.evaluate(() => HexApp.fx.mode) === 'firmware', w + ' ' + e + ' firmware-only -> firmware reference'); ok(c && Object.keys(c).length === 20 && Object.values(c).every(v => v.length === 3), w + ' effect ' + e + ' produced 20 colours'); if (e !== 'sparkle' && e !== 'ripple' && e !== 'breathe') ok(Object.values(c).some(v => v[0] + v[1] + v[2] > 0), w + ' effect ' + e + ' lit'); await p.click('#fxStop'); }
     await p.selectOption('#fxSel', 'rainbow_sweep'); await p.click('#fxPlay'); await p.waitForTimeout(600);
     await p.screenshot({ path: OUT + 'preview-rainbow-' + w + '.png' }); await p.click('#fxStop');
     await p.selectOption('#fxSel', 'ripple'); const top = await p.evaluate(() => { let best = null; document.querySelectorAll('.hx').forEach(g => { const r = g.getBoundingClientRect(); const sh = document.getElementById('sheet').getBoundingClientRect(); if (r.top > 60 && r.x + r.width / 2 > 80 && (getComputedStyle(document.getElementById('sheet')).position !== 'fixed' || r.right < sh.left) && (!best || r.top < best.t)) best = { t: r.top, i: +g.dataset.i, x: r.x + r.width / 2, y: r.y + r.height / 2 }; }); return best; });
@@ -118,6 +119,32 @@ const OUT = __dirname + '/screenshots/'; const URL = 'http://localhost:8411/web/
     let seen = null; await p.evaluate(() => { const F = HexApp.FX(); const k = F.frameLeds ? 'frameLeds' : 'frame', orig = F[k]; F[k] = function (e, pr, tiles, t) { window.__seen = tiles.map(x => x.leds); return orig(e, pr, tiles, t); }; });
     await p.click('#tabFx'); await p.click('#fxPlay'); await p.waitForTimeout(200); seen = await p.evaluate(() => window.__seen); await p.click('#fxStop');
     ok(seen && seen[1] === 12 && seen[0] === 60, 'frame() receives effective leds');
+    // led.count limit
+    await p.click('#tabLayout'); await p.fill('#lCount', '61'); ok((await p.textContent('#errList')).includes('LEDs per tile must be 1-60'), 'led.count > 60 flagged'); await p.fill('#lCount', '44');
+    // wall effect snippet + firmware reference
+    await p.click('#tabFx'); await p.selectOption('#fxSel', 'solid'); await p.fill('#fxParams input[type=color]', '#ff0000');
+    await p.click('#tabHw'); await p.fill('#hwDelay', '25000');
+    const fy = await p.inputValue('#hwFx');
+    ok(fy.includes('action: esphome.hex_c0_set_wall_fx') && fy.includes('effect: 0') && fy.includes('hue: 0') && fy.includes('saturation: 255') && fy.includes('value: 255') && fy.includes('start_delay_ms: 10000') && !(await p.isDisabled('#hwCopyFx')), 'wall fx YAML solid red, delay capped');
+    await p.click('#tabFx'); await p.selectOption('#fxSel', 'chase'); await p.click('#tabHw');
+    let P = await p.evaluate(() => HexApp.fwParams().P); ok(P.effect === 4 && P.speed === 3000 && P.scale === 300 && P.palette === 0, 'chase -> id 4, speed 3000, scale 300 ' + JSON.stringify(P));
+    await p.click('#tabFx'); await p.selectOption('#fxSel', 'breathe'); P = await p.evaluate(() => HexApp.fwParams().P); ok(P.effect === 3 && P.speed === 250, 'breathe -> pulse 3, speed 250');
+    await p.selectOption('#fxSel', 'wipe'); await p.click('#tabHw'); ok((await p.textContent('#hwFxMsg')).includes('select.hex_c0_wall_wipe_axis'), 'wipe axis note'); await p.click('#tabFx');
+    await p.selectOption('#fxSel', 'snake'); P = await p.evaluate(() => HexApp.fwParams().P); ok(P.effect === 10 && P.speed === 1000, 'snake -> id 10 (hexsyncId)');
+    await p.selectOption('#fxSel', 'sparkle'); ok(!!(await p.evaluate(() => HexApp.fwParams().error)), 'sparkle has no firmware id -> disabled');
+    await p.selectOption('#fxSel', 'spiral'); await p.click('#tabHw');
+    ok(await p.isDisabled('#hwCopyFx') && (await p.inputValue('#hwFx')) === '' && (await p.textContent('#hwFxMsg')).includes('no firmware id'), 'spiral: snippet disabled + reason');
+    await p.screenshot({ path: OUT + 'hw-wallfx-1280-spiral.png' });
+    ok(await p.evaluate(() => !!HexApp.fwRef()), 'firmware reference loaded');
+    await p.click('#tabFx'); await p.selectOption('#fxSrcSel', 'fw');
+    for (const e of ['solid', 'ripple', 'rainbow_sweep', 'breathe', 'chase', 'wipe', 'rainbow_flow', 'random_ripple', 'twinkle', 'color_cycle', 'snake']) {
+      await p.selectOption('#fxSel', e); await p.click('#fxPlay'); await p.waitForTimeout(250);
+      const m = await p.evaluate(() => [HexApp.fx.mode, HexApp.fx.leds && Object.keys(HexApp.fx.leds).length, HexApp.fx.leds && HexApp.derived().every(t => HexApp.fx.leds[t.id].length === t.leds)]);
+      ok(m[0] === 'firmware' && m[1] === 20 && m[2], 'firmware ref ' + e + ' ' + m.join(',')); await p.click('#fxStop'); }
+    await p.selectOption('#fxSel', 'rainbow_flow'); await p.click('#fxPlay'); await p.waitForTimeout(400); await p.screenshot({ path: OUT + 'preview-firmware-1280.png' }); await p.click('#fxStop');
+    await p.selectOption('#fxSel', 'spiral'); await p.click('#fxPlay'); await p.waitForTimeout(200);
+    ok((await p.textContent('#fxFwMsg')).includes('no firmware id') && !(await p.evaluate(() => HexApp.fx.play)), 'firmware ref spiral refused');
+    await p.selectOption('#fxSrcSel', 'be');
     // hardware push vs esphome/layout_bulk.txt
     await p.click('#tabHw'); await p.waitForTimeout(300);
     const exp = fs.readFileSync('/workspace/hex-lights/esphome/layout_bulk.txt', 'utf8').trim();

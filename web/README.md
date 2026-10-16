@@ -58,3 +58,14 @@ Controls are built from effects.json: colour → colour picker, number → slide
 when exported and draws each tile's `leds` as dots around the edge, offset by its rotation. Otherwise it falls back to `frame()`.
 Tiles passed in also carry `order` and `rotation` (degrees). The local `effects.js` fallback mirrors chase, wipe,
 rainbow_flow and the palettes.
+
+## Firmware limits and wall effect (Hardware hexsync v2)
+- LED count: `led.count` and tile `ledCount` must be 1–60 (`number.hex_<id>_led_count`). Higher values are flagged, not clamped.
+- Push tab → **Wall effect**: YAML for `esphome.hex_<master>_set_wall_fx(effect, palette, speed, scale, hue, saturation, value, start_delay_ms)`
+  built from the current preview. effect = effects.json `hexsyncId` (fallback table 0 solid … 10 snake). palette = index 0–5.
+  speed = cycles/s ×1000 (breathe: 1000/periodS), capped 0–10000. scale ×100 (chase tail, rainbow_flow scale), else 100.
+  hue/sat/val 0–255 from the colour (no colour → 0/255/255). start_delay_ms capped at 10000. Effects without an id (spiral, sparkle)
+  disable the snippet and show a message. Wipe axis is `select.hex_c0_wall_wipe_axis`, not a service field.
+- Preview source **Firmware reference** uses `../esphome/tools/effects-ref.js` `frame(P, tiles, tMs, ledCount)`. Tiles get numeric
+  ids from tiles.csv rows. It's called once with the largest led count, then sliced per tile. firmwareOnly effects (random_ripple,
+  twinkle, color_cycle, snake) always preview through it. Brightness is applied on top by the page, and the YAML `value` is not scaled by it.

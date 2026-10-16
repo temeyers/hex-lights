@@ -54,6 +54,7 @@
   function rotDeg(t) { return t.rotDeg != null && t.rotDeg !== '' ? int(t.rotDeg, 0) : (int(t.rot, 0) % 6) * 60; }
   function order(t, i) { return t.order != null && t.order !== '' ? int(t.order, 0) : i; }
   function rotFromDeg(d) { return Math.round((((d % 360) + 360) % 360) / 60) % 6; }
+  var MAXLED = 60; // firmware number.hex_<id>_led_count is 1..60
   var SLUG = /^[a-z0-9][a-z0-9_-]*$/, MAC = /^([0-9a-f]{2}[:-]){5}[0-9a-f]{2}$/i;
   /* errors: [{tile:index|null, field, msg}] */
   function validate(s) {
@@ -66,7 +67,7 @@
         if (ids[t.id] != null) { e.push({ tile: i, field: 'id', msg: 'Duplicate ID "' + t.id + '"' }); e.push({ tile: ids[t.id], field: 'id', msg: 'Duplicate ID "' + t.id + '"' }); }
         else ids[t.id] = i;
       }
-      if (t.ledCount !== '' && t.ledCount != null && !(t.ledCount >= 1 && t.ledCount <= 300)) e.push({ tile: i, field: 'ledCount', msg: 'LED count must be 1-300' });
+      if (t.ledCount !== '' && t.ledCount != null && !(t.ledCount >= 1 && t.ledCount <= MAXLED)) e.push({ tile: i, field: 'ledCount', msg: 'LED count must be 1-' + MAXLED + ' (firmware limit)' });
       if (!(t.q >= -50 && t.q <= 50 && t.r >= -50 && t.r <= 50)) e.push({ tile: i, field: 'pos', msg: 'Grid q/r must be -50..50' });
       var dg = rotDeg(t); if (!(dg >= 0 && dg <= 359) || dg % 1) e.push({ tile: i, field: 'rotDeg', msg: 'Rotation must be 0-359°' });
       var od = order(t, i); if (!(od >= 0 && od <= 254) || od % 1) e.push({ tile: i, field: 'order', msg: 'Chase order must be 0-254' });
@@ -79,10 +80,11 @@
     }
     if (s.tiles.length && !s.master) e.push({ tile: null, field: 'master', msg: 'No master tile chosen' });
     else if (s.master && ids[s.master] == null) e.push({ tile: null, field: 'master', msg: 'Master "' + s.master + '" is not a tile ID' });
+    if (!(s.led.count >= 1 && s.led.count <= MAXLED)) e.push({ tile: null, field: 'led', msg: 'LEDs per tile must be 1-' + MAXLED + ' (firmware limit)' });
     if (!/^GPIO\d+$/.test(pin(s.led.pin))) e.push({ tile: null, field: 'led', msg: 'LED pin must look like GPIO<n>' });
     if (TYPES.indexOf(s.led.type) < 0) e.push({ tile: null, field: 'led', msg: 'LED type must be WS2812' });
     if (ORDERS.indexOf(s.led.order) < 0) e.push({ tile: null, field: 'led', msg: 'Unknown colour order' });
     return e;
   }
-  g.LayoutFormat = { defaults: defaults, toObject: toObject, serialize: serialize, parse: parse, validate: validate, rotDeg: rotDeg, order: order, rotFromDeg: rotFromDeg, TYPES: TYPES, ORDERS: ORDERS };
+  g.LayoutFormat = { defaults: defaults, toObject: toObject, serialize: serialize, parse: parse, validate: validate, MAXLED: 60, rotDeg: rotDeg, order: order, rotFromDeg: rotFromDeg, TYPES: TYPES, ORDERS: ORDERS };
 })(this);
