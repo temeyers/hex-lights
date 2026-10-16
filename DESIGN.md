@@ -214,7 +214,7 @@ busy **[UNVERIFIED]**, set `use_dma: true` on the light (S3 supports RMT DMA) or
 raise `rmt_symbols`. Expect it to be fine; this is a common, light load.
 
 ### S3 Super Mini pin notes
-- LED data: **GPIO4** (substitution `led_pin`).
+- LED data: **GPIO13** (substitution `led_pin`).
 - Avoid: GPIO0/3/45/46 (strapping), GPIO19/20 (native USB), GPIO48 (onboard WS2812
   RGB LED on most S3 Super Minis **[verify on your board]**).
 - Flash 4 MB (some have 2 MB PSRAM; unused). Board profile `esp32-s3-devkitc-1`.
@@ -314,7 +314,7 @@ at 4.5–5.3 V.
 
 ### Per-tile wiring
 - **Capacitor:** 1000 µF / 10 V electrolytic + 100 nF across +5 V/GND at the strip input.
-- **Data:** S3 GPIO4 → **330 Ω series resistor** at the strip DIN, wire < 10 cm.
+- **Data:** S3 GPIO13 → **330 Ω series resistor** at the strip DIN, wire < 10 cm.
   WS2812B at 5 V wants VIH ≥ 0.7 × VDD = 3.5 V; 3.3 V usually works but is marginal.
   **Recommended:** a 74AHCT1G125 (or SN74AHCT125) powered from 5 V as a level shifter;
   cheap and removes the doubt. Alternative hack: power the first LED through a
@@ -331,3 +331,9 @@ at 4.5–5.3 V.
 - HA action → visible change on the wall: ~20–80 ms **[UNVERIFIED]** (API + ESP-NOW + next frame).
 - Tile-to-tile clock error: 1–3 ms **[UNVERIFIED]**; check by filming the Pulse effect at 240 fps.
 - Render time for 44 LEDs with `sinf`/HSV: well under 1 ms on the S3 **[EST]**.
+
+### Wiring decision (Terry, 2026-10-16) and untested risks
+Per tile: board 5V and GND pins feed the strip, LED data on **GPIO13** through a 330 Ω resistor, with no level shifter. Untested and flagged:
+- **Current through the 5V pin:** the board's 5V pin and its traces are not rated for the strip's load (estimate: up to ~1.45 A capped, 2.64 A uncapped full white). Prefer wiring the 5 V supply to the strip and the board's 5V pin in parallel at the tile's input, so strip current doesn't flow through the board. Never connect USB while the 5 V supply is on unless the board has a VBUS diode.
+- **3.3 V data:** WS2812B wants about 0.7×VDD (3.5 V at 5 V) for a high bit. 3.3 V often works over a short wire, but can flicker; running the strip a little lower (about 4.7–4.8 V) or adding the 74AHCT1G125 fixes it.
+- **GPIO13** is a normal S3 GPIO (not strapping, USB, or flash/PSRAM on the N8R8 / Super Mini as documented), but not yet checked on Terry's board.

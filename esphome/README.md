@@ -47,7 +47,7 @@ Each tile's **LED count** number (1-60, default 44) changes the active LEDs with
 
 ## Tuning
 Per-tile substitutions (in tiles.csv → generator, or the shared defaults in `templates/tile-common.yaml`):
-`led_pin` (GPIO4), `num_leds` (44), `max_scale`/`max_scale_pct` (0.55 hard ceiling),
+`led_pin` (GPIO13), `num_leds` (44), `max_scale`/`max_scale_pct` (0.55 hard ceiling),
 `tile_budget_ma` (1200), `static_leader` (0 = auto failover), `rotation`.
 
 ## Changing the layout without reflashing

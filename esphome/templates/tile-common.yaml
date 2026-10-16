@@ -8,7 +8,7 @@
 substitutions:
   rotation: "0"
   order: "-1"               # chase index; -1 = tile_num - 1
-  led_pin: GPIO4            # S3 Super Mini: avoid 0/3/45/46 (strapping), 19/20 (USB), 48 (onboard RGB LED)
+  led_pin: GPIO13            # S3 Super Mini: avoid 0/3/45/46 (strapping), 19/20 (USB), 48 (onboard RGB LED)
   num_leds: "60"            # pixels allocated (layout.json led.maxCount)
   led_count: "44"           # pixels rendered by default; runtime number "LED count"
   wall_controls_internal: "true"   # generator sets "false" on the master tile
