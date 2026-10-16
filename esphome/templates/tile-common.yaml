@@ -45,6 +45,17 @@ esphome:
               out->set_correction(k, k, k);
               if (id(tile_leds).current_values.is_on()) out->update_state(id(tile_leds));
             }
+            // Master: restore the saved wall effect/palette/axis/speed/scale (globals below) and start it on the
+            // whole wall. Here, not in a restore callback: hexsync and the light are set up, ESP-NOW may still be
+            // coming up (beacons repeat the params anyway).
+            if (!${wall_controls_internal} && id(wall_fx_saved) >= 0) {
+              auto &hs = *id(hex_sync);
+              hs.set_wall_fx(id(wall_fx_saved), id(wall_pal_saved), id(wall_speed_saved), id(wall_scale_saved),
+                             160, 255, 255, 300, id(wall_axis_saved));
+              ESP_LOGI("hexsync", "restored wall fx %s pal %s speed %d scale %d axis %d",
+                       hexsync::HexSync::effect_name(id(wall_fx_saved)), hexsync::HexSync::palette_name(id(wall_pal_saved)),
+                       id(wall_speed_saved), id(wall_scale_saved), id(wall_axis_saved));
+            }
             id(bright_ready) = true;
             ESP_LOGI("hexsync", "brightness: max_brightness=%.0f%% (max_scale %.2f), current_limit=%s (budget %d mA), effect value=%d/255, gamma=%s, transition 0s",
                      pct, id(hex_sync).max_scale(), id(hex_sync).budget_enabled() ? "ON" : "off",
@@ -56,6 +67,28 @@ esphome:
             brightness: ${boot_brightness}
 
 globals:
+  # Wall controls persisted on the master (template select/number with a lambda can't take restore_value).
+  # Written only by the interval below, after bright_ready; applied in on_boot(-100). -1 = never saved.
+  - id: wall_fx_saved
+    type: int
+    restore_value: true
+    initial_value: "-1"
+  - id: wall_pal_saved
+    type: int
+    restore_value: true
+    initial_value: "0"
+  - id: wall_axis_saved
+    type: int
+    restore_value: true
+    initial_value: "0"
+  - id: wall_speed_saved
+    type: int
+    restore_value: true
+    initial_value: "500"
+  - id: wall_scale_saved
+    type: int
+    restore_value: true
+    initial_value: "300"
   - id: bright_ready         # true once on_boot(-100) ran; restore-time callbacks must not touch the light
     type: bool
     restore_value: false
@@ -391,6 +424,20 @@ select:
     lambda: 'return std::string(id(hex_sync).sync_mode() ? "Jumper wire" : "Wireless (ESP-NOW)");'
     set_action:
       - lambda: 'id(hex_sync).set_sync_mode(x == "Jumper wire" ? 1 : 0);'
+
+interval:
+  # Master: mirror the live wall params (from selects, the number, set_wall_fx actions or peers) into the
+  # restoring globals. Flash writes are batched by preferences and flushed on OTA/safe reboot.
+  - interval: 2s
+    then:
+      - lambda: |-
+          if (${wall_controls_internal} || !id(bright_ready)) return;
+          auto &hs = *id(hex_sync);
+          if (id(wall_fx_saved) != hs.wall_effect()) id(wall_fx_saved) = hs.wall_effect();
+          if (id(wall_pal_saved) != hs.wall_palette()) id(wall_pal_saved) = hs.wall_palette();
+          if (id(wall_axis_saved) != hs.wall_axis()) id(wall_axis_saved) = hs.wall_axis();
+          if (id(wall_speed_saved) != hs.wall_speed()) id(wall_speed_saved) = hs.wall_speed();
+          if (id(wall_scale_saved) != hs.wall_scale()) id(wall_scale_saved) = hs.wall_scale();
 
 text_sensor:
   # Average colour the LEDs are showing ('#RRGGBB', 2 Hz, published only on change). Read-only: never fed back

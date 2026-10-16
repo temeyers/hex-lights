@@ -151,6 +151,7 @@ class HexSync : public Component {
   int wall_palette() const { return params_.palette; }
   int wall_speed() const { return params_.speed; }
   int wall_axis() const { return params_.axis; }
+  int wall_scale() const { return params_.scale; }
   static const char *effect_name(int id);
   static int effect_id(const std::string &name);
   static const char *palette_name(int id);
