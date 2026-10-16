@@ -1,4 +1,6 @@
 # Hex wall helpers (static). Synced effects use the master tile's set_wall_effect
+# Sync mode (ESP-NOW vs jumper wire on GPIO12), per-tile sync sensors and the
+# jumper-lost alert live in ha/hex_wall.generated.yaml; dashboard: ha/hex_wall_dashboard.generated.yaml.
 # action + the HexSync light effect; Coordinate-driven scripts + light group live in
 # ha/hex_wall.generated.yaml (regenerate with tools/gen_tiles.py). Install both
 # under config/packages/ with `homeassistant: packages: !include_dir_named packages`.

@@ -308,3 +308,24 @@ automation:
     actions:
       - delay: {seconds: 1}
       - action: script.hex_wall_led_count_apply
+  - id: hex_wall_sync_jumper_lost
+    alias: Hex wall - jumper sync lost
+    mode: single
+    max_exceeded: silent
+    triggers:
+      - trigger: state
+        entity_id: ["sensor.hex_c0_sync_source", "sensor.hex_r1_e_sync_source", "sensor.hex_r1_ne_sync_source", "sensor.hex_r1_nw_sync_source", "sensor.hex_r1_w_sync_source", "sensor.hex_r1_sw_sync_source", "sensor.hex_r1_se_sync_source", "sensor.hex_r2_a_sync_source", "sensor.hex_r2_b_sync_source", "sensor.hex_r2_c_sync_source", "sensor.hex_r2_d_sync_source", "sensor.hex_r2_e_sync_source", "sensor.hex_r2_f_sync_source", "sensor.hex_r2_g_sync_source", "sensor.hex_r2_h_sync_source", "sensor.hex_r2_i_sync_source", "sensor.hex_r2_j_sync_source", "sensor.hex_r2_k_sync_source", "sensor.hex_r2_l_sync_source", "sensor.hex_r3_a_sync_source"]
+        to: "jumper-lost"
+        for: {seconds: 15}
+    conditions:
+      - condition: state
+        entity_id: select.hex_c0_sync_mode
+        state: "Jumper wire"
+    actions:
+      - action: notify.notify
+        data:
+          title: Hex wall sync
+          message: >-
+            {{ state_attr(trigger.entity_id, 'friendly_name') or trigger.entity_id }} lost the
+            jumper-wire sync pulse (falling back to the ESP-NOW clock). Check the GPIO12 wire.
+      - delay: {minutes: 10}

@@ -16,6 +16,7 @@ TILE_DIR = "esphome/generated"
 DEFAULT_PACKAGE = "../templates/tile-common.yaml"
 BAD_PINS = {0: "strapping", 3: "strapping", 45: "strapping", 46: "strapping",
             19: "USB", 20: "USB", 48: "onboard RGB LED"}
+DEFAULT_SYNC_PIN = "GPIO12"   # template sync_pin; jumper-wire mode only
 PIN = re.compile(r"^GPIO(\d+)$")
 DEFAULT_PREFIX = "hex"
 
@@ -74,6 +75,11 @@ def validate(lay):
     if not isinstance(led["count"], int) or led["count"] < 1:
         raise LayoutError("led.count must be a positive int")
     check_pin(led["pin"], "led.pin")
+    # Jumper-wire sync line (Hardware's template sync_pin, default GPIO12).
+    sync_pin = led.get("syncPin", DEFAULT_SYNC_PIN)
+    check_pin(sync_pin, "led.syncPin")
+    if sync_pin == led["pin"]:
+        raise LayoutError(f"led.syncPin {sync_pin} collides with led.pin")
     if "maxCount" in led and (not isinstance(led["maxCount"], int) or led["maxCount"] < led["count"]):
         raise LayoutError("led.maxCount must be an int >= led.count")
     if "budgetMa" in led and (not isinstance(led["budgetMa"], int) or led["budgetMa"] < 1):
@@ -110,6 +116,8 @@ def validate(lay):
             raise LayoutError(f"tile {i}: ledCount must be a positive int")
         if "pin" in t:
             check_pin(t["pin"], f"tile {i}: pin")
+            if t["pin"] == sync_pin:
+                raise LayoutError(f"tile {i}: pin {t['pin']} collides with the sync pin")
         if "priority" in t and not isinstance(t["priority"], int):
             raise LayoutError(f"tile {i}: priority must be an int")
         if t.get("mac") and not MAC.match(str(t["mac"])):
@@ -202,6 +210,7 @@ def substitutions(lay, t, pin_leader=False):
         "led_pin": t.get("pin", led["pin"]),
         # num_leds = compile-time strip length (max); led_count = runtime default
         # for the per-tile number entity (PROPOSED, Hardware to confirm).
+        "sync_pin": lay["led"].get("syncPin", DEFAULT_SYNC_PIN),
         "num_leds": max(t["leds"], lay["led"].get("maxCount", t["leds"])),
         "led_count": t["leds"],
         # "0" keeps hexsync automatic failover; --pin-leader pins the master.
@@ -266,6 +275,7 @@ def build_outputs(lay, tile_yaml_out=False, pin_leader=False):
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     import gen_ha
     files["ha/hex_wall.generated.yaml"] = gen_ha.render(d, node, light_entity)
+    files["ha/hex_wall_dashboard.generated.yaml"] = gen_ha.render_dashboard(d, node)
     return files
 
 

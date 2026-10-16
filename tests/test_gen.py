@@ -69,7 +69,7 @@ def test_substitution_map():
     d = g.derive(lay()); t = {x["id"]: x for x in d["tiles"]}
     s = g.substitutions(d, t["r1-e"])
     assert s == {"tile_id": "r1-e", "tile_num": 2, "q": 1, "r": 0, "rotation": 0,
-                 "led_pin": "GPIO13", "num_leds": 60, "led_count": 44, "static_leader": 0, "leader_priority": 3}
+                 "led_pin": "GPIO13", "sync_pin": "GPIO12", "num_leds": 60, "led_count": 44, "static_leader": 0, "leader_priority": 3}
     assert g.substitutions(d, t["c0"])["leader_priority"] == 1
     assert g.substitutions(d, t["r1-e"], pin_leader=True)["static_leader"] == 1
     assert g.substitutions(d, t["r3-a"])["led_count"] == 42 and g.substitutions(d, t["r3-a"])["num_leds"] == 60
@@ -193,3 +193,34 @@ def test_csv_order_opt_in(tmp_path):
     assert run("--emit-csv", "c.csv").returncode == 0 and "order" not in (tmp_path / "c.csv").read_text()
     assert run("--emit-csv", "c.csv", "--csv-order").returncode == 0
     assert (tmp_path / "c.csv").read_text().startswith("id,q,r,rot,order")
+
+def test_sync_pin_validation():
+    L = lay(); assert g.validate(L) == []
+    assert g.substitutions(g.derive(L), g.derive(L)["tiles"][0])["sync_pin"] == "GPIO12"
+    L["led"]["syncPin"] = L["led"]["pin"]
+    with pytest.raises(g.LayoutError, match="collides"): g.validate(L)
+    L = lay(); L["tiles"][2]["pin"] = "GPIO12"
+    with pytest.raises(g.LayoutError, match="sync pin"): g.validate(L)
+    L = lay(); L["led"]["syncPin"] = "GPIO48"
+    with pytest.raises(g.LayoutError, match="syncPin"): g.validate(L)
+
+def test_sync_mode_ha():
+    import yaml, gen_ha
+    h = yaml.safe_load(open(os.path.join(ROOT, "ha/hex_wall.generated.yaml")))
+    a = next(x for x in h["automation"] if x["id"] == "hex_wall_sync_jumper_lost")
+    ents = a["triggers"][0]["entity_id"]
+    assert len(ents) == 20 and "sensor.hex_r1_e_sync_source" in ents
+    assert a["triggers"][0]["to"] == "jumper-lost"
+    assert a["conditions"][0] == {"condition": "state", "entity_id": "select.hex_c0_sync_mode", "state": "Jumper wire"}
+    assert a["actions"][0]["action"] == "notify.notify"
+    L = lay(); L["ha"] = {"notifyService": "notify.mobile_app_terry"}
+    assert "action: notify.mobile_app_terry" in gen_ha.render(g.derive(L), g.node, g.light_entity)
+    tpl = open(os.path.join(ROOT, "esphome/templates/tile-common.yaml")).read()
+    for name in ("name: Sync source", "name: Sync pulse jitter", "name: Sync pulse offset", "name: Sync mode",
+                 '"Wireless (ESP-NOW)", "Jumper wire"'):
+        assert name in tpl, name
+    cpp = open(os.path.join(ROOT, "esphome/components/hexsync/hexsync.cpp")).read()
+    assert '"jumper-lost"' in cpp
+    dash = yaml.safe_load(open(os.path.join(ROOT, "ha/hex_wall_dashboard.generated.yaml")))
+    txt = json.dumps(dash)
+    assert "select.hex_c0_sync_mode" in txt and "sensor.hex_r2_a_sync_pulse_jitter" in txt and "sensor.hex_c0_sync_pulse_offset" in txt

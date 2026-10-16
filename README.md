@@ -61,3 +61,9 @@ Hardware's newer firmware signature is `set_wall_fx(effect, palette, speed, scal
 
 ### tiles.csv order column
 `--emit-csv` writes `id,q,r,rot` (it matches the committed file). Add `--csv-order` to also write `order` (empty = Hardware's default of row − 1). Hardware's generator reads it.
+
+### Sync mode (Hardware d3aeb8b)
+- `select.hex_c0_sync_mode` (master only) has the options `Wireless (ESP-NOW)` (default) and `Jumper wire` (GPIO12, `led.syncPin`). The generator rejects a sync pin equal to the LED pin (GPIO13) or to any tile's pin.
+- Per tile: `sensor.hex_<id>_sync_source` (`espnow` | `jumper` | `jumper-lost`), `sensor.hex_<id>_sync_pulse_jitter` (µs), `sensor.hex_<id>_sync_pulse_offset` (ms).
+- Automation `hex_wall_sync_jumper_lost` alerts when any tile is `jumper-lost` for 15 s while the mode is `Jumper wire`. It notifies `notifyService` (default `notify.notify`), which you can override with `"ha": {"notifyService": "notify.mobile_app_x"}`. After an alert it waits 10 minutes before alerting again.
+- Dashboard: `ha/hex_wall_dashboard.generated.yaml` is a Lovelace dashboard in YAML mode. It has the wall controls, the sync mode select and a sync glance card for each tile.
