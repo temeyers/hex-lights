@@ -413,3 +413,6 @@ input_boolean:
   hex_wall_manual_color:
     name: Hex wall manual colour (tiles show the light colour; effects off)
     initial: false
+  hex_wall_control_all:
+    name: Control all
+    icon: mdi:hexagon-multiple

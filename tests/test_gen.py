@@ -414,3 +414,10 @@ def test_no_empty_selector_configs():
     assert json.loads(gen_ha.fields_yaml({"c": gen_ha._rgb("x", [1, 2, 3]), "t": gen_ha._txt("y")})) == {
         "c": {"description": "x", "example": "1, 2, 3", "default": [1, 2, 3], "selector": {"color_rgb": None}},
         "t": {"description": "y", "example": "", "selector": {"text": None}}}
+
+
+def test_control_all_helper():
+    import yaml
+    h = yaml.safe_load(open(os.path.join(ROOT, "ha/hex_wall.generated.yaml")))
+    b = h["input_boolean"]["hex_wall_control_all"]
+    assert b["name"] == "Control all" and "initial" not in b   # UI toggle: keeps its state across restarts
