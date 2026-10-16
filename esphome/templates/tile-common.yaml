@@ -20,6 +20,7 @@ substitutions:
   # Full output by default: 100% on the slider = full LED drive. Runtime ceiling = HA number "Max brightness".
   # WARNING: full white ~= 44 x 60 mA ~= 2.6 A per tile (~53 A wall). Feed the strip directly (not via the
   # S3 Super Mini 5V pin); keep 3 A per-tile fuses and the 60 A PSU. See README / DESIGN.md.
+  led_gamma: "2.8"          # ESPHome default; gamma never lowers 255 but dims mid levels (value 180 -> ~38 %)
   max_scale: "1.0"          # first-boot value for hexsync's current model (Max brightness overrides at boot)
   tile_budget_ma: "1200"    # hexsync effect current budget per tile (ESTIMATED model); OFF unless "Current limit" switch is on
 
@@ -27,6 +28,13 @@ esphome:
   name: hex-${hex_nn}
   friendly_name: Hex ${hex_nn}
   min_version: 2025.9.0
+  on_boot:
+    - priority: -100   # after restored numbers/switches have applied
+      then:
+        - lambda: |-
+            ESP_LOGI("hexsync", "brightness: max_brightness=%.0f%% (max_scale %.2f), current_limit=%s (budget %d mA), effect value=%d/255, gamma=%s, transition 0s",
+                     id(max_brightness).state, id(hex_sync).max_scale(), id(hex_sync).budget_enabled() ? "ON" : "off",
+                     id(hex_sync).budget_ma(), id(hex_sync).effect_value(), "${led_gamma}");
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -139,13 +147,18 @@ light:
     chipset: WS2812
     rgb_order: GRB   # 2025.9.x lacks channel_colors; 2026.x accepts rgb_order (deprecated, removed 2027.3.0) -> switch to "channel_colors: GRB" once 2025.9 support is dropped
     default_transition_length: 0s
+    gamma_correct: ${led_gamma}
     # No compile-time cap: the "Max brightness" number sets the correction (ceiling) at runtime.
     restore_mode: RESTORE_DEFAULT_OFF
     effects:
       - addressable_lambda:
           name: HexSync
           update_interval: 16ms   # ~60 fps target; 44 LEDs take ~1.4 ms on the wire
-          lambda: 'id(hex_sync).render(it);'
+          lambda: |-
+            // solid / mono palette follow THIS tile's light colour live (brightness via the light's correction)
+            auto &v = id(tile_leds).current_values;
+            id(hex_sync).set_light_color(v.get_red(), v.get_green(), v.get_blue());
+            id(hex_sync).render(it);
       - addressable_rainbow:
           name: Local rainbow (unsynced)
 

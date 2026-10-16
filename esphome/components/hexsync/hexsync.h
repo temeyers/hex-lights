@@ -7,6 +7,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 #include <cstdint>
+#include <cmath>
 
 namespace esphome {
 namespace hexsync {
@@ -112,7 +113,7 @@ struct HxPeer {
 struct HxParams {
   uint32_t gen{0};
   uint8_t effect{FX_RADIAL_WAVE};
-  uint8_t hue{160}, sat{255}, value{180};
+  uint8_t hue{160}, sat{255}, value{255};  // full by default: brightness = light slider x Max brightness
   uint16_t speed{500}, scale{300};
   uint8_t palette{PAL_RAINBOW}, axis{AX_X};
   uint32_t start_ms{0};
@@ -167,7 +168,14 @@ class HexSync : public Component {
   // Runtime: HA "Max brightness" (0..1, also the light's correction) and "Current limit" switch (default off).
   void set_max_scale(float k) { max_scale_ = k < 0 ? 0 : (k > 1 ? 1 : k); }
   void set_budget_enabled(bool on) { budget_enabled_ = on; }
+  // Live light colour (LightColorValues RGB 0..1, normalised); used by solid and the mono palette.
+  void set_light_color(float r, float g, float b) {
+    light_c_ = Color((uint8_t) lroundf(r * 255), (uint8_t) lroundf(g * 255), (uint8_t) lroundf(b * 255));
+  }
   bool budget_enabled() const { return budget_enabled_; }
+  float max_scale() const { return max_scale_; }
+  int effect_value() const { return params_.value; }
+  int budget_ma() const { return budget_ma_; }
   void set_timing(uint32_t beacon, uint32_t timeout) { beacon_ms_ = beacon; timeout_ms_ = timeout; }
 
   void setup() override;
@@ -241,6 +249,7 @@ class HexSync : public Component {
   int budget_ma_{1500};
   float ma_led_{60.0f}, max_scale_{1.0f};
   bool budget_enabled_{false};
+  Color light_c_{255, 255, 255};
   uint32_t beacon_ms_{100}, timeout_ms_{1500};
 
   HxParams params_;

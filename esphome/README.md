@@ -104,3 +104,11 @@ The layout service is now `set_hex_layout(hex_num, q, r, rotation, order)`, rena
 ## Effects on a single tile
 
 Every LED has its own position on the tile ring: angle `2*pi*i/n + rotation`, where `n` is the runtime LED count. So each effect animates within one tile, not just from tile to tile. Chase and snake run a comet LED by LED through the tiles in chase order. With no peers it circles the ring. Only solid and pulse are uniform, by design. Host check: `node tools/check-effects.js` (it uses `tools/effects-ref.js`, which mirrors the firmware math).
+
+## Colour and brightness chain (per tile)
+- Output = effect colour × effect `value`/255 × light slider × Max brightness, then gamma (`led_gamma`, default 2.8).
+- **Solid** (and the **mono** palette in every effect) uses this tile's HA light colour live from `current_values`. Brightness comes from the light slider and Max brightness. Each tile follows its own light, so set colours through the light group.
+- The effect `value` now defaults to 255. It used to be 180, which with gamma 2.8 gave only about 38 % drive. The wall selects keep the last value received, so send `value: 255` in `set_wall_fx`.
+- The Current limit switch defaults to off, so no budget scaling is applied.
+- The boot log prints `brightness: max_brightness=…, current_limit=…, effect value=…, gamma=…`.
+- Gamma 2.8 never lowers full output (255 stays 255), but it dims mid levels. Set `led_gamma: "1.0"` for a linear, brighter look.

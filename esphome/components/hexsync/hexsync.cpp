@@ -695,51 +695,54 @@ Color HexSync::pixel_(int led, int n, float t_s, int index, int count, float xn,
   const float sc = P.scale / 100.0f;
   const int pid = P.palette;
   const float lf = (float) led / std::max(1, n);
+  // Palette-free colour = this tile's HA light colour (current_values, set every frame by the effect lambda).
+  // Brightness is applied by the light's own correction (slider x Max brightness), not here.
+  const bool mono = pid == PAL_MONO || pid < 0 || pid >= PAL_COUNT;
+  auto lpal = [&](float u) { return mono ? light_c_ : pal(pid, u, P.hue, P.sat); };
   Color c(0, 0, 0);
   switch (P.effect) {
     case FX_SOLID:
-      c = pal(PAL_MONO, 0, P.hue, P.sat);
-      break;
+      return light_c_;  // solid = exactly the light entity's colour (no wall value scaling)
     case FX_RADIAL_WAVE: {  // effects.json "ripple" from the master (0,0)
       float per = max_ringw + 2;
       float ph = fmodf(t_s * spd, per);
       float k = std::max(0.0f, 1.0f - fabsf(ph - ringw));
-      c = scale_c(pal(pid, ringw / max_ringw, P.hue, P.sat), k);
+      c = scale_c(lpal(ringw / max_ringw), k);
       break;
     }
     case FX_RAINBOW_SWEEP: {
       float u = (P.axis == AX_Y ? yn : P.axis == AX_RING ? ringw / max_ringw : P.axis == AX_ANGLE ? angle / 360.0f : xn) +
                 t_s * spd;
-      c = pal(pid, u, P.hue, P.sat);
+      c = lpal(u);
       break;
     }
     case FX_PULSE: {  // effects.json "breathe" (uniform by design)
       float k = 0.5f - 0.5f * cosf(6.2831853f * t_s * spd);
-      c = scale_c(pal(pid, 0, P.hue, P.sat), k);
+      c = scale_c(lpal(0), k);
       break;
     }
     case FX_CHASE:
     case FX_SNAKE: {
       float k = chase_k(t_s, spd, sc, index, count, led, n);
       if (P.effect == FX_SNAKE && k <= 0 && head_d == 1) k = 0.25f;  // live neighbours of the head glow
-      c = scale_c(pal(pid, (index + lf) / count, P.hue, P.sat), k);
+      c = scale_c(lpal((index + lf) / count), k);
       break;
     }
     case FX_WIPE: {
       float u = P.axis == AX_Y ? yn : P.axis == AX_RING ? ringw / max_ringw : P.axis == AX_ANGLE ? angle / 360.0f : xn;
       float ph = fmodf(t_s * spd, 2.0f);
       bool on = ph < 1 ? u <= ph : u > ph - 1;
-      c = on ? pal(pid, u, P.hue, P.sat) : Color(0, 0, 0);
+      c = on ? lpal(u) : Color(0, 0, 0);
       break;
     }
     case FX_RAINBOW_FLOW:
-      c = pal(pid, ((xn + yn) / 2.0f) * sc - t_s * spd, P.hue, P.sat);
+      c = lpal(((xn + yn) / 2.0f) * sc - t_s * spd);
       break;
     case FX_RIPPLE: {
       float per = max_od + 2;
       float ph = fmodf(t_s * spd, per);
       float k = std::max(0.0f, 1.0f - fabsf(ph - od));
-      c = scale_c(pal(pid, od / max_od, P.hue, P.sat), k);
+      c = scale_c(lpal(od / max_od), k);
       break;
     }
     case FX_TWINKLE: {
@@ -749,11 +752,11 @@ Color HexSync::pixel_(int led, int n, float t_s, int index, int count, float xn,
       float f = u - slot;
       float density = std::min(1.0f, sc / 10.0f);  // scale 150 -> 0.15
       bool on = hash01(g, slot + (seed_ & 0xffffu)) < density;
-      c = on ? scale_c(pal(pid, hash01(slot, g), P.hue, P.sat), sinf(3.14159265f * f)) : Color(0, 0, 0);
+      c = on ? scale_c(lpal(hash01(slot, g)), sinf(3.14159265f * f)) : Color(0, 0, 0);
       break;
     }
     case FX_COLOR_CYCLE:
-      c = pal(pid, (index + lf) / count + t_s * spd, P.hue, P.sat);
+      c = lpal((index + lf) / count + t_s * spd);
       break;
     default:
       break;

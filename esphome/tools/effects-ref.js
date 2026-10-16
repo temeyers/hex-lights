@@ -1,7 +1,8 @@
 // Reference of hexsync v2 effect math (mirrors components/hexsync/hexsync.cpp pixel_/render).
 // Front End can use it for the preview. Pure functions; output [r,g,b] 0..255.
 // tiles: [{id, q, r, order}] (live layout). P: {effect, palette, speed (mc/s), scale (x100),
-// hue, sat, value (0-255), axis (0 x,1 y,2 ring,3 angle), seed (u32)}. tMs = clock - start_ms (>=0).
+// hue, sat, value (0-255), axis (0 x,1 y,2 ring,3 angle), seed (u32), rgb?: [r,g,b] light colour}.
+// Firmware: solid = the tile's HA light colour (rgb), and the mono palette (5) uses rgb too; without rgb, hue/sat. tMs = clock - start_ms (>=0).
 const STOPS = [null,
   [[0,40,120],[0,160,200],[40,220,180],[0,40,120]],   // ocean
   [[255,60,0],[255,0,80],[120,0,160],[255,60,0]],     // sunset
@@ -61,25 +62,26 @@ function frame(P, tiles, tMs, ledCount = 44) {
       let angle = Math.atan2(py, px) * 180 / Math.PI; if (angle < 0) angle += 360;
       const od = Math.hypot(px - ox, py - oy) / SQ3 + SPIRAL * lf;
       const axisU = P.axis === 1 ? yn : P.axis === 2 ? ringw / maxRingW : P.axis === 3 ? angle / 360 : xn;
+      const lpal = u => (P.palette === 5 || !STOPS[P.palette] && P.palette !== 0) && P.rgb ? P.rgb.slice() : pal(P.palette, u, P.hue, P.sat);
       let c = [0, 0, 0];
       switch (P.effect) {
-        case 0: c = pal(5, 0, P.hue, P.sat); break;                                    // solid
+        case 0: c = P.rgb ? P.rgb.slice() : pal(5, 0, P.hue, P.sat); leds.push(c); continue;  // solid: light colour, no value scaling
         case 1: { const ph = fmod(ts*spd, maxRingW+2);                                 // radial_wave
-          c = scaleC(pal(P.palette, ringw/maxRingW, P.hue, P.sat), Math.max(0, 1-Math.abs(ph-ringw))); break; }
-        case 2: c = pal(P.palette, axisU + ts*spd, P.hue, P.sat); break;                // rainbow_sweep
-        case 3: c = scaleC(pal(P.palette, 0, P.hue, P.sat), 0.5 - 0.5*Math.cos(2*Math.PI*ts*spd)); break; // pulse (uniform)
+          c = scaleC(lpal(ringw/maxRingW), Math.max(0, 1-Math.abs(ph-ringw))); break; }
+        case 2: c = lpal(axisU + ts*spd); break;                // rainbow_sweep
+        case 3: c = scaleC(lpal(0), 0.5 - 0.5*Math.cos(2*Math.PI*ts*spd)); break; // pulse (uniform)
         case 4: case 10: { let k = chaseK(ts, spd, sc, idx, count, led, n);             // chase / snake
           if (P.effect === 10 && k <= 0 && headD === 1) k = 0.25;
-          c = scaleC(pal(P.palette, (idx + lf)/count, P.hue, P.sat), k); break; }
+          c = scaleC(lpal((idx + lf)/count), k); break; }
         case 5: { const ph = fmod(ts*spd, 2), on = ph < 1 ? axisU <= ph : axisU > ph - 1; // wipe
-          c = on ? pal(P.palette, axisU, P.hue, P.sat) : [0,0,0]; break; }
-        case 6: c = pal(P.palette, ((xn+yn)/2)*sc - ts*spd, P.hue, P.sat); break;           // rainbow_flow
+          c = on ? lpal(axisU) : [0,0,0]; break; }
+        case 6: c = lpal(((xn+yn)/2)*sc - ts*spd); break;           // rainbow_flow
         case 7: { const ph = fmod(ts*spd, maxOd+2);                                         // random_ripple
-          c = scaleC(pal(P.palette, od/maxOd, P.hue, P.sat), Math.max(0, 1-Math.abs(ph-od))); break; }
+          c = scaleC(lpal(od/maxOd), Math.max(0, 1-Math.abs(ph-od))); break; }
         case 8: { const g = idx*64 + led, u = ts*spd + hash01(g, s16), slot = Math.floor(u), f = u - slot; // twinkle
           const on = hash01(g, (slot + s16) >>> 0) < Math.min(1, sc/10);
-          c = on ? scaleC(pal(P.palette, hash01(slot, g), P.hue, P.sat), Math.sin(Math.PI*f)) : [0,0,0]; break; }
-        case 9: c = pal(P.palette, (idx + lf)/count + ts*spd, P.hue, P.sat); break;        // color_cycle
+          c = on ? scaleC(lpal(hash01(slot, g)), Math.sin(Math.PI*f)) : [0,0,0]; break; }
+        case 9: c = lpal((idx + lf)/count + ts*spd); break;        // color_cycle
       }
       leds.push(scaleC(c, P.value / 255));
     }
