@@ -31,7 +31,7 @@ esphome:
   min_version: 2025.9.0
   project:
     name: temeyers.hex-lights
-    version: "17304e3-led"   # firmware source commit (bump on every firmware change); -led = onboard LED off
+    version: "17304e3"   # firmware source commit (bump on every firmware change)
   on_boot:
     # Restore (numbers/switches) fires BEFORE the light is set up: touching the light there crashed 85cf36d
     # (update_state -> schedule_show -> null LightState). Apply brightness/limit here, after every setup().
@@ -205,19 +205,6 @@ hexsync:
   hard_max_scale: ${max_scale}
 
 light:
-  # Onboard LED of the ESP32-S3 Super Mini on GPIO48 (WS2812 RGB on most boards, a plain blue LED on some).
-  # Nothing drove it, so it floated and blinked. Claim the pin and hold it off: the RMT sends an all-zero frame
-  # (WS2812 -> off) and idles low (plain LED -> off). GPIO48 is not a strapping pin and is not led_pin/sync_pin
-  # (gen_tiles.py rejects 48 for those). Internal: not exposed to HA.
-  - platform: esp32_rmt_led_strip
-    id: onboard_led
-    internal: true
-    pin: GPIO48
-    num_leds: 1
-    chipset: WS2812
-    rgb_order: GRB
-    default_transition_length: 0s
-    restore_mode: ALWAYS_OFF
   - platform: esp32_rmt_led_strip
     id: tile_leds
     name: Light
