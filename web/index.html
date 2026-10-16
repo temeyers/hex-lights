@@ -1,0 +1,55 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Hex lights layout</title><link rel="stylesheet" href="app.css"></head>
+<body>
+<header class="top"><h1>Hex wall</h1><span id="count" class="pill num">0 tiles</span><span id="errs" class="pill bad" hidden></span></header>
+<main id="stage"><svg id="svg" xmlns="http://www.w3.org/2000/svg" role="application" aria-label="Hex grid"><g id="grid"></g><g id="tiles"></g></svg>
+<div class="zoom"><button class="iconbtn" id="zin" aria-label="Zoom in">+</button><button class="iconbtn" id="zout" aria-label="Zoom out">−</button><button class="iconbtn" id="zfit" aria-label="Fit">⤢</button></div></main>
+<nav class="tabs">
+<button class="btn pr" id="add">+ Add tile</button>
+<button class="btn" id="tabLayout">Layout</button>
+<button class="btn" id="tabFx">Preview</button>
+<button class="btn" id="tabFile">File</button>
+</nav>
+<section id="sheet" class="sheet" hidden>
+<div class="sh-head"><h2 id="shTitle">Tile</h2><button class="iconbtn" id="shClose" aria-label="Close">✕</button></div>
+<div id="pTile" class="pane">
+ <label>Tile ID (slug or MAC)<input id="tId" autocomplete="off" autocapitalize="off" spellcheck="false"></label><p id="tIdErr" class="err"></p>
+ <label>Name (optional)<input id="tName"></label>
+ <label>MAC (optional)<input id="tMac" autocapitalize="off" placeholder="aa:bb:cc:dd:ee:ff"></label>
+ <div class="row2"><label>Rotation<select id="tRot"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
+ <label>LED count<input id="tLed" type="number" min="1" inputmode="numeric" placeholder="default"></label></div>
+ <p class="mu small" id="tPos"></p>
+ <div class="row2"><button class="btn" id="tMaster">Make master</button><button class="btn danger" id="tDel">Delete</button></div>
+</div>
+<div id="pLayout" class="pane">
+ <label>Layout name<input id="lName"></label>
+ <div class="row2"><label>Orientation<select id="lOri"><option value="pointy">Pointy top</option><option value="flat">Flat top</option></select></label>
+ <label>Hex size (mm)<input id="lSize" type="number" min="1" inputmode="decimal"></label></div>
+ <h3>LEDs</h3>
+ <div class="row2"><label>Data pin<input id="lPin" type="number" min="0" inputmode="numeric"></label>
+ <label>LEDs per tile<input id="lCount" type="number" min="1" inputmode="numeric"></label></div>
+ <div class="row2"><label>Type<select id="lType"></select></label><label>Colour order<select id="lOrder"></select></label></div>
+ <label>Master tile<select id="lMaster"></select></label>
+ <ul id="errList" class="errlist"></ul>
+</div>
+<div id="pFx" class="pane">
+ <p class="mu small" id="fxSrc"></p>
+ <label>Effect<select id="fxSel"></select></label>
+ <div id="fxParams"></div>
+ <label>Brightness <span id="briV" class="num"></span><input id="bri" type="range" min="0" max="100" value="80"></label>
+ <label>Preview speed <span id="spdV" class="num"></span><input id="spd" type="range" min="0" max="300" value="100"></label>
+ <div class="row2"><button class="btn pr" id="fxPlay">Play</button><button class="btn" id="fxStop">Stop</button></div>
+ <p class="mu small">Local simulation only. Tap a tile to set the ripple origin.</p>
+</div>
+<div id="pFile" class="pane">
+ <div class="row2"><button class="btn pr" id="exp">Export JSON</button><button class="btn" id="impBtn">Import JSON</button></div>
+ <input type="file" id="imp" accept="application/json,.json" hidden>
+ <textarea id="json" rows="10" spellcheck="false" class="mono"></textarea>
+ <div class="row2"><button class="btn" id="copy">Copy</button><button class="btn" id="loadTxt">Load from text</button></div>
+ <button class="btn danger" id="clear">Clear layout</button>
+ <p id="fileMsg" class="small mu"></p>
+</div>
+</section>
+<script src="layout-format.js"></script><script src="effects.js"></script><script src="app.js"></script>
+</body></html>
