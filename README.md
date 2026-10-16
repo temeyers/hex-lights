@@ -8,11 +8,11 @@ Work in progress.
 ```
 {"version": 1, "name": "Hex Wall",
  "hex": {"orientation": "pointy|flat", "sizeMm": 100},
- "led": {"pin": "GPIO4", "type": "WS2812", "order": "GRB", "count": 44,
+ "led": {"pin": "GPIO13", "type": "WS2812", "order": "GRB", "count": 44,
          "budgetMa": 1200, "maxScale": 0.55},          (budgetMa/maxScale optional)
  "master": "c0",
  "tiles": [{"id": "c0", "name": "Center", "mac": "AA:..", "q": 0, "r": 0, "rot": 0,
-            "ledCount": 44, "pin": "GPIO4", "priority": 1}]}  (name/mac/rot/ledCount/pin/priority optional)
+            "ledCount": 44, "pin": "GPIO13", "priority": 1}]}  (name/mac/rot/ledCount/pin/priority optional)
 ```
 - `id` is a slug (`[a-z0-9-]`) or a MAC. `q`,`r` are axial coords, `s=-q-r`, and `rot` is 0-5.
 - Validation: version 1, 1-64 tiles, unique ids and coords, exactly one master that is a tile id. Pins must be `GPIO<n>` and must not be GPIO0/3/45/46 (strapping), 19/20 (USB) or 48 (onboard RGB). Islands the master can't reach through neighbours give a warning.
