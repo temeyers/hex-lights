@@ -175,6 +175,7 @@ def test_hexsync_interface_matches_hardware():
 def test_wall_fx_axis_arg():
     import yaml, gen_ha
     L = lay(); d = g.derive(L)
+    L["ha"] = {"wallFxAxisArg": False}; d = g.derive(L)   # default is True since firmware 2b5b875
     off = gen_ha.render(d, g.node, g.light_entity)
     assert "select.hex_01_wall_wipe_axis" in off.split("hex_wall_led_count_apply")[0].split("hex_wall_fx_apply")[1]
     assert "axis: " not in off.split("hex_wall_fx_apply:")[1].split("hex_wall_led_count_apply")[0]

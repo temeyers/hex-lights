@@ -33,7 +33,7 @@ INTERFACE = {
     "wall_axis_select": "select.{master}_wall_wipe_axis",  # x|y|ring|angle
     # true once Hardware's firmware with set_wall_fx(..., axis) is flashed (axis then REQUIRED):
     # pass axis (0 x, 1 y, 2 ring, 3 angle) on the service call and skip the select.
-    "wallFxAxisArg": False,
+    "wallFxAxisArg": True,   # firmware 2b5b875+ requires axis on set_wall_fx
     # Sync mode (Hardware d3aeb8b): select on the master only (internal on other tiles)
     "sync_mode_select": "select.{master}_sync_mode",
     "sync_mode_wireless": "Wireless (ESP-NOW)",

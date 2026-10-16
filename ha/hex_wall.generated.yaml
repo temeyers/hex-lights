@@ -285,12 +285,7 @@ script:
                 saturation: 215
                 value: 255
                 start_delay_ms: 300
-      - if: "{{ has_value('select.hex_01_wall_wipe_axis') }}"
-        then:
-          - action: select.select_option
-            continue_on_error: true
-            target: {entity_id: select.hex_01_wall_wipe_axis}
-            data: {option: "{{ states('input_select.hex_wall_axis') }}"}
+                axis: "{{ {'x': 0, 'y': 1, 'ring': 2, 'angle': 3}.get(states('input_select.hex_wall_axis'), 0) }}"
       - action: light.turn_on
         target: {entity_id: "{{ tgt_light }}"}
         data: {effect: HexSync}
