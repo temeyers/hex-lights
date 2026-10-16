@@ -1,0 +1,35 @@
+# Hex light wall layout. See README.md for the format.
+wall:
+  name: Hex Wall
+  orientation: pointy        # pointy | flat
+  leds_per_tile: 12
+  led_pin: GPIO4
+  led_type: WS2812           # default WS2812
+  color_order: GRB           # default GRB
+  master: c0
+  device_prefix: hex         # device_name = <prefix>-<id>
+  package: templates/tile-common.yaml   # optional, relative to this file
+  # ha_light_entity: "light.{node}"     # optional, {node} = device_name with _ instead of -
+
+tiles:
+  # compact 20-tile blob: centre + ring 1 (6) + 13 of ring 2
+  - {id: c0, name: Center, q: 0, r: 0}
+  - {id: r1-e,  name: Ring1 E,  q: 1,  r: 0}
+  - {id: r1-ne, name: Ring1 NE, q: 1,  r: -1}
+  - {id: r1-nw, name: Ring1 NW, q: 0,  r: -1}
+  - {id: r1-w,  name: Ring1 W,  q: -1, r: 0}
+  - {id: r1-sw, name: Ring1 SW, q: -1, r: 1}
+  - {id: r1-se, name: Ring1 SE, q: 0,  r: 1}
+  - {id: r2-a, name: Ring2 A, q: 2,  r: 0}
+  - {id: r2-b, name: Ring2 B, q: 2,  r: -1}
+  - {id: r2-c, name: Ring2 C, q: 2,  r: -2}
+  - {id: r2-d, name: Ring2 D, q: 1,  r: -2}
+  - {id: r2-e, name: Ring2 E, q: 0,  r: -2}
+  - {id: r2-f, name: Ring2 F, q: -1, r: -1}
+  - {id: r2-g, name: Ring2 G, q: -2, r: 0}
+  - {id: r2-h, name: Ring2 H, q: -2, r: 1}
+  - {id: r2-i, name: Ring2 I, q: -2, r: 2}
+  - {id: r2-j, name: Ring2 J, q: -1, r: 2}
+  - {id: r2-k, name: Ring2 K, q: 0,  r: 2}
+  - {id: r2-l, name: Ring2 L, q: 1,  r: 1, rotation: 0}
+  - {id: r2-m, name: Ring2 M, q: 3,  r: -1, mac: "AA:BB:CC:DD:EE:01"}
