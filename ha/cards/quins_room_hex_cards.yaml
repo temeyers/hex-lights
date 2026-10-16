@@ -103,16 +103,6 @@
   - condition: state
     entity: switch.hex_target_manual_color
     state: 'on'
-- type: custom:mushroom-template-card
-  primary: Displayed color
-  secondary: '{% set t = states(''input_select.hex_wall_target'') %}{% set s = ''sensor.hex_'' ~ (t[4:] if t[:4] == ''Hex '' else ''01'') ~ ''_displayed_color'' %}{{ states(s) }}'
-  icon: mdi:hexagon
-  icon_color: '{% set t = states(''input_select.hex_wall_target'') %}{% set s = ''sensor.hex_'' ~ (t[4:] if t[:4] == ''Hex '' else ''01'') ~ ''_displayed_color'' %}{{ states(s) }}'
-  entity: light.hex_target
-  tap_action:
-    action: toggle
-  hold_action:
-    action: more-info
 - type: tile
   entity: switch.hex_target_manual_color
   name: Manual color
