@@ -56,10 +56,6 @@
         {
          "entity": "sensor.hex_01_displayed_color",
          "name": "Shown"
-        },
-        {
-         "entity": "sensor.hex_01_light_rgb",
-         "name": "Light RGB"
         }
        ]
       },
@@ -95,10 +91,6 @@
         {
          "entity": "sensor.hex_02_displayed_color",
          "name": "Shown"
-        },
-        {
-         "entity": "sensor.hex_02_light_rgb",
-         "name": "Light RGB"
         }
        ]
       },
@@ -134,10 +126,6 @@
         {
          "entity": "sensor.hex_03_displayed_color",
          "name": "Shown"
-        },
-        {
-         "entity": "sensor.hex_03_light_rgb",
-         "name": "Light RGB"
         }
        ]
       },
@@ -173,10 +161,6 @@
         {
          "entity": "sensor.hex_04_displayed_color",
          "name": "Shown"
-        },
-        {
-         "entity": "sensor.hex_04_light_rgb",
-         "name": "Light RGB"
         }
        ]
       },
@@ -212,10 +196,6 @@
         {
          "entity": "sensor.hex_05_displayed_color",
          "name": "Shown"
-        },
-        {
-         "entity": "sensor.hex_05_light_rgb",
-         "name": "Light RGB"
         }
        ]
       },
@@ -251,10 +231,6 @@
         {
          "entity": "sensor.hex_06_displayed_color",
          "name": "Shown"
-        },
-        {
-         "entity": "sensor.hex_06_light_rgb",
-         "name": "Light RGB"
         }
        ]
       },
@@ -290,10 +266,6 @@
         {
          "entity": "sensor.hex_07_displayed_color",
          "name": "Shown"
-        },
-        {
-         "entity": "sensor.hex_07_light_rgb",
-         "name": "Light RGB"
         }
        ]
       },
@@ -329,10 +301,6 @@
         {
          "entity": "sensor.hex_08_displayed_color",
          "name": "Shown"
-        },
-        {
-         "entity": "sensor.hex_08_light_rgb",
-         "name": "Light RGB"
         }
        ]
       },
@@ -368,10 +336,6 @@
         {
          "entity": "sensor.hex_09_displayed_color",
          "name": "Shown"
-        },
-        {
-         "entity": "sensor.hex_09_light_rgb",
-         "name": "Light RGB"
         }
        ]
       },
@@ -407,10 +371,6 @@
         {
          "entity": "sensor.hex_10_displayed_color",
          "name": "Shown"
-        },
-        {
-         "entity": "sensor.hex_10_light_rgb",
-         "name": "Light RGB"
         }
        ]
       },
@@ -446,10 +406,6 @@
         {
          "entity": "sensor.hex_11_displayed_color",
          "name": "Shown"
-        },
-        {
-         "entity": "sensor.hex_11_light_rgb",
-         "name": "Light RGB"
         }
        ]
       },
@@ -485,10 +441,6 @@
         {
          "entity": "sensor.hex_12_displayed_color",
          "name": "Shown"
-        },
-        {
-         "entity": "sensor.hex_12_light_rgb",
-         "name": "Light RGB"
         }
        ]
       },
@@ -524,10 +476,6 @@
         {
          "entity": "sensor.hex_13_displayed_color",
          "name": "Shown"
-        },
-        {
-         "entity": "sensor.hex_13_light_rgb",
-         "name": "Light RGB"
         }
        ]
       },
@@ -563,10 +511,6 @@
         {
          "entity": "sensor.hex_14_displayed_color",
          "name": "Shown"
-        },
-        {
-         "entity": "sensor.hex_14_light_rgb",
-         "name": "Light RGB"
         }
        ]
       },
@@ -602,10 +546,6 @@
         {
          "entity": "sensor.hex_15_displayed_color",
          "name": "Shown"
-        },
-        {
-         "entity": "sensor.hex_15_light_rgb",
-         "name": "Light RGB"
         }
        ]
       },
@@ -641,10 +581,6 @@
         {
          "entity": "sensor.hex_16_displayed_color",
          "name": "Shown"
-        },
-        {
-         "entity": "sensor.hex_16_light_rgb",
-         "name": "Light RGB"
         }
        ]
       },
@@ -680,10 +616,6 @@
         {
          "entity": "sensor.hex_17_displayed_color",
          "name": "Shown"
-        },
-        {
-         "entity": "sensor.hex_17_light_rgb",
-         "name": "Light RGB"
         }
        ]
       },
@@ -719,10 +651,6 @@
         {
          "entity": "sensor.hex_18_displayed_color",
          "name": "Shown"
-        },
-        {
-         "entity": "sensor.hex_18_light_rgb",
-         "name": "Light RGB"
         }
        ]
       },
@@ -758,10 +686,6 @@
         {
          "entity": "sensor.hex_19_displayed_color",
          "name": "Shown"
-        },
-        {
-         "entity": "sensor.hex_19_light_rgb",
-         "name": "Light RGB"
         }
        ]
       },
@@ -797,12 +721,134 @@
         {
          "entity": "sensor.hex_20_displayed_color",
          "name": "Shown"
-        },
-        {
-         "entity": "sensor.hex_20_light_rgb",
-         "name": "Light RGB"
         }
        ]
+      }
+     ]
+    },
+    {
+     "type": "entities",
+     "title": "Light RGB readback (rgb_color)",
+     "entities": [
+      {
+       "type": "attribute",
+       "entity": "light.hex_01_light",
+       "attribute": "rgb_color",
+       "name": "Hex 01"
+      },
+      {
+       "type": "attribute",
+       "entity": "light.hex_02_light",
+       "attribute": "rgb_color",
+       "name": "Hex 02"
+      },
+      {
+       "type": "attribute",
+       "entity": "light.hex_03_light",
+       "attribute": "rgb_color",
+       "name": "Hex 03"
+      },
+      {
+       "type": "attribute",
+       "entity": "light.hex_04_light",
+       "attribute": "rgb_color",
+       "name": "Hex 04"
+      },
+      {
+       "type": "attribute",
+       "entity": "light.hex_05_light",
+       "attribute": "rgb_color",
+       "name": "Hex 05"
+      },
+      {
+       "type": "attribute",
+       "entity": "light.hex_06_light",
+       "attribute": "rgb_color",
+       "name": "Hex 06"
+      },
+      {
+       "type": "attribute",
+       "entity": "light.hex_07_light",
+       "attribute": "rgb_color",
+       "name": "Hex 07"
+      },
+      {
+       "type": "attribute",
+       "entity": "light.hex_08_light",
+       "attribute": "rgb_color",
+       "name": "Hex 08"
+      },
+      {
+       "type": "attribute",
+       "entity": "light.hex_09_light",
+       "attribute": "rgb_color",
+       "name": "Hex 09"
+      },
+      {
+       "type": "attribute",
+       "entity": "light.hex_10_light",
+       "attribute": "rgb_color",
+       "name": "Hex 10"
+      },
+      {
+       "type": "attribute",
+       "entity": "light.hex_11_light",
+       "attribute": "rgb_color",
+       "name": "Hex 11"
+      },
+      {
+       "type": "attribute",
+       "entity": "light.hex_12_light",
+       "attribute": "rgb_color",
+       "name": "Hex 12"
+      },
+      {
+       "type": "attribute",
+       "entity": "light.hex_13_light",
+       "attribute": "rgb_color",
+       "name": "Hex 13"
+      },
+      {
+       "type": "attribute",
+       "entity": "light.hex_14_light",
+       "attribute": "rgb_color",
+       "name": "Hex 14"
+      },
+      {
+       "type": "attribute",
+       "entity": "light.hex_15_light",
+       "attribute": "rgb_color",
+       "name": "Hex 15"
+      },
+      {
+       "type": "attribute",
+       "entity": "light.hex_16_light",
+       "attribute": "rgb_color",
+       "name": "Hex 16"
+      },
+      {
+       "type": "attribute",
+       "entity": "light.hex_17_light",
+       "attribute": "rgb_color",
+       "name": "Hex 17"
+      },
+      {
+       "type": "attribute",
+       "entity": "light.hex_18_light",
+       "attribute": "rgb_color",
+       "name": "Hex 18"
+      },
+      {
+       "type": "attribute",
+       "entity": "light.hex_19_light",
+       "attribute": "rgb_color",
+       "name": "Hex 19"
+      },
+      {
+       "type": "attribute",
+       "entity": "light.hex_20_light",
+       "attribute": "rgb_color",
+       "name": "Hex 20"
       }
      ]
     }

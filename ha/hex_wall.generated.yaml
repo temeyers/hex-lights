@@ -393,9 +393,6 @@ group:
   hex_wall_displayed_colors:
     name: Hex wall displayed colours
     entities: ["sensor.hex_01_displayed_color", "sensor.hex_02_displayed_color", "sensor.hex_03_displayed_color", "sensor.hex_04_displayed_color", "sensor.hex_05_displayed_color", "sensor.hex_06_displayed_color", "sensor.hex_07_displayed_color", "sensor.hex_08_displayed_color", "sensor.hex_09_displayed_color", "sensor.hex_10_displayed_color", "sensor.hex_11_displayed_color", "sensor.hex_12_displayed_color", "sensor.hex_13_displayed_color", "sensor.hex_14_displayed_color", "sensor.hex_15_displayed_color", "sensor.hex_16_displayed_color", "sensor.hex_17_displayed_color", "sensor.hex_18_displayed_color", "sensor.hex_19_displayed_color", "sensor.hex_20_displayed_color"]
-  hex_wall_light_rgb:
-    name: Hex wall light RGB readback
-    entities: ["sensor.hex_01_light_rgb", "sensor.hex_02_light_rgb", "sensor.hex_03_light_rgb", "sensor.hex_04_light_rgb", "sensor.hex_05_light_rgb", "sensor.hex_06_light_rgb", "sensor.hex_07_light_rgb", "sensor.hex_08_light_rgb", "sensor.hex_09_light_rgb", "sensor.hex_10_light_rgb", "sensor.hex_11_light_rgb", "sensor.hex_12_light_rgb", "sensor.hex_13_light_rgb", "sensor.hex_14_light_rgb", "sensor.hex_15_light_rgb", "sensor.hex_16_light_rgb", "sensor.hex_17_light_rgb", "sensor.hex_18_light_rgb", "sensor.hex_19_light_rgb", "sensor.hex_20_light_rgb"]
 input_boolean:
   hex_wall_current_limit:
     name: Hex wall current limit (1200 mA per tile)

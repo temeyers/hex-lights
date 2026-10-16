@@ -6,4 +6,3 @@ recorder:
   exclude:
     entity_globs:
       - sensor.hex_*_displayed_color
-      - sensor.hex_*_light_rgb
