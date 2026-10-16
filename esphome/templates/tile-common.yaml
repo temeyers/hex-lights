@@ -229,8 +229,16 @@ light:
               id(hex_sync).set_wall_rgb(rv.get_red(), rv.get_green(), rv.get_blue());
             }
             id(hex_sync).render(it);
-      - addressable_rainbow:
-          name: Local rainbow (unsynced)
+    # HexSync is always on: it is the only effect, and any "effect: None" (HA device page, light.turn_on without
+    # effect) is turned straight back into HexSync. Solid colour = manual colour / solid wall effect.
+    on_state:
+      - if:
+          condition:
+            lambda: 'return id(bright_ready) && id(tile_leds).remote_values.is_on() && id(tile_leds).get_effect_name() != "HexSync";'
+          then:
+            - light.turn_on:
+                id: tile_leds
+                effect: HexSync
 
 sensor:
   - platform: template
