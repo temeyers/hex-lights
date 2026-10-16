@@ -257,7 +257,6 @@ def substitutions(lay, t, pin_leader=False):
         subs["tile_budget_ma"] = led["budgetMa"]  # else template default 1200
     if "maxScale" in led:                          # else template default 0.55 / 55%
         subs["max_scale"] = led["maxScale"]
-        subs["max_scale_pct"] = f"{round(led['maxScale'] * 100)}%"
     return subs
 
 

@@ -214,6 +214,35 @@ script:
                       transition: "{{ dt / 2 }}"
                       brightness: "{{ 255 if range(1000) | random < dens * 1000 else 1 }}"
             - delay: {seconds: "{{ dt }}"}
+  hex_wall_max_brightness_apply:
+    alias: Hex wall push max brightness to tiles
+    variables:
+      targets: ["number.hex_01_max_brightness", "number.hex_02_max_brightness", "number.hex_03_max_brightness", "number.hex_04_max_brightness", "number.hex_05_max_brightness", "number.hex_06_max_brightness", "number.hex_07_max_brightness", "number.hex_08_max_brightness", "number.hex_09_max_brightness", "number.hex_10_max_brightness", "number.hex_11_max_brightness", "number.hex_12_max_brightness", "number.hex_13_max_brightness", "number.hex_14_max_brightness", "number.hex_15_max_brightness", "number.hex_16_max_brightness", "number.hex_17_max_brightness", "number.hex_18_max_brightness", "number.hex_19_max_brightness", "number.hex_20_max_brightness"]
+      v: "{{ states('input_number.hex_wall_max_brightness') | int(100) }}"
+    sequence:
+      - repeat:
+          for_each: "{{ targets | select('has_value') | list }}"
+          sequence:
+            - action: number.set_value
+              continue_on_error: true
+              target: {entity_id: "{{ repeat.item }}"}
+              data: {value: "{{ v }}"}
+  hex_wall_current_limit_apply:
+    alias: Hex wall push current limit to tiles
+    variables:
+      targets: ["switch.hex_01_current_limit", "switch.hex_02_current_limit", "switch.hex_03_current_limit", "switch.hex_04_current_limit", "switch.hex_05_current_limit", "switch.hex_06_current_limit", "switch.hex_07_current_limit", "switch.hex_08_current_limit", "switch.hex_09_current_limit", "switch.hex_10_current_limit", "switch.hex_11_current_limit", "switch.hex_12_current_limit", "switch.hex_13_current_limit", "switch.hex_14_current_limit", "switch.hex_15_current_limit", "switch.hex_16_current_limit", "switch.hex_17_current_limit", "switch.hex_18_current_limit", "switch.hex_19_current_limit", "switch.hex_20_current_limit"]
+    sequence:
+      - variables:
+          live: "{{ targets | select('has_value') | list }}"
+      - if: "{{ live | length > 0 }}"
+        then:
+          - if: "{{ is_state('input_boolean.hex_wall_current_limit', 'on') }}"
+            then:
+              - action: switch.turn_on
+                target: {entity_id: "{{ live }}"}
+            else:
+              - action: switch.turn_off
+                target: {entity_id: "{{ live }}"}
   hex_wall_sync_mode_apply_layout:
     alias: Hex wall set sync mode from layout.json (Wireless (ESP-NOW))
     sequence:
@@ -288,6 +317,14 @@ input_number:
     step: 0.05
     initial: 1
     mode: slider
+  hex_wall_max_brightness:
+    name: Hex wall max brightness
+    min: 0
+    max: 100
+    step: 1
+    initial: 100
+    unit_of_measurement: "%"
+    mode: slider
   hex_wall_led_count:
     name: Hex wall LEDs per tile
     min: 1
@@ -335,3 +372,24 @@ automation:
             {{ state_attr(trigger.entity_id, 'friendly_name') or trigger.entity_id }} lost the
             jumper-wire sync pulse (falling back to the ESP-NOW clock). Check the GPIO12 wire.
       - delay: {minutes: 10}
+  - id: hex_wall_max_brightness_changed
+    alias: Hex wall - max brightness changed
+    mode: restart
+    triggers:
+      - trigger: state
+        entity_id: input_number.hex_wall_max_brightness
+    actions:
+      - delay: {seconds: 1}
+      - action: script.hex_wall_max_brightness_apply
+  - id: hex_wall_current_limit_changed
+    alias: Hex wall - current limit changed
+    mode: restart
+    triggers:
+      - trigger: state
+        entity_id: input_boolean.hex_wall_current_limit
+    actions:
+      - action: script.hex_wall_current_limit_apply
+input_boolean:
+  hex_wall_current_limit:
+    name: Hex wall current limit (1200 mA per tile)
+    initial: false

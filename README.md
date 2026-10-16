@@ -73,3 +73,6 @@ Hardware's newer firmware signature is `set_wall_fx(effect, palette, speed, scal
 
 ### Hex NN names (Hardware 9b55813)
 HA entities and services use `hex_NN`, where NN is the tile's 2-digit 1-based row in tiles.csv (= layout.json order): c0 = 01 … r3-a = 20. The master is `hex_01`. Keep it first in layout.json, because Hardware's template exposes the wall controls only on row 1. Services: `esphome.hex_01_set_wall_fx`, `_set_wall_effect`, `_set_layout_bulk`, `_set_hex_layout(hex_num, q, r, rotation, order)`. The leader binary sensor is `binary_sensor.hex_NN_sync_leader`. All of these names are in `INTERFACE` (tools/gen_ha.py).
+
+### Max brightness / current limit (Hardware 85cf36d)
+Each tile has `number.hex_NN_max_brightness` (0-100 %, default 100, restored after reboot) and `switch.hex_NN_current_limit` (default off; on = 1200 mA budget per tile). Wall-wide helpers `input_number.hex_wall_max_brightness` and `input_boolean.hex_wall_current_limit` push to every tile that has the entity whenever they change. Both appear on the dashboard for each tile. `max_scale_pct` is no longer generated.

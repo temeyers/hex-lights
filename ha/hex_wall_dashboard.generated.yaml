@@ -16,6 +16,8 @@
       "input_select.hex_wall_axis",
       "input_number.hex_wall_speed",
       "input_number.hex_wall_led_count",
+      "input_number.hex_wall_max_brightness",
+      "input_boolean.hex_wall_current_limit",
       "select.hex_01_sync_mode"
      ]
     },
@@ -42,6 +44,14 @@
         {
          "entity": "binary_sensor.hex_01_sync_leader",
          "name": "Leader"
+        },
+        {
+         "entity": "number.hex_01_max_brightness",
+         "name": "Max %"
+        },
+        {
+         "entity": "switch.hex_01_current_limit",
+         "name": "Limit"
         }
        ]
       },
@@ -65,6 +75,14 @@
         {
          "entity": "binary_sensor.hex_02_sync_leader",
          "name": "Leader"
+        },
+        {
+         "entity": "number.hex_02_max_brightness",
+         "name": "Max %"
+        },
+        {
+         "entity": "switch.hex_02_current_limit",
+         "name": "Limit"
         }
        ]
       },
@@ -88,6 +106,14 @@
         {
          "entity": "binary_sensor.hex_03_sync_leader",
          "name": "Leader"
+        },
+        {
+         "entity": "number.hex_03_max_brightness",
+         "name": "Max %"
+        },
+        {
+         "entity": "switch.hex_03_current_limit",
+         "name": "Limit"
         }
        ]
       },
@@ -111,6 +137,14 @@
         {
          "entity": "binary_sensor.hex_04_sync_leader",
          "name": "Leader"
+        },
+        {
+         "entity": "number.hex_04_max_brightness",
+         "name": "Max %"
+        },
+        {
+         "entity": "switch.hex_04_current_limit",
+         "name": "Limit"
         }
        ]
       },
@@ -134,6 +168,14 @@
         {
          "entity": "binary_sensor.hex_05_sync_leader",
          "name": "Leader"
+        },
+        {
+         "entity": "number.hex_05_max_brightness",
+         "name": "Max %"
+        },
+        {
+         "entity": "switch.hex_05_current_limit",
+         "name": "Limit"
         }
        ]
       },
@@ -157,6 +199,14 @@
         {
          "entity": "binary_sensor.hex_06_sync_leader",
          "name": "Leader"
+        },
+        {
+         "entity": "number.hex_06_max_brightness",
+         "name": "Max %"
+        },
+        {
+         "entity": "switch.hex_06_current_limit",
+         "name": "Limit"
         }
        ]
       },
@@ -180,6 +230,14 @@
         {
          "entity": "binary_sensor.hex_07_sync_leader",
          "name": "Leader"
+        },
+        {
+         "entity": "number.hex_07_max_brightness",
+         "name": "Max %"
+        },
+        {
+         "entity": "switch.hex_07_current_limit",
+         "name": "Limit"
         }
        ]
       },
@@ -203,6 +261,14 @@
         {
          "entity": "binary_sensor.hex_08_sync_leader",
          "name": "Leader"
+        },
+        {
+         "entity": "number.hex_08_max_brightness",
+         "name": "Max %"
+        },
+        {
+         "entity": "switch.hex_08_current_limit",
+         "name": "Limit"
         }
        ]
       },
@@ -226,6 +292,14 @@
         {
          "entity": "binary_sensor.hex_09_sync_leader",
          "name": "Leader"
+        },
+        {
+         "entity": "number.hex_09_max_brightness",
+         "name": "Max %"
+        },
+        {
+         "entity": "switch.hex_09_current_limit",
+         "name": "Limit"
         }
        ]
       },
@@ -249,6 +323,14 @@
         {
          "entity": "binary_sensor.hex_10_sync_leader",
          "name": "Leader"
+        },
+        {
+         "entity": "number.hex_10_max_brightness",
+         "name": "Max %"
+        },
+        {
+         "entity": "switch.hex_10_current_limit",
+         "name": "Limit"
         }
        ]
       },
@@ -272,6 +354,14 @@
         {
          "entity": "binary_sensor.hex_11_sync_leader",
          "name": "Leader"
+        },
+        {
+         "entity": "number.hex_11_max_brightness",
+         "name": "Max %"
+        },
+        {
+         "entity": "switch.hex_11_current_limit",
+         "name": "Limit"
         }
        ]
       },
@@ -295,6 +385,14 @@
         {
          "entity": "binary_sensor.hex_12_sync_leader",
          "name": "Leader"
+        },
+        {
+         "entity": "number.hex_12_max_brightness",
+         "name": "Max %"
+        },
+        {
+         "entity": "switch.hex_12_current_limit",
+         "name": "Limit"
         }
        ]
       },
@@ -318,6 +416,14 @@
         {
          "entity": "binary_sensor.hex_13_sync_leader",
          "name": "Leader"
+        },
+        {
+         "entity": "number.hex_13_max_brightness",
+         "name": "Max %"
+        },
+        {
+         "entity": "switch.hex_13_current_limit",
+         "name": "Limit"
         }
        ]
       },
@@ -341,6 +447,14 @@
         {
          "entity": "binary_sensor.hex_14_sync_leader",
          "name": "Leader"
+        },
+        {
+         "entity": "number.hex_14_max_brightness",
+         "name": "Max %"
+        },
+        {
+         "entity": "switch.hex_14_current_limit",
+         "name": "Limit"
         }
        ]
       },
@@ -364,6 +478,14 @@
         {
          "entity": "binary_sensor.hex_15_sync_leader",
          "name": "Leader"
+        },
+        {
+         "entity": "number.hex_15_max_brightness",
+         "name": "Max %"
+        },
+        {
+         "entity": "switch.hex_15_current_limit",
+         "name": "Limit"
         }
        ]
       },
@@ -387,6 +509,14 @@
         {
          "entity": "binary_sensor.hex_16_sync_leader",
          "name": "Leader"
+        },
+        {
+         "entity": "number.hex_16_max_brightness",
+         "name": "Max %"
+        },
+        {
+         "entity": "switch.hex_16_current_limit",
+         "name": "Limit"
         }
        ]
       },
@@ -410,6 +540,14 @@
         {
          "entity": "binary_sensor.hex_17_sync_leader",
          "name": "Leader"
+        },
+        {
+         "entity": "number.hex_17_max_brightness",
+         "name": "Max %"
+        },
+        {
+         "entity": "switch.hex_17_current_limit",
+         "name": "Limit"
         }
        ]
       },
@@ -433,6 +571,14 @@
         {
          "entity": "binary_sensor.hex_18_sync_leader",
          "name": "Leader"
+        },
+        {
+         "entity": "number.hex_18_max_brightness",
+         "name": "Max %"
+        },
+        {
+         "entity": "switch.hex_18_current_limit",
+         "name": "Limit"
         }
        ]
       },
@@ -456,6 +602,14 @@
         {
          "entity": "binary_sensor.hex_19_sync_leader",
          "name": "Leader"
+        },
+        {
+         "entity": "number.hex_19_max_brightness",
+         "name": "Max %"
+        },
+        {
+         "entity": "switch.hex_19_current_limit",
+         "name": "Limit"
         }
        ]
       },
@@ -479,6 +633,14 @@
         {
          "entity": "binary_sensor.hex_20_sync_leader",
          "name": "Leader"
+        },
+        {
+         "entity": "number.hex_20_max_brightness",
+         "name": "Max %"
+        },
+        {
+         "entity": "switch.hex_20_current_limit",
+         "name": "Limit"
         }
        ]
       }

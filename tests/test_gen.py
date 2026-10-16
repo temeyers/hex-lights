@@ -75,7 +75,8 @@ def test_substitution_map():
     assert g.substitutions(d, t["r3-a"])["led_count"] == 42 and g.substitutions(d, t["r3-a"])["num_leds"] == 60
     L = lay(); L["led"].update(budgetMa=900, maxScale=0.4); L["tiles"][1]["priority"] = 7
     s = g.substitutions(g.derive(L), g.derive(L)["tiles"][1])
-    assert (s["tile_budget_ma"], s["max_scale"], s["max_scale_pct"], s["leader_priority"]) == (900, 0.4, "40%", 7)
+    assert (s["tile_budget_ma"], s["max_scale"], s["leader_priority"]) == (900, 0.4, 7)
+    assert "max_scale_pct" not in s
     assert g.light_entity(d, t["r1-e"]) == "light.hex_02_light"
 
 @pytest.mark.parametrize("pin", ["GPIO0", "GPIO3", "GPIO45", "GPIO46", "GPIO19", "GPIO20", "GPIO48", "D4"])
@@ -283,3 +284,23 @@ def test_hex_nn_names():
                   "- action: set_wall_fx", "name: Sync leader", "name: Wall wipe axis", "name: Sync mode"):
             assert k in tpl, k
         assert "Sync leader (this tile)" not in tpl
+
+def test_brightness_and_current_limit():
+    import yaml
+    h = yaml.safe_load(open(os.path.join(ROOT, "ha/hex_wall.generated.yaml")))
+    n = h["input_number"]["hex_wall_max_brightness"]
+    assert (n["min"], n["max"], n["initial"]) == (0, 100, 100)
+    assert "hex_wall_current_limit" in h["input_boolean"]
+    sc = h["script"]
+    b = json.dumps(sc["hex_wall_max_brightness_apply"]); c = json.dumps(sc["hex_wall_current_limit_apply"])
+    assert "number.hex_01_max_brightness" in b and "number.hex_20_max_brightness" in b and "has_value" in b
+    assert "switch.hex_07_current_limit" in c and "switch.turn_on" in c and "switch.turn_off" in c
+    ids = {a["id"] for a in h["automation"]}
+    assert {"hex_wall_max_brightness_changed", "hex_wall_current_limit_changed"} <= ids
+    dash = open(os.path.join(ROOT, "ha/hex_wall_dashboard.generated.yaml")).read()
+    assert "number.hex_03_max_brightness" in dash and "switch.hex_03_current_limit" in dash
+    tpl = open(os.path.join(ROOT, "esphome/templates/tile-common.yaml")).read()
+    if "name: Max brightness" in tpl:
+        assert "name: Current limit" in tpl
+    for f in ("esphome/generated",):
+        pass
