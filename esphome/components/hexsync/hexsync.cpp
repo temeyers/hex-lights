@@ -130,7 +130,7 @@ void HexSync::send_(uint8_t type) {
   p.palette = params_.palette;
   p.axis = params_.axis;
   p.start_ms = params_.start_ms;
-  p.flags = params_.flags & 1;
+  p.flags = params_.flags & 3;
   p.seed = seed_;
   memcpy(p.rgb, params_.rgb, 3);
   esp_now_send(BCAST, (const uint8_t *) &p, sizeof(p));
@@ -150,12 +150,17 @@ void HexSync::handle_(const HxPacket &p, uint32_t rx_local) {
     params_.value = p.value;
     params_.speed = p.speed;
     params_.scale = p.scale;
-    params_.palette = p.palette < PAL_COUNT ? p.palette : 0;
+    params_.flags = (params_.flags & ~2) | (p.flags & 2);
+    if (p.palette == PAL_LIGHT) {  // 7dfa536 'light color' -> manual color, keep our palette
+      params_.flags |= 2;
+    } else {
+      params_.palette = p.palette < PAL_LIGHT ? p.palette : 0;
+    }
     params_.axis = p.axis;
     params_.start_ms = p.start_ms;
     memcpy(params_.rgb, p.rgb, 3);
     if ((p.flags & 1) != (params_.flags & 1)) {
-      params_.flags = p.flags & 1;
+      params_.flags = (params_.flags & ~1) | (p.flags & 1);
       save_pending_ = true;  // every tile saves the mode it receives
       save_at_ = millis();
       apply_sync_mode_();
@@ -596,7 +601,12 @@ void HexSync::set_wall_fx(int effect, int palette, int speed, int scale, int hue
   uint32_t now = effect_clock();
   params_.gen = (now > params_.gen) ? now : params_.gen + 1;
   params_.effect = (effect >= 0 && effect < FX_COUNT) ? effect : FX_SOLID;
-  params_.palette = (palette >= 0 && palette < PAL_COUNT) ? palette : PAL_RAINBOW;
+  if (palette == PAL_LIGHT) {  // legacy 'light color' id: manual color on, palette unchanged
+    params_.flags |= 2;
+    if (params_.palette >= PAL_LIGHT) params_.palette = PAL_RAINBOW;
+  } else {
+    params_.palette = (palette >= 0 && palette < PAL_LIGHT) ? palette : PAL_RAINBOW;
+  }
   params_.speed = (uint16_t) std::max(0, std::min(65535, speed));
   params_.scale = (uint16_t) std::max(1, std::min(65535, scale));
   params_.hue = (uint8_t) std::max(0, std::min(255, hue));
@@ -606,6 +616,15 @@ void HexSync::set_wall_fx(int effect, int palette, int speed, int scale, int hue
   for (int i = 0; i < 3; i++) send_(HX_SET);  // burst: broadcast has no retries
   ESP_LOGI(TAG, "wall fx %s pal %s speed %u scale %u start +%d ms", effect_name(params_.effect),
            palette_name(params_.palette), params_.speed, params_.scale, start_delay_ms);
+}
+
+void HexSync::set_manual_color(bool on) {
+  if (on == manual_color()) return;  // also stops the switch mirror from re-broadcasting
+  params_.flags = (params_.flags & ~2) | (on ? 2 : 0);
+  uint32_t now = effect_clock();
+  params_.gen = (now > params_.gen) ? now : params_.gen + 1;
+  for (int i = 0; i < 3; i++) send_(HX_SET);
+  ESP_LOGI(TAG, "manual color %s", on ? "ON" : "off");
 }
 
 // Legacy v1 action path (set_wall_effect): keeps palette/axis, starts now.
@@ -727,6 +746,7 @@ Color HexSync::pixel_(int led, int n, float t_s, int index, int count, float xn,
     if (pid == PAL_LIGHT) return scale_c(lc, 0.625f + 0.375f * cosf(6.2831853f * u));
     return mono ? light_c_ : pal(pid, u, P.hue, P.sat);
   };
+  if (P.flags & 2) return lc;  // manual color: solid of the master's chosen rgb (brightness via correction)
   Color c(0, 0, 0);
   switch (P.effect) {
     case FX_SOLID:
@@ -880,7 +900,7 @@ void HexSync::render(light::AddressableLight &it) {
 
 std::string HexSync::displayed_color() {
   float r, g, b;
-  if (params_.palette == PAL_LIGHT && params_.effect != FX_SOLID) {
+  if (manual_color() || (params_.palette == PAL_LIGHT && params_.effect != FX_SOLID)) {
     r = params_.rgb[0]; g = params_.rgb[1]; b = params_.rgb[2];
   } else if (params_.effect == FX_SOLID) {
     r = light_c_.r; g = light_c_.g; b = light_c_.b;

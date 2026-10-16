@@ -50,7 +50,7 @@ struct __attribute__((packed)) HxPacket {
   uint8_t channel;     // sender's Wi-Fi channel (diagnostic / mismatch check)
   uint8_t palette;     // v2: HxPalette
   uint8_t axis;        // v2: wipe axis HxAxis
-  uint8_t flags;       // v2: bit0 = sync mode jumper (1) / wireless (0); bits1-7 reserved 0
+  uint8_t flags;       // v2: bit0 = sync mode jumper (1) / wireless (0); v3: bit1 = manual color; bits2-7 reserved 0
   uint32_t start_ms;   // v2: effect phase origin on the shared clock; t = clock - start_ms
   uint32_t seed;       // v2: leader random seed (ripple origin, twinkle)
   uint8_t rgb[3];      // v3: master light's chosen colour (PAL_LIGHT); never read back from LEDs
@@ -122,7 +122,7 @@ struct HxParams {
   uint16_t speed{500}, scale{300};
   uint8_t palette{PAL_RAINBOW}, axis{AX_X};
   uint32_t start_ms{0};
-  uint8_t flags{0};  // bit0 jumper
+  uint8_t flags{0};  // bit0 jumper, bit1 manual color (wall-wide solid of rgb)
   uint8_t rgb[3]{255, 255, 255};  // PAL_LIGHT colour (master light remote_values)
 };
 
@@ -152,6 +152,9 @@ class HexSync : public Component {
   int wall_speed() const { return params_.speed; }
   int wall_axis() const { return params_.axis; }
   int wall_scale() const { return params_.scale; }
+  // Manual color: every tile shows the master's synced rgb as solid. Wall-wide (packet flags bit1, newest gen wins).
+  void set_manual_color(bool on);
+  bool manual_color() const { return params_.flags & 2; }
   static const char *effect_name(int id);
   static int effect_id(const std::string &name);
   static const char *palette_name(int id);

@@ -41,6 +41,14 @@ for (let e = 1; e < NAMES.length; e++) for (const rgb of [[255,0,0],[0,80,255]])
   }
   if (!lit) bad(`light color ${NAMES[e]} dark`);
 }
+// manual color: every effect/palette shows exactly P.rgb on every LED; off -> effect runs again
+for (let e = 0; e < NAMES.length; e++) for (const pal of [0, 4]) {
+  const P = {effect:e, palette:pal, speed:500, scale:150, hue:0, sat:255, value:255, axis:0, seed:3, rgb:[255,0,0], manual:true};
+  for (let t = 0; t < 3000; t += 250) for (const id of [1,2,3]) if (frame(P, walls.three, t, 44)[id].some(c => c.join() !== '255,0,0'))
+    { bad(`manual color ${NAMES[e]} pal ${pal} not solid rgb`); t = 1e9; break; }
+}
+{ const P = {effect:4, palette:4, speed:500, scale:150, hue:0, sat:255, value:255, axis:0, seed:3, rgb:[255,0,0], manual:false};
+  if (frame(P, walls.lone, 1000, 44)[1].every(c => c.join() === '255,0,0')) bad('manual off still solid'); }
 // determinism
 { const P = {effect:7, palette:1, speed:700, scale:150, hue:0, sat:255, value:255, axis:0, seed:99};
   if (JSON.stringify(frame(P, walls.three, 4321, 44)) !== JSON.stringify(frame(P, walls.three, 4321, 44))) bad('not deterministic'); }

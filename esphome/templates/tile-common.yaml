@@ -48,6 +48,10 @@ esphome:
             // Master: restore the saved wall effect/palette/axis/speed/scale (globals below) and start it on the
             // whole wall. Here, not in a restore callback: hexsync and the light are set up, ESP-NOW may still be
             // coming up (beacons repeat the params anyway).
+            if (!${wall_controls_internal} && id(wall_pal_saved) == 6) {  // saved by 7dfa536 'light color'
+              id(wall_pal_saved) = 0;
+              id(manual_color).publish_state(true);  // bright_ready still false: on_turn_on below is a no-op
+            }
             if (!${wall_controls_internal} && id(wall_fx_saved) >= 0) {
               auto &hs = *id(hex_sync);
               hs.set_wall_fx(id(wall_fx_saved), id(wall_pal_saved), id(wall_speed_saved), id(wall_scale_saved),
@@ -56,6 +60,7 @@ esphome:
                        hexsync::HexSync::effect_name(id(wall_fx_saved)), hexsync::HexSync::palette_name(id(wall_pal_saved)),
                        id(wall_speed_saved), id(wall_scale_saved), id(wall_axis_saved));
             }
+            if (!${wall_controls_internal}) id(hex_sync).set_manual_color(id(manual_color).state);  // master owns it
             id(bright_ready) = true;
             ESP_LOGI("hexsync", "brightness: max_brightness=%.0f%% (max_scale %.2f), current_limit=%s (budget %d mA), effect value=%d/255, gamma=%s, transition 0s",
                      pct, id(hex_sync).max_scale(), id(hex_sync).budget_enabled() ? "ON" : "off",
@@ -369,6 +374,18 @@ number:
       - lambda: 'id(hex_sync).set_order((int) x);'
 
 switch:
+  # Manual color: ON = every tile shows the master light's chosen colour as solid; OFF = the wall effect runs.
+  # Wall-wide (packet flags bit1). Restore only sets the state (optimistic); the master applies it to hexsync in
+  # on_boot(-100), followers take the master's flag and their switch mirrors it.
+  - platform: template
+    id: manual_color
+    name: Manual color
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    on_turn_on:
+      - lambda: 'if (id(bright_ready)) id(hex_sync).set_manual_color(true);'
+    on_turn_off:
+      - lambda: 'if (id(bright_ready)) id(hex_sync).set_manual_color(false);'
   # Per-tile current budget (ESTIMATED model, hexsync effects only). Off = no firmware current cap.
   - platform: template
     name: Current limit
@@ -398,7 +415,7 @@ select:
   - platform: template
     name: Wall palette
     internal: ${wall_controls_internal}
-    options: [rainbow, ocean, sunset, forest, fire, mono, light color]
+    options: [rainbow, ocean, sunset, forest, fire, mono]   # id 6 "light color" retired -> Manual color switch
     update_interval: 2s
     lambda: 'return std::string(hexsync::HexSync::palette_name(id(hex_sync).wall_palette()));'
     set_action:
@@ -438,6 +455,13 @@ interval:
           if (id(wall_axis_saved) != hs.wall_axis()) id(wall_axis_saved) = hs.wall_axis();
           if (id(wall_speed_saved) != hs.wall_speed()) id(wall_speed_saved) = hs.wall_speed();
           if (id(wall_scale_saved) != hs.wall_scale()) id(wall_scale_saved) = hs.wall_scale();
+  # Every tile: Manual color switch mirrors the wall-wide flag (master or any tile's HA change, newest wins).
+  - interval: 1s
+    then:
+      - lambda: |-
+          if (!id(bright_ready)) return;
+          bool m = id(hex_sync).manual_color();
+          if (id(manual_color).state != m) id(manual_color).publish_state(m);  // on_turn_* -> set_manual_color no-op
 
 text_sensor:
   # Average colour the LEDs are showing ('#RRGGBB', 2 Hz, published only on change). Read-only: never fed back
