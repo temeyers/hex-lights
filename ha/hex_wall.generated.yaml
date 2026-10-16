@@ -233,9 +233,9 @@ script:
               - action: switch.turn_off
                 target: {entity_id: "{{ live }}"}
   hex_wall_manual_color_apply:
-    alias: Hex wall push manual colour to tiles
+    alias: Hex wall manual colour (master switch; followers sync over ESP-NOW)
     variables:
-      targets: ["switch.hex_01_manual_color", "switch.hex_02_manual_color", "switch.hex_03_manual_color", "switch.hex_04_manual_color", "switch.hex_05_manual_color", "switch.hex_06_manual_color", "switch.hex_07_manual_color", "switch.hex_08_manual_color", "switch.hex_09_manual_color", "switch.hex_10_manual_color", "switch.hex_11_manual_color", "switch.hex_12_manual_color", "switch.hex_13_manual_color", "switch.hex_14_manual_color", "switch.hex_15_manual_color", "switch.hex_16_manual_color", "switch.hex_17_manual_color", "switch.hex_18_manual_color", "switch.hex_19_manual_color", "switch.hex_20_manual_color"]
+      targets: ["switch.hex_01_manual_color"]
     sequence:
       - variables:
           live: "{{ targets | select('has_value') | list }}"

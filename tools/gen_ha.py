@@ -18,8 +18,9 @@ INTERFACE = {
     # Hardware 85cf36d: per-tile runtime ceiling (0-100 %, restored) and 1200 mA budget switch
     "max_brightness_number": "number.{node}_max_brightness",
     "current_limit_switch": "switch.{node}_current_limit",
-    # PENDING Hardware: per-tile "Manual color" switch (replaces palette 'light color')
-    "manual_color_switch": "switch.{node}_manual_color",
+    # Hardware 2b5b875: "Manual color" switch, wall-wide. HA writes ONLY the master's
+    # switch; ESP-NOW syncs followers (writing all tiles would race newest-wins).
+    "manual_color_switch": "switch.{master}_manual_color",
     # Hardware-confirmed: text_sensor "Displayed color" '#RRGGBB' @1-2 Hz
     "displayed_color_sensor": "sensor.{node}_displayed_color",
     # light RGB readback = rgb_color attribute of the tile light (no separate sensor)
@@ -366,9 +367,9 @@ def wall_block(d, node, master):
               - action: switch.turn_off
                 target: {{entity_id: "{{{{ live }}}}"}}
 """
-    mc = [I["manual_color_switch"].format(node=n) for n in tn]
+    mc = [I["manual_color_switch"].format(master=mnode)]
     limit_scripts += f"""  hex_wall_manual_color_apply:
-    alias: Hex wall push manual colour to tiles
+    alias: Hex wall manual colour (master switch; followers sync over ESP-NOW)
     variables:
       targets: {J(mc)}
     sequence:

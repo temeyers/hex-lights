@@ -333,7 +333,9 @@ def test_light_color_palette_removed_manual_color():
     assert "light color" not in h["input_select"]["hex_wall_palette"]["options"]
     assert h["input_boolean"]["hex_wall_manual_color"]["initial"] is False
     c = json.dumps(h["script"]["hex_wall_manual_color_apply"])
-    assert "switch.hex_01_manual_color" in c and "switch.hex_20_manual_color" in c and "has_value" in c
+    assert "switch.hex_01_manual_color" in c and "has_value" in c
+    assert h["script"]["hex_wall_manual_color_apply"]["variables"]["targets"] == ["switch.hex_01_manual_color"]
+    assert gen_ha.INTERFACE["manual_color_switch"] == "switch.{master}_manual_color"
     assert any(a["id"] == "hex_wall_manual_color_changed" for a in h["automation"])
     dash = yaml.safe_load(open(os.path.join(ROOT, "ha/hex_wall_dashboard.generated.yaml")))
     cards = dash["views"][0]["cards"]
