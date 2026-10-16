@@ -534,7 +534,8 @@ Color HexSync::pixel_(int led, int n, float t_s, int index, int count, float xn,
       break;
     }
     case FX_RAINBOW_SWEEP: {
-      float u = (P.axis == AX_Y ? yn : xn) + t_s * spd;
+      float u = (P.axis == AX_Y ? yn : P.axis == AX_RING ? (float) ring / std::max(1, max_ring)
+                 : P.axis == AX_ANGLE ? angle / 360.0f : xn) + t_s * spd;
       c = pal(pid, u, P.hue, P.sat);
       break;
     }

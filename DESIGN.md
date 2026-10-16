@@ -162,10 +162,10 @@ Legacy `esphome.hex_c0_set_wall_effect` still works (keeps palette, starts now).
 |---|---|---|
 | 0 | solid | hsv(hue,sat) × value |
 | 1 | radial_wave | = effects.json "ripple" from the master (q,r = 0,0) |
-| 2 | rainbow_sweep | palette over normalized x (or y) |
+| 2 | rainbow_sweep | pal(u + t·speed), u = x / y / ring/maxRing / angle/360 (same axis as wipe) |
 | 3 | pulse | = effects.json "breathe" |
 | 4 | chase | tile-to-tile by chase order, tail = scale/100 tiles |
-| 5 | wipe | axis x / y / ring / angle (Wall wipe axis select) |
+| 5 | wipe | axis x / y / ring / angle (Wall wipe axis select / `axis` arg; also drives rainbow_sweep) |
 | 6 | rainbow_flow | u = ((x+y)/2)·scale − t·speed |
 | 7 | random_ripple | ring from a random tile each period; origin = tiles sorted by id [hash01(seed,k)·N] |
 | 8 | twinkle | per-LED, deterministic from seed; density = scale/1000 |

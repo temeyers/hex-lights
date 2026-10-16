@@ -56,7 +56,8 @@ function frame(P, tiles, tMs, ledCount = 44) {
         case 0: c = pal(5, 0, P.hue, P.sat); break;                                    // solid
         case 1: { const ph = fmod(ts*spd, maxRing+2);                                  // radial_wave
           c = scaleC(pal(P.palette, ring/Math.max(1,maxRing), P.hue, P.sat), Math.max(0, 1-Math.abs(ph-ring))); break; }
-        case 2: c = pal(P.palette, (P.axis === 1 ? yn : xn) + ts*spd, P.hue, P.sat); break;   // rainbow_sweep
+        case 2: { const u = P.axis === 1 ? yn : P.axis === 2 ? ring/Math.max(1,maxRing) : P.axis === 3 ? angle/360 : xn; // rainbow_sweep
+          c = pal(P.palette, u + ts*spd, P.hue, P.sat); break; }
         case 3: c = scaleC(pal(P.palette, 0, P.hue, P.sat), 0.5 - 0.5*Math.cos(2*Math.PI*ts*spd)); break; // pulse
         case 4: case 10: { const h = fmod(ts*spd, count), d = fmod(h - idx + count, count); // chase / snake
           let k = Math.max(0, 1 - d / Math.max(1, sc)); if (P.effect === 10 && k <= 0 && headD === 1) k = 0.25;
