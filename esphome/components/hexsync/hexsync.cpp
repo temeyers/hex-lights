@@ -746,7 +746,9 @@ Color HexSync::pixel_(int led, int n, float t_s, int index, int count, float xn,
     if (pid == PAL_LIGHT) return scale_c(lc, 0.625f + 0.375f * cosf(6.2831853f * u));
     return mono ? light_c_ : pal(pid, u, P.hue, P.sat);
   };
-  if (P.flags & 2) return lc;  // manual color: solid of the master's chosen rgb (brightness via correction)
+  // manual color (wall-wide flag): solid of THIS tile's own light colour, so a single Hex can differ
+  // (white shades / per-tile colour); 'All' sets every tile's light via light.hex_wall. Brightness via correction.
+  if (P.flags & 2) return light_c_;
   Color c(0, 0, 0);
   switch (P.effect) {
     case FX_SOLID:
@@ -900,9 +902,9 @@ void HexSync::render(light::AddressableLight &it) {
 
 std::string HexSync::displayed_color() {
   float r, g, b;
-  if (manual_color() || (params_.palette == PAL_LIGHT && params_.effect != FX_SOLID)) {
+  if (params_.palette == PAL_LIGHT && params_.effect != FX_SOLID && !manual_color()) {
     r = params_.rgb[0]; g = params_.rgb[1]; b = params_.rgb[2];
-  } else if (params_.effect == FX_SOLID) {
+  } else if (manual_color() || params_.effect == FX_SOLID) {
     r = light_c_.r; g = light_c_.g; b = light_c_.b;
   } else {
     if (dc_frames_ == 0) return "";  // effect not rendering (other effect / off): keep last value

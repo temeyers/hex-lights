@@ -206,7 +206,7 @@ script:
   hex_wall_max_brightness_apply:
     alias: Hex wall push max brightness to tiles
     variables:
-      targets: ["number.hex_01_max_brightness", "number.hex_02_max_brightness", "number.hex_03_max_brightness", "number.hex_04_max_brightness", "number.hex_05_max_brightness", "number.hex_06_max_brightness", "number.hex_07_max_brightness", "number.hex_08_max_brightness", "number.hex_09_max_brightness", "number.hex_10_max_brightness", "number.hex_11_max_brightness", "number.hex_12_max_brightness", "number.hex_13_max_brightness", "number.hex_14_max_brightness", "number.hex_15_max_brightness", "number.hex_16_max_brightness", "number.hex_17_max_brightness", "number.hex_18_max_brightness", "number.hex_19_max_brightness", "number.hex_20_max_brightness"]
+      targets: "{{ (states.number | map(attribute='entity_id') | select('match', '^number[.]hex_[0-9]+_max_brightness$') | sort | select('has_value') | list) }}"
       v: "{{ states('input_number.hex_wall_max_brightness') | int(100) }}"
     sequence:
       - repeat:
@@ -219,7 +219,7 @@ script:
   hex_wall_current_limit_apply:
     alias: Hex wall push current limit to tiles
     variables:
-      targets: ["switch.hex_01_current_limit", "switch.hex_02_current_limit", "switch.hex_03_current_limit", "switch.hex_04_current_limit", "switch.hex_05_current_limit", "switch.hex_06_current_limit", "switch.hex_07_current_limit", "switch.hex_08_current_limit", "switch.hex_09_current_limit", "switch.hex_10_current_limit", "switch.hex_11_current_limit", "switch.hex_12_current_limit", "switch.hex_13_current_limit", "switch.hex_14_current_limit", "switch.hex_15_current_limit", "switch.hex_16_current_limit", "switch.hex_17_current_limit", "switch.hex_18_current_limit", "switch.hex_19_current_limit", "switch.hex_20_current_limit"]
+      targets: "{{ (states.switch | map(attribute='entity_id') | select('match', '^switch[.]hex_[0-9]+_current_limit$') | sort | select('has_value') | list) }}"
     sequence:
       - variables:
           live: "{{ targets | select('has_value') | list }}"
@@ -232,6 +232,15 @@ script:
             else:
               - action: switch.turn_off
                 target: {entity_id: "{{ live }}"}
+  hex_target_white:
+    alias: Hex target - white shade (emulated colour temperature on RGB LEDs)
+    mode: queued
+    fields:
+      kelvin: {description: "2000-6500 K (warm 2700, neutral 4000, cool 6500)", example: 4000}
+    sequence:
+      - action: number.set_value
+        target: {entity_id: "{% set t = states('input_select.hex_wall_target') %}{{ ['number.hex_' ~ t[4:] ~ '_white_temperature'] if t[:4] == 'Hex ' else states.number | map(attribute='entity_id') | select('match', '^number[.]hex_[0-9]+_white_temperature$') | select('has_value') | list }}"}
+        data: {value: "{{ [2000, [6500, kelvin | int(4000)] | min] | max }}"}
   hex_wall_manual_color_apply:
     alias: Hex wall manual colour (master switch; followers sync over ESP-NOW)
     variables:
@@ -261,8 +270,8 @@ script:
       fx_ids: {"solid": 0, "radial_wave": 1, "rainbow_sweep": 2, "pulse": 3, "chase": 4, "wipe": 5, "rainbow_flow": 6, "random_ripple": 7, "twinkle": 8, "color_cycle": 9, "snake": 10}
       pal_ids: {"rainbow": 0, "ocean": 1, "sunset": 2, "forest": 3, "fire": 4, "mono": 5}
       fx: "{{ states('input_select.hex_wall_fx') }}"
-      tgt_nodes: "{% set t = states('input_select.hex_wall_target') %}{% if t[:4] == 'Hex ' %}{{ ['hex_' ~ t[4:]] }}{% else %}{% set ns = namespace(o=[]) %}{% for n in ['hex_01', 'hex_02', 'hex_03', 'hex_04', 'hex_05', 'hex_06', 'hex_07', 'hex_08', 'hex_09', 'hex_10', 'hex_11', 'hex_12', 'hex_13', 'hex_14', 'hex_15', 'hex_16', 'hex_17', 'hex_18', 'hex_19', 'hex_20'] %}{% if has_value('light.' ~ n ~ '_light') %}{% set ns.o = ns.o + [n] %}{% endif %}{% endfor %}{{ ns.o }}{% endif %}"
-      tgt_light: "{% set t = states('input_select.hex_wall_target') %}{{ 'light.hex_' ~ t[4:] ~ '_light' if t[:4] == 'Hex ' else 'light.hex_wall' }}"
+      tgt_nodes: "{% set t = states('input_select.hex_wall_target') %}{% if t[:4] == 'Hex ' %}{{ ['hex_' ~ t[4:]] }}{% else %}{{ (states.light | map(attribute='entity_id') | select('match', '^light[.]hex_[0-9]+_light$') | sort | select('has_value') | list) | map('replace', 'light.', '') | map('replace', '_light', '') | list }}{% endif %}"
+      tgt_light: "{% set t = states('input_select.hex_wall_target') %}{{ ['light.hex_' ~ t[4:] ~ '_light'] if t[:4] == 'Hex ' else (states.light | map(attribute='entity_id') | select('match', '^light[.]hex_[0-9]+_light$') | sort | select('has_value') | list) }}"
     sequence:
       - if: "{{ fx == 'off' }}"
         then:
@@ -292,7 +301,7 @@ script:
   hex_wall_led_count_apply:
     alias: Hex wall push LED count to tiles
     variables:
-      targets: ["number.hex_01_led_count", "number.hex_02_led_count", "number.hex_03_led_count", "number.hex_04_led_count", "number.hex_05_led_count", "number.hex_06_led_count", "number.hex_07_led_count", "number.hex_08_led_count", "number.hex_09_led_count", "number.hex_10_led_count", "number.hex_11_led_count", "number.hex_12_led_count", "number.hex_13_led_count", "number.hex_14_led_count", "number.hex_15_led_count", "number.hex_16_led_count", "number.hex_17_led_count", "number.hex_18_led_count", "number.hex_19_led_count", "number.hex_20_led_count"]
+      targets: "{{ (states.number | map(attribute='entity_id') | select('match', '^number[.]hex_[0-9]+_led_count$') | sort | select('has_value') | list) }}"
       overrides: {"number.hex_20_led_count": 42}
       n: "{{ states('input_number.hex_wall_led_count') | int(44) }}"
     sequence:
@@ -350,10 +359,12 @@ automation:
     triggers:
       - trigger: homeassistant
         event: start
+      - trigger: event
+        event_type: entity_registry_updated
       - trigger: time_pattern
-        minutes: "/5"
+        minutes: "/1"
     variables:
-      want: "{% set ns = namespace(o=['All']) %}{% for n in ['hex_01', 'hex_02', 'hex_03', 'hex_04', 'hex_05', 'hex_06', 'hex_07', 'hex_08', 'hex_09', 'hex_10', 'hex_11', 'hex_12', 'hex_13', 'hex_14', 'hex_15', 'hex_16', 'hex_17', 'hex_18', 'hex_19', 'hex_20'] %}{% if has_value('light.' ~ n ~ '_light') %}{% set ns.o = ns.o + ['Hex ' ~ n[4:]] %}{% endif %}{% endfor %}{{ ns.o }}"
+      want: "{{ ['All'] + ((states.light | map(attribute='entity_id') | select('match', '^light[.]hex_[0-9]+_light$') | sort | list) | map('replace', 'light.hex_', 'Hex ') | map('replace', '_light', '') | list) }}"
     conditions:
       - "{{ state_attr('input_select.hex_wall_target', 'options') != want }}"
     actions:
@@ -491,23 +502,29 @@ template:
       - name: Hex target
         unique_id: hex_target_light
         icon: mdi:hexagon-multiple
-        state: "{% set t = states('input_select.hex_wall_target') %}{{ is_state('light.hex_' ~ t[4:] ~ '_light' if t[:4] == 'Hex ' else 'light.hex_wall', 'on') }}"
-        level: "{% set t = states('input_select.hex_wall_target') %}{{ state_attr('light.hex_' ~ t[4:] ~ '_light' if t[:4] == 'Hex ' else 'light.hex_wall', 'brightness') | int(0) }}"
-        rgb: "{% set t = states('input_select.hex_wall_target') %}{{ state_attr('light.hex_' ~ t[4:] ~ '_light' if t[:4] == 'Hex ' else 'light.hex_wall', 'rgb_color') or (255, 255, 255) }}"
+        state: "{% set t = states('input_select.hex_wall_target') %}{% set l = ['light.hex_' ~ t[4:] ~ '_light'] if t[:4] == 'Hex ' else (states.light | map(attribute='entity_id') | select('match', '^light[.]hex_[0-9]+_light$') | sort | select('has_value') | list) %}{% set on = l | select('is_state', 'on') | list %}{{ on | length > 0 }}"
+        level: "{% set t = states('input_select.hex_wall_target') %}{% set l = ['light.hex_' ~ t[4:] ~ '_light'] if t[:4] == 'Hex ' else (states.light | map(attribute='entity_id') | select('match', '^light[.]hex_[0-9]+_light$') | sort | select('has_value') | list) %}{% set on = l | select('is_state', 'on') | list %}{{ on | map('state_attr', 'brightness') | map('int', 0) | max | default(0) }}"
+        rgb: "{% set t = states('input_select.hex_wall_target') %}{% set l = ['light.hex_' ~ t[4:] ~ '_light'] if t[:4] == 'Hex ' else (states.light | map(attribute='entity_id') | select('match', '^light[.]hex_[0-9]+_light$') | sort | select('has_value') | list) %}{% set on = l | select('is_state', 'on') | list %}{{ (on + l) | map('state_attr', 'rgb_color') | reject('none') | first | default((255, 255, 255)) }}"
         turn_on:
           - action: light.turn_on
-            target: {entity_id: "{% set t = states('input_select.hex_wall_target') %}{{ 'light.hex_' ~ t[4:] ~ '_light' if t[:4] == 'Hex ' else 'light.hex_wall' }}"}
+            target: {entity_id: "{% set t = states('input_select.hex_wall_target') %}{{ ['light.hex_' ~ t[4:] ~ '_light'] if t[:4] == 'Hex ' else (states.light | map(attribute='entity_id') | select('match', '^light[.]hex_[0-9]+_light$') | sort | select('has_value') | list) }}"}
         turn_off:
           - action: light.turn_off
-            target: {entity_id: "{% set t = states('input_select.hex_wall_target') %}{{ 'light.hex_' ~ t[4:] ~ '_light' if t[:4] == 'Hex ' else 'light.hex_wall' }}"}
+            target: {entity_id: "{% set t = states('input_select.hex_wall_target') %}{{ ['light.hex_' ~ t[4:] ~ '_light'] if t[:4] == 'Hex ' else (states.light | map(attribute='entity_id') | select('match', '^light[.]hex_[0-9]+_light$') | sort | select('has_value') | list) }}"}
         set_level:
           - action: light.turn_on
-            target: {entity_id: "{% set t = states('input_select.hex_wall_target') %}{{ 'light.hex_' ~ t[4:] ~ '_light' if t[:4] == 'Hex ' else 'light.hex_wall' }}"}
+            target: {entity_id: "{% set t = states('input_select.hex_wall_target') %}{{ ['light.hex_' ~ t[4:] ~ '_light'] if t[:4] == 'Hex ' else (states.light | map(attribute='entity_id') | select('match', '^light[.]hex_[0-9]+_light$') | sort | select('has_value') | list) }}"}
             data: {brightness: "{{ brightness }}"}
         set_rgb:
           - action: light.turn_on
-            target: {entity_id: "{% set t = states('input_select.hex_wall_target') %}{{ 'light.hex_' ~ t[4:] ~ '_light' if t[:4] == 'Hex ' else 'light.hex_wall' }}"}
+            target: {entity_id: "{% set t = states('input_select.hex_wall_target') %}{{ ['light.hex_' ~ t[4:] ~ '_light'] if t[:4] == 'Hex ' else (states.light | map(attribute='entity_id') | select('match', '^light[.]hex_[0-9]+_light$') | sort | select('has_value') | list) }}"}
             data: {rgb_color: ["{{ r }}", "{{ g }}", "{{ b }}"]}
+        temperature: "{% set t = states('input_select.hex_wall_target') %}{% set e = 'number.hex_' ~ t[4:] ~ '_white_temperature' if t[:4] == 'Hex ' else 'number.hex_01_white_temperature' %}{{ (1000000 / (states(e) | float(4000))) | round(0) | int }}"
+        min_mireds: 153
+        max_mireds: 500
+        set_temperature:
+          - action: script.hex_target_white
+            data: {kelvin: "{{ (1000000 / color_temp) | round(-2) | int }}"}
   - switch:
       - name: Hex target manual color
         unique_id: hex_target_manual_color

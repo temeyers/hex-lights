@@ -120,7 +120,7 @@ def test_ha_wall_interface():
     assert h["input_number"]["hex_wall_led_count"]["initial"] == 44
     assert h["input_number"]["hex_wall_led_count"]["max"] == 60
     txt = open(os.path.join(ROOT, "ha/hex_wall.generated.yaml")).read()
-    assert "number.hex_01_led_count" in txt and "esphome.{{ repeat.item }}_set_wall_fx" in txt
+    assert "^number[.]hex_[0-9]+_led_count$" in txt and "esphome.{{ repeat.item }}_set_wall_fx" in txt
 
 def test_ha_yaml_no_duplicate_keys():
     import yaml
@@ -295,8 +295,8 @@ def test_brightness_and_current_limit():
     assert "hex_wall_current_limit" in h["input_boolean"]
     sc = h["script"]
     b = json.dumps(sc["hex_wall_max_brightness_apply"]); c = json.dumps(sc["hex_wall_current_limit_apply"])
-    assert "number.hex_01_max_brightness" in b and "number.hex_20_max_brightness" in b and "has_value" in b
-    assert "switch.hex_07_current_limit" in c and "switch.turn_on" in c and "switch.turn_off" in c
+    assert "^number[.]hex_[0-9]+_max_brightness$" in b and "has_value" in b  # dynamic: any Hex NN
+    assert "^switch[.]hex_[0-9]+_current_limit$" in c and "switch.turn_on" in c and "switch.turn_off" in c
     ids = {a["id"] for a in h["automation"]}
     assert {"hex_wall_max_brightness_changed", "hex_wall_current_limit_changed"} <= ids
     dash = open(os.path.join(ROOT, "ha/hex_wall_dashboard.generated.yaml")).read()

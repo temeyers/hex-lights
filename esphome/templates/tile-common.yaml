@@ -328,6 +328,32 @@ number:
     set_action:
       - lambda: 'id(hex_sync).set_led_count((int) x);'
   # Shared wall controls; visible in HA only on the master (internal elsewhere).
+  # White shades for Manual color. The LEDs are RGB-only (WS2812), so colour temperature is emulated: setting
+  # this number converts the Kelvin value to RGB (Tanner Helland blackbody fit) and sets the light colour.
+  # Brightness is left alone. The value is the last white chosen; it is not updated by later RGB changes.
+  - platform: template
+    id: white_temp
+    name: White temperature
+    icon: mdi:thermometer
+    unit_of_measurement: K
+    min_value: 2000
+    max_value: 6500
+    step: 100
+    mode: slider
+    optimistic: true
+    restore_value: true
+    initial_value: 4000
+    set_action:
+      - lambda: |-
+          float t = x / 100.0f, r, g, b;
+          if (t <= 66) { r = 255; g = 99.4708025861f * logf(t) - 161.1195681661f; }
+          else { r = 329.698727446f * powf(t - 60, -0.1332047592f); g = 288.1221695283f * powf(t - 60, -0.0755148492f); }
+          if (t >= 66) b = 255; else if (t <= 19) b = 0; else b = 138.5177312231f * logf(t - 10) - 305.0447927307f;
+          auto cl = [](float v) { return std::max(0.0f, std::min(255.0f, v)) / 255.0f; };
+          auto call = id(tile_leds).make_call();
+          call.set_rgb(cl(r), cl(g), cl(b));
+          call.set_effect("HexSync");
+          call.perform();
   - platform: template
     name: Wall speed
     internal: ${wall_controls_internal}
@@ -382,7 +408,7 @@ number:
       - lambda: 'id(hex_sync).set_order((int) x);'
 
 switch:
-  # Manual color: ON = every tile shows the master light's chosen colour as solid; OFF = the wall effect runs.
+  # Manual color: ON = every tile shows its own light colour as solid (wall-wide flag); OFF = the wall effect runs.
   # Wall-wide (packet flags bit1). Restore only sets the state (optimistic); the master applies it to hexsync in
   # on_boot(-100), followers take the master's flag and their switch mirrors it.
   - platform: template

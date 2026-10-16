@@ -124,6 +124,64 @@
   card_mod:
     style: 'ha-card { background: rgba(255,255,255,0.08) !important; backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); border: 1px solid rgba(255,255,255,0.14)
       !important; border-radius: 22px !important; box-shadow: 0 8px 32px rgba(0,0,0,0.35) !important; }'
+# White shades (manual colour on): emulated colour temperature -> script.hex_target_white -> number.hex_NN_white_temperature
+- type: tile
+  entity: light.hex_target
+  name: White shade
+  icon: mdi:thermometer
+  hide_state: true
+  features:
+  - type: light-color-temp
+  features_position: bottom
+  visibility: &id001
+  - condition: state
+    entity: switch.hex_target_manual_color
+    state: 'on'
+  grid_options:
+    columns: 12
+- type: grid
+  columns: 3
+  square: false
+  visibility: *id001
+  grid_options:
+    columns: 12
+  cards:
+  - type: button
+    name: Warm 2700K
+    icon: mdi:weather-sunset
+    icon_height: 28px
+    show_state: false
+    tap_action:
+      action: perform-action
+      perform_action: script.hex_target_white
+      data:
+        kelvin: 2700
+    card_mod:
+      style: 'ha-card { --card-mod-icon-color: #ffa757; }'
+  - type: button
+    name: Neutral 4000K
+    icon: mdi:white-balance-sunny
+    icon_height: 28px
+    show_state: false
+    tap_action:
+      action: perform-action
+      perform_action: script.hex_target_white
+      data:
+        kelvin: 4000
+    card_mod:
+      style: 'ha-card { --card-mod-icon-color: #ffd1a3; }'
+  - type: button
+    name: Cool 6500K
+    icon: mdi:snowflake
+    icon_height: 28px
+    show_state: false
+    tap_action:
+      action: perform-action
+      perform_action: script.hex_target_white
+      data:
+        kelvin: 6500
+    card_mod:
+      style: 'ha-card { --card-mod-icon-color: #fffefa; }'
 - type: entities
   state_color: true
   grid_options:

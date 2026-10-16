@@ -283,14 +283,21 @@ script:
     return "\n".join(l.rstrip() for l in out.splitlines() if l.strip() != "") + "\n"
 
 
+def dyn(domain, suffix, live=True):
+    """Jinja expression (no braces): every <domain>.hex_NN_<suffix> entity, sorted - Hex 03..NN need no regen.
+    light.hex_wall never matches (no NN)."""
+    e = (f"(states.{domain} | map(attribute='entity_id') | select('match', '^{domain}[.]hex_[0-9]+_{suffix}$') "
+         f"| sort{' | select(\'has_value\')' if live else ''} | list)")
+    return e
+
+
 def target_jinja(tn, mnode):
     """Jinja for the panel target (input_select.hex_wall_target): tile nodes to write, and the light to drive."""
     T = "{% set t = states('input_select.hex_wall_target') %}"
     nodes = (T + "{% if t[:4] == 'Hex ' %}{{ ['hex_' ~ t[4:]] }}{% else %}"
-             "{% set ns = namespace(o=[]) %}{% for n in " + json.dumps(tn).replace('"', "'") + " %}"
-             "{% if has_value('light.' ~ n ~ '_light') %}{% set ns.o = ns.o + [n] %}{% endif %}{% endfor %}"
-             "{{ ns.o }}{% endif %}")
-    light = T + "{{ 'light.hex_' ~ t[4:] ~ '_light' if t[:4] == 'Hex ' else 'light.hex_wall' }}"
+             "{{ " + dyn("light", "light") + " | map('replace', 'light.', '') | map('replace', '_light', '') | list }}"
+             "{% endif %}")
+    light = T + "{{ ['light.hex_' ~ t[4:] ~ '_light'] if t[:4] == 'Hex ' else " + dyn("light", "light") + " }}"
     return nodes, light
 
 
@@ -307,15 +314,16 @@ def target_block(tn, mnode):
     """
     J = json.dumps
     T = "{% set t = states('input_select.hex_wall_target') %}"
-    TL = T + "{{ 'light.hex_' ~ t[4:] ~ '_light' if t[:4] == 'Hex ' else 'light.hex_wall' }}"
+    TL = T + "{{ ['light.hex_' ~ t[4:] ~ '_light'] if t[:4] == 'Hex ' else " + dyn("light", "light") + " }}"
+    TLS = T + "{% set l = ['light.hex_' ~ t[4:] ~ '_light'] if t[:4] == 'Hex ' else " + dyn("light", "light") + " %}"
+    TLON = TLS + "{% set on = l | select('is_state', 'on') | list %}"
     master_sw = "switch." + mnode + "_manual_color"
     TS = (T + "{{ 'switch.hex_' ~ t[4:] ~ '_manual_color' if t[:4] == 'Hex ' else '" + master_sw + "' }}")
     ALL_SW = ("{{ states.switch | map(attribute='entity_id') | select('match', '^switch[.]hex_[0-9]+_manual_color$') "
               "| select('has_value') | list }}")
     TSW = T + "{{ ['switch.hex_' ~ t[4:] ~ '_manual_color'] if t[:4] == 'Hex ' else " + ALL_SW[3:-3] + " }}"
-    opts = ("{% set ns = namespace(o=['All']) %}{% for n in " + J(tn).replace('"', "'") + " %}"
-            "{% if has_value('light.' ~ n ~ '_light') %}{% set ns.o = ns.o + ['Hex ' ~ n[4:]] %}{% endif %}"
-            "{% endfor %}{{ ns.o }}")
+    opts = ("{{ ['All'] + (" + dyn("light", "light", live=False)
+            + " | map('replace', 'light.hex_', 'Hex ') | map('replace', '_light', '') | list) }}")
     # tile selects (only the master exposes wall selects; followers fall back to the master's)
     def tsel(kind):
         return (T + "{% set e = 'select.hex_' ~ t[4:] ~ '_" + kind + "' if t[:4] == 'Hex ' else '' %}"
@@ -328,8 +336,10 @@ def target_block(tn, mnode):
     triggers:
       - trigger: homeassistant
         event: start
+      - trigger: event
+        event_type: entity_registry_updated
       - trigger: time_pattern
-        minutes: "/5"
+        minutes: "/1"
     variables:
       want: {J(opts)}
     conditions:
@@ -389,9 +399,9 @@ template:
       - name: Hex target
         unique_id: hex_target_light
         icon: mdi:hexagon-multiple
-        state: {J("{% set l = " + TL[len(T):].replace("{{ ", "").replace(" }}", "") + " %}" if False else T + "{{ is_state(" + TL[len(T) + 3:-3] + ", 'on') }}")}
-        level: {J(T + "{{ state_attr(" + TL[len(T) + 3:-3] + ", 'brightness') | int(0) }}")}
-        rgb: {J(T + "{{ state_attr(" + TL[len(T) + 3:-3] + ", 'rgb_color') or (255, 255, 255) }}")}
+        state: {J(TLON + "{{ on | length > 0 }}")}
+        level: {J(TLON + "{{ on | map('state_attr', 'brightness') | map('int', 0) | max | default(0) }}")}
+        rgb: {J(TLON + "{{ (on + l) | map('state_attr', 'rgb_color') | reject('none') | first | default((255, 255, 255)) }}")}
         turn_on:
           - action: light.turn_on
             target: {{entity_id: {J(TL)}}}
@@ -406,6 +416,12 @@ template:
           - action: light.turn_on
             target: {{entity_id: {J(TL)}}}
             data: {{rgb_color: ["{{{{ r }}}}", "{{{{ g }}}}", "{{{{ b }}}}"]}}
+        temperature: {J(T + "{% set e = 'number.hex_' ~ t[4:] ~ '_white_temperature' if t[:4] == 'Hex ' else 'number." + mnode + "_white_temperature' %}{{ (1000000 / (states(e) | float(4000))) | round(0) | int }}")}
+        min_mireds: 153
+        max_mireds: 500
+        set_temperature:
+          - action: script.hex_target_white
+            data: {{kelvin: "{{{{ (1000000 / color_temp) | round(-2) | int }}}}"}}
   - switch:
       - name: Hex target manual color
         unique_id: hex_target_manual_color
@@ -418,7 +434,20 @@ template:
           - action: switch.turn_off
             target: {{entity_id: {J(TSW)}}}
 """
-    return sel, autos, tmpl
+    TWN = (T + "{{ ['number.hex_' ~ t[4:] ~ '_white_temperature'] if t[:4] == 'Hex ' else states.number "
+           "| map(attribute='entity_id') | select('match', '^number[.]hex_[0-9]+_white_temperature$') "
+           "| select('has_value') | list }}")
+    scr = f"""  hex_target_white:
+    alias: Hex target - white shade (emulated colour temperature on RGB LEDs)
+    mode: queued
+    fields:
+      kelvin: {{description: "2000-6500 K (warm 2700, neutral 4000, cool 6500)", example: 4000}}
+    sequence:
+      - action: number.set_value
+        target: {{entity_id: {J(TWN)}}}
+        data: {{value: "{{{{ [2000, [6500, kelvin | int(4000)] | min] | max }}}}"}}
+"""
+    return sel, autos, tmpl, scr
 
 
 def wall_block(d, node, master):
@@ -447,7 +476,7 @@ def wall_block(d, node, master):
     eff = I["light_effect"]
     tn = [node(d, t) for t in d["tiles"]]
     TGT_NODES, TGT_LIGHT = target_jinja(tn, mnode)
-    TB_SELECT, TB_AUTOS, TB_TEMPLATE = target_block(tn, mnode)
+    TB_SELECT, TB_AUTOS, TB_TEMPLATE, TB_SCRIPT = target_block(tn, mnode)
     want_mode = I["sync_mode_jumper"] if (d.get("sync") or {}).get("mode") == "jumper" else I["sync_mode_wireless"]
     src = [I["sync_source_sensor"].format(node=n) for n in tn]
     mode_sel = I["sync_mode_select"].format(master=mnode)
@@ -480,7 +509,7 @@ def wall_block(d, node, master):
   hex_wall_max_brightness_apply:
     alias: Hex wall push max brightness to tiles
     variables:
-      targets: {J(mb)}
+      targets: "{{{{ {dyn('number', 'max_brightness')} }}}}"
       v: "{{{{ states('input_number.hex_wall_max_brightness') | int(100) }}}}"
     sequence:
       - repeat:
@@ -493,7 +522,7 @@ def wall_block(d, node, master):
   hex_wall_current_limit_apply:
     alias: Hex wall push current limit to tiles
     variables:
-      targets: {J(cl)}
+      targets: "{{{{ {dyn('switch', 'current_limit')} }}}}"
     sequence:
       - variables:
           live: "{{{{ targets | select('has_value') | list }}}}"
@@ -508,6 +537,7 @@ def wall_block(d, node, master):
                 target: {{entity_id: "{{{{ live }}}}"}}
 """
     mc = [I["manual_color_switch"].format(master=mnode)]
+    limit_scripts += TB_SCRIPT
     limit_scripts += f"""  hex_wall_manual_color_apply:
     alias: Hex wall manual colour (master switch; followers sync over ESP-NOW)
     variables:
@@ -598,7 +628,7 @@ def wall_block(d, node, master):
   hex_wall_led_count_apply:
     alias: Hex wall push LED count to tiles
     variables:
-      targets: {J(numbers)}
+      targets: "{{{{ {dyn('number', 'led_count')} }}}}"
       overrides: {J(per_tile)}
       n: "{{{{ states('input_number.hex_wall_led_count') | int(44) }}}}"
     sequence:
