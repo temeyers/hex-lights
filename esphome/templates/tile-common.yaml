@@ -134,7 +134,7 @@ light:
     pin: ${led_pin}
     num_leds: ${num_leds}
     chipset: WS2812
-    rgb_order: GRB
+    rgb_order: GRB   # 2025.9.x lacks channel_colors; 2026.x accepts rgb_order (deprecated, removed 2027.3.0) -> switch to "channel_colors: GRB" once 2025.9 support is dropped
     default_transition_length: 0s
     # Hard ceiling for EVERYTHING this light shows (HA solid colors too).
     color_correct: ["${max_scale_pct}", "${max_scale_pct}", "${max_scale_pct}"]

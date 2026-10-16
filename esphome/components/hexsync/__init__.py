@@ -53,8 +53,24 @@ CONFIG_SCHEMA = cv.Schema(
 ).extend(cv.COMPONENT_SCHEMA)
 
 
+def _is_esp_idf():
+    # CORE.using_esp_idf was removed in ESPHome 2026.x; fall back to the esp32 framework type.
+    v = getattr(CORE, "using_esp_idf", None)
+    if v is not None:
+        return bool(v)
+    try:
+        from esphome.components.esp32 import get_esp32_variant  # noqa: F401
+        from esphome.const import CONF_FRAMEWORK, CONF_TYPE
+        fw = CORE.config.get("esp32", {}).get(CONF_FRAMEWORK, {}).get(CONF_TYPE)
+        if fw is not None:
+            return fw in ("esp-idf", "esp_idf")
+    except Exception:
+        pass
+    return getattr(CORE, "target_framework", "") in ("esp-idf", "esp_idf")
+
+
 def _final(config):
-    if not CORE.using_esp_idf:
+    if not _is_esp_idf():
         raise cv.Invalid("hexsync requires the esp-idf framework")
     return config
 

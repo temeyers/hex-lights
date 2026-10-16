@@ -65,7 +65,7 @@ void HexSync::setup() {
     if (l.led_count >= 1 && l.led_count <= HX_MAX_LEDS) led_count_ = l.led_count;
     params_.flags = (l.sync_mode & 1);  // default 0 = wireless; GPIO untouched unless 1
     ESP_LOGI(TAG, "layout from flash: q=%d r=%d rot=%d order=%d gen=%u sync=%s", q_, r_, rot_deg_, order_,
-             layout_gen_, (params_.flags & 1) ? "jumper" : "wireless");
+             (unsigned) layout_gen_, (params_.flags & 1) ? "jumper" : "wireless");
   }
   apply_sync_mode_();  // wireless: does nothing to the sync pin
 }
@@ -434,7 +434,7 @@ void HexSync::apply_layout_(const HxLayoutEntry &e, uint32_t gen) {
   bool same = e.q == q_ && e.r == r_ && (e.rotation % 360) == rot_deg_ && e.order == order_;
   q_ = e.q; r_ = e.r; rot_deg_ = e.rotation % 360; order_ = e.order;
   if (!same || gen != layout_gen_) {
-    ESP_LOGI(TAG, "layout set: q=%d r=%d rot=%d order=%d (gen %u)", q_, r_, rot_deg_, order_, gen);
+    ESP_LOGI(TAG, "layout set: q=%d r=%d rot=%d order=%d (gen %u)", q_, r_, rot_deg_, order_, (unsigned) gen);
     layout_changed_(gen);
   } else {
     status_pending_ = true;

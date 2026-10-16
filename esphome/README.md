@@ -71,3 +71,12 @@ Set it back to `Wireless (ESP-NOW)` to release the pin. Different pin or first-b
 `python3 tools/gen_tiles.py --sync-pin GPIO12 --sync-mode wireless` (writes `sync_pin` and `sync_mode_default`
 into every tile; the mode saved on a tile wins after its first boot).
 See DESIGN.md → Sync mode.
+
+## ESPHome version compatibility
+
+Validated (`esphome config` + `esphome compile` on tiles/tile_01.yaml) with **2025.9.3** and **2026.9.1** (HA add-on).
+
+- `hexsync` no longer uses `CORE.using_esp_idf` (removed in 2026.x); it falls back to the `esp32: framework: type`.
+- The LED strip keeps `rgb_order: GRB`, because 2025.9.x rejects `channel_colors`. 2026.x accepts it with a deprecation warning, and the option is removed in 2027.3.0. Switch to `channel_colors: GRB` once 2025.9 support is dropped.
+- 2026.x rejects an all-zeros `api_key`. Use a real key: `openssl rand -base64 32`.
+- If you build with both versions on one machine, give them separate PlatformIO dirs, for example `PLATFORMIO_CORE_DIR=~/.platformio-esphome2025`. Otherwise the 2026 ESP-IDF package breaks 2025 builds (`esp_driver_bitscrambler`).
