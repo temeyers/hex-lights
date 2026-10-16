@@ -69,3 +69,18 @@ rainbow_flow and the palettes.
 - Preview source **Firmware reference** uses `../esphome/tools/effects-ref.js` `frame(P, tiles, tMs, ledCount)`. Tiles get numeric
   ids from tiles.csv rows. It's called once with the largest led count, then sliced per tile. firmwareOnly effects (random_ripple,
   twinkle, color_cycle, snake) always preview through it.
+
+## Sync mode (DESIGN.md "Sync mode: Wireless (default) or Jumper wire", d3aeb8b)
+- **Storage:** DESIGN.md/layout.json define no key, so the editor uses an optional top-level
+  `"sync": {"mode": "wireless" | "jumper", "pin": "GPIO<n>"}`. It's written only when not the default (wireless, GPIO12), so Back End's
+  layout.json round-trips unchanged. gen_tiles.py `validate()` accepts it and `derive()` copies it through (checked). It does not yet
+  feed the `sync_pin` substitution. On the device the mode is the master's `select.hex_c0_sync_mode`
+  (`Wireless (ESP-NOW)` / `Jumper wire`) and sync_pin is a compile-time substitution (default GPIO12).
+- **Sync pin** uses the same rule as the data pin (`GPIO<n>`, not 0/3/45/46 strapping, 19/20 USB, 48 RGB LED, same as gen_tiles
+  `check_pin`), and is flagged if it equals the LED data pin.
+- **Wiring panel** (Layout tab, Jumper only): one shared SYNC line + GND bus, a 330 Ω series resistor at each tile, one 4.7 kΩ
+  pull-up to 3.3 V, pin = sync_pin. Matches DESIGN.md. Its only nuance: the 4.7 kΩ is "optional" (internal ~45 kΩ pull-ups for short lines [EST]).
+- **Sync source badge** (grid `W`/`J`, `·L` = expected leader; tile panel): *expected* value only. Wireless → `espnow`, Jumper →
+  `jumper` (the leader also reports `jumper`). The live value, including `jumper-lost`, comes from `sensor.hex_<id>_sync_source` in HA, which the editor doesn't read.
+  The expected leader is the master (gen_tiles gives it leader_priority 1); failover can move it.
+- **Push YAML** adds a `select.select_option` on `select.hex_c0_sync_mode`. Wall-fx YAML is unchanged (the mode isn't a set_wall_fx field).

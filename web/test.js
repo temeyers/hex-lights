@@ -48,11 +48,27 @@ const OUT = __dirname + '/screenshots/'; const URL = 'http://localhost:8411/web/
     // layout panel
     await p.click('#tabLayout'); await p.fill('#lName', 'Living room'); await p.fill('#lPin', '5'); await p.fill('#lCount', '36'); await p.selectOption('#lOrder', 'RGB');
     await p.screenshot({ path: OUT + 'layout-panel-' + w + '.png' });
+    // sync mode
+    ok(await p.evaluate(() => HexApp.state().sync.mode) === 'wireless' && await p.isHidden('#wireBox') && !(await p.evaluate(() => 'sync' in JSON.parse(LayoutFormat.serialize(HexApp.state())))), w + ' sync default wireless, not exported');
+    ok(await p.$$eval('.hx .sb text', t => t.length === 20 && t.filter(x => x.textContent.startsWith('W')).length === 20 && t.filter(x => x.textContent.endsWith('·L')).length === 1), w + ' 20 W badges, 1 leader');
+    await p.click('#syJ');
+    ok(await p.isVisible('#wireBox'), w + ' wiring panel shown in jumper mode');
+    const wt = await p.textContent('#wireBox'); ok(wt.includes('330 Ω') && wt.includes('4.7 kΩ') && wt.includes('GPIO12') && wt.includes('×20'), w + ' diagram: 330 Ω, 4.7 kΩ, GPIO12');
+    const wb = await p.$eval('#wireBox svg', e => e.getBoundingClientRect()); ok(wb.right <= w && wb.width > 200, w + ' diagram fits (' + Math.round(wb.width) + 'px)');
+    ok(await p.$$eval('.hx .sb text', t => t.every(x => x.textContent.startsWith('J'))), w + ' badges show J');
+    await p.fill('#lSyncPin', 'GPIO5'); ok((await p.textContent('#errList')).includes('Sync pin must not be the LED data pin'), w + ' sync pin == data pin flagged');
+    await p.fill('#lSyncPin', 'GPIO0'); ok((await p.textContent('#errList')).includes('strapping'), w + ' sync pin strapping flagged');
+    await p.fill('#lSyncPin', 'pin12'); ok((await p.textContent('#errList')).includes('Sync pin must look like GPIO<n>'), w + ' sync pin format flagged');
+    await p.fill('#lSyncPin', 'GPIO14'); ok((await p.textContent('#wireBox')).includes('GPIO14') && !(await p.textContent('#errList')).includes('Sync pin'), w + ' diagram follows sync_pin');
+    await p.screenshot({ path: OUT + 'sync-jumper-' + w + '.png' });
+    await p.locator('#wireBox').screenshot({ path: OUT + 'wiring-' + w + '.png' });
+    ok(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth), w + ' no sideways scroll with diagram');
+    const so = JSON.parse(await p.evaluate(() => LayoutFormat.serialize(HexApp.state()))).sync; ok(so && so.mode === 'jumper' && so.pin === 'GPIO14', w + ' sync exported ' + JSON.stringify(so));
     // export
     await p.click('#tabFile'); const [dl] = await Promise.all([p.waitForEvent('download'), p.click('#exp')]);
     const file = OUT + '../layout-export-' + w + '.json'; await dl.saveAs(file); const exp = fs.readFileSync(file, 'utf8'); const o = JSON.parse(exp);
     ok(o.version === 1 && o.tiles.length === 20 && o.master === 'hex-01' && o.led.pin === 'GPIO5' && o.led.order === 'RGB' && o.tiles[0].ledCount === 42 && o.tiles[0].mac && o.tiles[0].rot === 3 && !('rotationDeg' in o.tiles[0]) && o.tiles[1].rot === 2 && o.tiles[1].rotationDeg === 105 && o.tiles[1].order === 7 && !('order' in o.tiles[2]), w + ' export content (rot/rotationDeg/order)');
-    ok(JSON.stringify(Object.keys(o)) === '["version","name","hex","led","master","tiles"]' && !('x' in o.tiles[0]) && !('ring' in o.tiles[0]), w + ' export has no derived fields');
+    ok(JSON.stringify(Object.keys(o)) === '["version","name","hex","led","master","tiles","sync"]' && !('x' in o.tiles[0]) && !('ring' in o.tiles[0]), w + ' export has no derived fields');
     // reimport after clearing
     await p.evaluate(() => { localStorage.clear(); }); await p.reload();
     ok(await p.textContent('#count') === '0 tiles', w + ' cleared');
@@ -112,6 +128,11 @@ const OUT = __dirname + '/screenshots/'; const URL = 'http://localhost:8411/web/
     ok(mm.length === 0 && mine.length === ref.length, 'derived fields match out/layout.json');
     const src = JSON.parse(fs.readFileSync('/workspace/hex-lights/layout.json', 'utf8')), back = JSON.parse(await p.evaluate(() => LayoutFormat.serialize(HexApp.state())));
     ok(JSON.stringify(back) === JSON.stringify(src), 'Back End layout.json round-trips unchanged');
+    await p.evaluate(() => { const s = HexApp.state(); s.sync = { mode: 'jumper', pin: 'GPIO12' }; });
+    await p.locator('.hx').first().click(); ok((await p.textContent('#tSync')).includes('jumper') && (await p.textContent('#tSync')).includes('expected') && (await p.textContent('#tSync')).includes('sensor.hex_c0_sync_source'), 'tile panel: expected jumper + live sensor name');
+    await p.click('#tabHw'); { const y = await p.inputValue('#hwYaml'); ok(y.includes('option: "Jumper wire"'), 'push YAML sync mode follows layout (Jumper wire)'); } await p.click('#tabHw');
+    const rj = await p.evaluate(() => LayoutFormat.parse(LayoutFormat.serialize(HexApp.state())).layout.sync); ok(rj.mode === 'jumper' && rj.pin === 'GPIO12', 'sync round-trips via parse');
+    await p.evaluate(() => { HexApp.state().sync = { mode: 'wireless', pin: 'GPIO12' }; }); await p.click('#tabFile');
     const imp = JSON.parse(JSON.stringify(src)); imp.led.count = 60; imp.tiles[1].ledCount = 12;
     await p.evaluate(t => { document.getElementById('json').value = t; }, JSON.stringify(imp)); await p.click('#loadTxt');
     const dd = await p.evaluate(() => [HexApp.state().led.count, HexApp.derived().map(t => t.leds)]);
@@ -155,6 +176,7 @@ const OUT = __dirname + '/screenshots/'; const URL = 'http://localhost:8411/web/
     await p.click('#tabHw'); await p.waitForTimeout(300);
     const exp = fs.readFileSync('/workspace/hex-lights/esphome/layout_bulk.txt', 'utf8').trim();
     await p.evaluate(t => { document.getElementById('json').value = t; }, fs.readFileSync('/workspace/hex-lights/layout.json', 'utf8')); await p.click('#tabFile'); await p.click('#loadTxt'); await p.click('#tabHw');
+    { const y0 = await p.inputValue('#hwYaml'); ok(y0.includes('entity_id: select.hex_c0_sync_mode') && y0.includes('option: "Wireless (ESP-NOW)"'), 'push YAML has sync mode (wireless)'); }
     const bulk = await p.inputValue('#hwBulk'); ok(bulk === exp, 'bulk string == esphome/layout_bulk.txt (' + bulk.length + ' chars)');
     const yaml = await p.inputValue('#hwYaml'); ok(yaml.includes('action: esphome.hex_c0_set_layout_bulk') && yaml.includes('action: esphome.hex_c0_set_tile_layout\ndata: {tile_id: 20, q: 3, r: -1, rotation: 0, order: 19}') && !(await p.isDisabled('#hwCopy')), 'YAML snippets + copy enabled');
     await p.click('#hwCopy'); ok((await p.textContent('#hwMsg')).includes('copied'), 'copy bulk');

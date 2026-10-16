@@ -4,12 +4,12 @@
   var TYPES = ['WS2812'], ORDERS = ['GRB', 'RGB', 'BRG', 'RBG', 'GBR', 'BGR'];
   function defaults() {
     return { version: 1, name: 'Hex wall', hex: { orientation: 'pointy', sizeMm: 100 },
-      led: { pin: 'GPIO13', type: 'WS2812', order: 'GRB', count: 44 }, master: null, tiles: [] };
+      led: { pin: 'GPIO13', type: 'WS2812', order: 'GRB', count: 44 }, master: null, tiles: [], sync: { mode: 'wireless', pin: 'GPIO12' } };
   }
   function pin(v) { if (typeof v === 'number' || /^\d+$/.test(str(v))) return 'GPIO' + parseInt(v, 10); return str(v).toUpperCase(); }
   function extras(src, known) { var o = {}; for (var k in src) if (src.hasOwnProperty(k) && known.indexOf(k) < 0) o[k] = src[k]; return o; }
   function merge(o, x) { for (var k in x) if (x.hasOwnProperty(k) && !(k in o)) o[k] = x[k]; return o; }
-  var TOP = ['version', 'name', 'hex', 'led', 'master', 'tiles'], LEDK = ['pin', 'type', 'order', 'count'], TK = ['id', 'name', 'mac', 'q', 'r', 'rot', 'ledCount', 'rotationDeg', 'order'],
+  var TOP = ['version', 'name', 'hex', 'led', 'master', 'tiles', 'sync'], LEDK = ['pin', 'type', 'order', 'count'], TK = ['id', 'name', 'mac', 'q', 'r', 'rot', 'ledCount', 'rotationDeg', 'order'],
     DERIVED = ['s', 'ring', 'x', 'y', 'angle', 'index', 'isMaster', 'leds', 'neighbors'];
   function int(v, d) { v = parseInt(v, 10); return isNaN(v) ? d : v; }
   function str(v) { return v == null ? '' : String(v).trim(); }
@@ -28,6 +28,9 @@
       if (t.order != null && t.order !== '') x.order = int(t.order, 0);
       o.tiles.push(merge(x, t._x || {}));
     }
+    /* optional top-level "sync": {mode:'wireless'|'jumper', pin:'GPIO<n>'}; omitted when default (wireless, GPIO12) */
+    var sy = s.sync || {}, sm = sy.mode === 'jumper' ? 'jumper' : 'wireless', sp = pin(sy.pin || 'GPIO12');
+    if (sm !== 'wireless' || sp !== 'GPIO12') o.sync = merge({ mode: sm, pin: sp }, sy._x || {});
     return merge(o, s._x || {});
   }
   function serialize(s) { return JSON.stringify(toObject(s), null, 2); }
@@ -40,7 +43,8 @@
     var s = { version: 1, name: str(o.name || d.name),
       hex: { orientation: h.orientation === 'flat' ? 'flat' : 'pointy', sizeMm: Number(h.sizeMm) || d.hex.sizeMm },
       led: { pin: l.pin == null ? d.led.pin : pin(l.pin), type: l.type || d.led.type, order: l.order || d.led.order, count: int(l.count, d.led.count), _x: extras(l, LEDK) },
-      master: o.master == null ? null : String(o.master), tiles: [], _x: extras(o, TOP) };
+      master: o.master == null ? null : String(o.master), tiles: [], _x: extras(o, TOP),
+      sync: { mode: o.sync && o.sync.mode === 'jumper' ? 'jumper' : 'wireless', pin: o.sync && o.sync.pin != null ? pin(o.sync.pin) : 'GPIO12', _x: extras(o.sync || {}, ['mode', 'pin']) } };
     var ts = o.tiles || [];
     for (var i = 0; i < ts.length; i++) {
       var t = ts[i];
@@ -54,6 +58,9 @@
   function rotDeg(t) { return t.rotDeg != null && t.rotDeg !== '' ? int(t.rotDeg, 0) : (int(t.rot, 0) % 6) * 60; }
   function order(t, i) { return t.order != null && t.order !== '' ? int(t.order, 0) : i; }
   function rotFromDeg(d) { return Math.round((((d % 360) + 360) % 360) / 60) % 6; }
+  /* same rule as tools/gen_tiles.py check_pin (S3 Super Mini) */
+  var BAD_PINS = { 0: 'strapping', 3: 'strapping', 45: 'strapping', 46: 'strapping', 19: 'USB', 20: 'USB', 48: 'onboard RGB LED' };
+  function pinErr(v, what) { var m = /^GPIO(\d+)$/.exec(pin(v)); if (!m) return what + ' must look like GPIO<n>'; var n = +m[1]; return BAD_PINS[n] ? what + ' GPIO' + n + ' is not allowed on the S3 Super Mini (' + BAD_PINS[n] + ')' : ''; }
   var MAXLED = 60; // firmware number.hex_<id>_led_count is 1..60
   var SLUG = /^[a-z0-9][a-z0-9_-]*$/, MAC = /^([0-9a-f]{2}[:-]){5}[0-9a-f]{2}$/i;
   /* errors: [{tile:index|null, field, msg}] */
@@ -81,10 +88,12 @@
     if (s.tiles.length && !s.master) e.push({ tile: null, field: 'master', msg: 'No master tile chosen' });
     else if (s.master && ids[s.master] == null) e.push({ tile: null, field: 'master', msg: 'Master "' + s.master + '" is not a tile ID' });
     if (!(s.led.count >= 1 && s.led.count <= MAXLED)) e.push({ tile: null, field: 'led', msg: 'LEDs per tile must be 1-' + MAXLED + ' (firmware limit)' });
-    if (!/^GPIO\d+$/.test(pin(s.led.pin))) e.push({ tile: null, field: 'led', msg: 'LED pin must look like GPIO<n>' });
+    var pe = pinErr(s.led.pin, 'LED data pin'); if (pe) e.push({ tile: null, field: 'led', msg: pe });
+    var sy = s.sync || {}, se = pinErr(sy.pin || 'GPIO12', 'Sync pin'); if (se) e.push({ tile: null, field: 'sync', msg: se });
+    else if (pin(sy.pin || 'GPIO12') === pin(s.led.pin)) e.push({ tile: null, field: 'sync', msg: 'Sync pin must not be the LED data pin (' + pin(s.led.pin) + ')' });
     if (TYPES.indexOf(s.led.type) < 0) e.push({ tile: null, field: 'led', msg: 'LED type must be WS2812' });
     if (ORDERS.indexOf(s.led.order) < 0) e.push({ tile: null, field: 'led', msg: 'Unknown colour order' });
     return e;
   }
-  g.LayoutFormat = { defaults: defaults, toObject: toObject, serialize: serialize, parse: parse, validate: validate, MAXLED: 60, rotDeg: rotDeg, order: order, rotFromDeg: rotFromDeg, TYPES: TYPES, ORDERS: ORDERS };
+  g.LayoutFormat = { defaults: defaults, toObject: toObject, serialize: serialize, parse: parse, validate: validate, pinErr: pinErr, normPin: pin, MAXLED: 60, rotDeg: rotDeg, order: order, rotFromDeg: rotFromDeg, TYPES: TYPES, ORDERS: ORDERS };
 })(this);

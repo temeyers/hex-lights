@@ -139,5 +139,9 @@
       "r": -13,
       "rot": 0
     }
-  ]
+  ],
+  "sync": {
+    "mode": "jumper",
+    "pin": "GPIO14"
+  }
 }

@@ -42,3 +42,11 @@ input[type=range]{padding:0}input[type=color]{padding:2px}textarea{font:13px/18p
 .hx .led{pointer-events:none}
 details summary{min-height:44px;display:flex;align-items:center;cursor:pointer}
 .btn:disabled{opacity:.5;cursor:not-allowed}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0}.seg .btn{font-size:14px;line-height:18px}
+.wire{margin:8px 0;padding:8px;border-radius:14px;background:var(--glass);border:1px solid var(--glass-bd);box-shadow:var(--gsh)}
+.wire svg{width:100%;height:auto;display:block}.wire svg text{font:600 11px system-ui;fill:var(--tx)}.wire svg .mu{fill:var(--mu);font-weight:500}
+.wire svg .ln{stroke:var(--tx);stroke-width:2;fill:none}.wire svg .gnd{stroke:var(--mu);stroke-width:2}.wire svg .res{fill:var(--sf);stroke:var(--pr);stroke-width:2}
+.wire svg .pu{fill:var(--sf);stroke:#B45309;stroke-width:2}.wire svg .tile{fill:var(--sf2);stroke:var(--bd);}
+.wire ul{margin:6px 0 0;padding-left:18px;font-size:13px;color:var(--mu)}
+.hx .sb{pointer-events:none}.hx .sb rect{stroke:none}.hx .sb text{font:700 9px system-ui;fill:#fff}
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;color:#fff;margin-right:6px}

@@ -67,11 +67,37 @@
       h += '<g class="hx' + (i === sel ? ' sel' : '') + (bad[i] ? ' bad' : '') + '" data-i="' + i + '"><path d="' + corners(p[0], p[1], R - 2) + '"' + fill + '/>' +
         '<line class="rotmark" x1="' + (p[0] + Math.cos(a) * R * 0.55).toFixed(1) + '" y1="' + (p[1] + Math.sin(a) * R * 0.55).toFixed(1) + '" x2="' + (p[0] + Math.cos(a) * R * 0.8).toFixed(1) + '" y2="' + (p[1] + Math.sin(a) * R * 0.8).toFixed(1) + '"/>' +
         dots + (D ? '' : '<text x="' + p[0] + '" y="' + p[1] + '">' + esc(lab.length > 9 ? lab.slice(0, 8) + '…' : lab) + '</text>') +
-        (i === mi ? '<text class="star" x="' + p[0] + '" y="' + (p[1] - R * 0.5) + '">★</text>' : '') + '</g>';
+        syncBadge(i, p) + (i === mi ? '<text class="star" x="' + p[0] + '" y="' + (p[1] - R * 0.5) + '">★</text>' : '') + '</g>';
     }
     gT.innerHTML = h;
     $('count').textContent = st.tiles.length + (st.tiles.length === 1 ? ' tile' : ' tiles');
     $('errs').hidden = !errs.length; $('errs').textContent = errs.length + ' issue' + (errs.length > 1 ? 's' : '');
+  }
+  /* expected sync source per DESIGN.md (live value only from sensor.hex_<id>_sync_source: espnow / jumper / jumper-lost).
+     Wireless -> espnow for every tile. Jumper -> jumper for every tile (the leader pulses the line and also reports jumper).
+     Leader expected = master (gen_tiles gives it leader_priority 1). */
+  function syncSrc(i) { var j = st.sync && st.sync.mode === 'jumper', lead = i === masterIdx();
+    return { src: j ? 'jumper' : 'espnow', color: j ? '#B45309' : '#2563EB', lead: lead,
+      why: j ? (lead ? 'leader: pulses the sync line every 100 ms' : 'follows the leader\'s pulses; falls back to espnow (jumper-lost) after >1 s without edges') : (lead ? 'leader: clock source over ESP-NOW' : 'clock from the leader over ESP-NOW') }; }
+  function nid(id) { id = String(id || ''); return /^([0-9a-f]{2}[:-]){5}[0-9a-f]{2}$/i.test(id) ? id.toLowerCase().replace(/[^0-9a-f]/g, '') : id.replace(/-/g, '_'); }
+  function syncBadge(i, p) { var s = syncSrc(i), tx = (s.src === 'jumper' ? 'J' : 'W') + (s.lead ? '·L' : ''), w = s.lead ? 22 : 14, x = p[0] - w / 2, y = p[1] + R * 0.38;
+    return '<g class="sb"><title>Sync source (expected): ' + s.src + '</title><rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + w + '" height="12" rx="6" fill="' + s.color + '"/><text x="' + p[0].toFixed(1) + '" y="' + (y + 6).toFixed(1) + '">' + tx + '</text></g>'; }
+  /* jumper wiring per DESIGN.md "Sync mode": one shared line + GND, 330 R series at each tile, one 4.7 k pull-up to 3.3 V */
+  function wiring(pinName, n) {
+    var cols = [70, 165, 260], h = '<svg viewBox="0 0 340 250" role="img" aria-label="Jumper wire sync wiring">';
+    h += '<text x="18" y="16">3.3V (any one tile)</text><line class="ln" x1="40" y1="22" x2="40" y2="36"/>';
+    h += '<rect class="pu" x="30" y="36" width="20" height="34" rx="3"/><text x="56" y="52">4.7 kΩ pull-up</text><text class="mu" x="56" y="65">one only (optional*)</text>';
+    h += '<line class="ln" x1="40" y1="70" x2="40" y2="90"/><line class="ln" x1="14" y1="90" x2="330" y2="90"/><text x="6" y="106">SYNC</text>';
+    for (var k = 0; k < 3; k++) { var x = cols[k];
+      h += '<circle cx="' + x + '" cy="90" r="3" fill="currentColor"/><line class="ln" x1="' + x + '" y1="90" x2="' + x + '" y2="104"/>';
+      h += '<rect class="res" x="' + (x - 10) + '" y="104" width="20" height="30" rx="3"/><text x="' + (x + 14) + '" y="123">330 Ω</text>';
+      h += '<line class="ln" x1="' + x + '" y1="134" x2="' + x + '" y2="150"/><rect class="tile" x="' + (x - 34) + '" y="150" width="68" height="44" rx="8"/>';
+      h += '<text x="' + (x - 26) + '" y="168">' + esc(pinName) + '</text><text class="mu" x="' + (x - 26) + '" y="184">tile ' + (k + 1) + '</text>';
+      h += '<line class="gnd" x1="' + x + '" y1="194" x2="' + x + '" y2="214"/><text class="mu" x="' + (x + 4) + '" y="208">GND</text>'; }
+    h += '<text x="300" y="175">… ×' + Math.max(n, 1) + '</text><line class="gnd" x1="14" y1="214" x2="330" y2="214"/><text x="14" y="232">GND bus (LED power GND is fine)</text></svg>';
+    h += '<ul><li>Each tile: ' + esc(pinName) + ' → 330 Ω series resistor → shared SYNC line. Plus a shared GND.</li><li>One 4.7 kΩ pull-up to 3.3 V on one tile. *DESIGN.md: optional, internal ~45 kΩ pull-ups also work for short lines [EST].</li>' +
+      '<li>Twisted pair (sync + GND) or ribbon, kept short and away from the 5 V branch runs. Open-drain: tiles only pull low.</li><li>Then set <span class="mono">select.' + nodeName() + '_sync_mode</span> to "Jumper wire". sync_pin is a compile-time substitution (regenerate and flash to change it).</li></ul>';
+    return h;
   }
   function refresh() { render(); save(); syncPanels(); }
 
@@ -93,11 +119,15 @@
       setv($('tId'), t.id); setv($('tName'), t.name); setv($('tMac'), t.mac); setv($('tQ'), t.q); setv($('tR'), t.r); setv($('tDeg'), LF.rotDeg(t)); setv($('tOrd'), t.order == null || t.order === '' ? '' : t.order); $('tOrd').placeholder = 'default (' + sel + ')'; $('tOrdDef').disabled = t.order == null || t.order === ''; setv($('tLed'), t.ledCount); $('tLed').placeholder = 'default (' + st.led.count + ')'; $('tLedDef').disabled = t.ledCount === '';
       for (var i = 0; i < errs.length; i++) if (errs[i].tile === sel) e.push(errs[i].msg);
       $('tIdErr').textContent = e.join(' · ');
+      var ss = syncSrc(sel); $('tSync').innerHTML = '<span class="badge" style="background:' + ss.color + '">' + ss.src + '</span>expected · ' + esc(ss.why) + '. Live value: <span class="mono">sensor.hex_' + esc(nid(t.id)) + '_sync_source</span>';
       $('tPos').textContent = 'q ' + t.q + ', r ' + t.r + (t.id && t.id === st.master ? ' · master' : '');
       $('tMaster').textContent = t.id && t.id === st.master ? 'Is master ★' : 'Make master';
     } else if (cur === 'tile') show(null);
     if (cur === 'hw') hwSync();
     if (cur === 'layout') {
+      var sy = st.sync || (st.sync = { mode: 'wireless', pin: 'GPIO12' }), jm = sy.mode === 'jumper';
+      $('syW').className = 'btn' + (jm ? '' : ' on'); $('syJ').className = 'btn' + (jm ? ' on' : ''); $('syW').setAttribute('aria-checked', !jm); $('syJ').setAttribute('aria-checked', jm);
+      setv($('lSyncPin'), sy.pin); $('wireBox').hidden = !jm; if (jm) $('wireBox').innerHTML = wiring(LF.normPin(sy.pin || 'GPIO12'), st.tiles.length);
       setv($('lName'), st.name); $('lOri').value = st.hex.orientation; setv($('lSize'), st.hex.sizeMm); setv($('lPin'), st.led.pin); setv($('lCount'), st.led.count);
       opts($('lType'), LF.TYPES, st.led.type); opts($('lOrder'), LF.ORDERS, st.led.order);
       var m = [{ v: '', t: '— none —' }]; for (var j = 0; j < st.tiles.length; j++) if (st.tiles[j].id) m.push(st.tiles[j].id); opts($('lMaster'), m, st.master || '');
@@ -128,6 +158,9 @@
   bind('lCount', 'input', function () { st.led.count = parseInt(this.value, 10) || 0; refresh(); });
   bind('lType', 'change', function () { st.led.type = this.value; refresh(); });
   bind('lOrder', 'change', function () { st.led.order = this.value; refresh(); });
+  bind('syW', 'click', function () { st.sync.mode = 'wireless'; refresh(); });
+  bind('syJ', 'click', function () { st.sync.mode = 'jumper'; refresh(); });
+  bind('lSyncPin', 'input', function () { st.sync.pin = this.value.trim(); refresh(); });
   bind('lMaster', 'change', function () { st.master = this.value || null; refresh(); });
   bind('errs', 'click', function () { show('layout'); });
   bind('shClose', 'click', function () { sel = -1; show(null); render(); });
@@ -344,6 +377,7 @@
     $('hwErr').innerHTML = b.problems.map(function (p) { return '<li>' + esc(p) + '</li>'; }).join('') + (b.problems.length ? '<li><b>Fix these first: one bad entry makes the tile reject the whole string.</b></li>' : '');
     $('hwBulk').value = b.problems.length ? '' : b.bulk; $('hwCopy').disabled = !!b.problems.length; $('hwCopyYaml').disabled = !!b.problems.length;
     $('hwYaml').value = b.problems.length ? '' : '# Bulk (all tiles)\naction: esphome.' + nn + '_set_layout_bulk\ndata:\n  layout: "' + b.bulk + '"\n\n# Per tile (resend one that did not ack)\n' +
+      '# Sync mode (DESIGN.md: master-only select; sync_pin ' + LF.normPin(st.sync.pin || 'GPIO12') + ' is a compile-time substitution)\naction: select.select_option\ntarget:\n  entity_id: select.' + nn + '_sync_mode\ndata:\n  option: "' + (st.sync.mode === 'jumper' ? 'Jumper wire' : 'Wireless (ESP-NOW)') + '"\n\n' +
       b.entries.map(function (e) { return '# ' + e.id + '\naction: esphome.' + nn + '_set_tile_layout\ndata: {tile_id: ' + e.tile_id + ', q: ' + e.q + ', r: ' + e.r + ', rotation: ' + e.rotation + ', order: ' + e.order + '}'; }).join('\n---\n');
     $('hwCsvBox').open = !csv; hwFxSync(); return b;
   }

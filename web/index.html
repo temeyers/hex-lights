@@ -26,6 +26,7 @@
  <div class="row2"><label>LED count<input id="tLed" type="number" min="1" max="60" step="1" inputmode="numeric" placeholder="default"></label></div>
  <button class="btn" id="tLedDef">Use default LED count</button>
  <p class="mu small" id="tPos"></p>
+ <p class="small" id="tSync"></p>
  <div class="row2"><button class="btn" id="tMaster">Make master</button><button class="btn danger" id="tDel">Delete</button></div>
 </div>
 <div id="pLayout" class="pane">
@@ -37,6 +38,10 @@
  <label>LEDs per tile<input id="lCount" type="number" min="1" max="60" inputmode="numeric"></label></div>
  <div class="row2"><label>Type<select id="lType"></select></label><label>Colour order<select id="lOrder"></select></label></div>
  <label>Master tile<select id="lMaster"></select></label>
+ <h3>Sync</h3>
+ <div class="seg" role="radiogroup" aria-label="Sync mode"><button type="button" class="btn" id="syW" role="radio">Wireless (ESP-NOW)</button><button type="button" class="btn" id="syJ" role="radio">Jumper wire</button></div>
+ <label>Sync pin (jumper mode)<input id="lSyncPin" placeholder="GPIO12" autocapitalize="characters"></label>
+ <div id="wireBox" class="wire" hidden></div>
  <ul id="errList" class="errlist"></ul>
 </div>
 <div id="pFx" class="pane">
