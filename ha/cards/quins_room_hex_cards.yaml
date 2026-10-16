@@ -1,5 +1,11 @@
 # Quins Room (/quins-room, view 'quins') Hex Lights cards, exported from Home Assistant 2026-10-16.
 # Requires: Mushroom, card-mod (HACS), resource /local/hex-layout-card/hex-layout-card.js?v=3 (type module).
+# Manual color: once switch.hex_01_manual_color exists, add to the Effect/Palette/Speed/Wipe axis entities card:
+#   visibility:
+#     - condition: state
+#       entity: switch.hex_01_manual_color
+#       state_not: "on"
+# (Not applied yet: HA hides the card when the condition entity doesn't exist, even with state_not.)
 - type: heading
   heading: Hex Lights
   heading_style: title
@@ -53,6 +59,17 @@
     action: toggle
   hold_action:
     action: more-info
+- type: tile
+  entity: switch.hex_01_manual_color
+  name: Manual color
+  icon: mdi:palette
+  tap_action:
+    action: toggle
+  hold_action:
+    action: more-info
+  card_mod:
+    style: 'ha-card { background: rgba(255,255,255,0.08) !important; backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); border: 1px solid rgba(255,255,255,0.14)
+      !important; border-radius: 22px !important; box-shadow: 0 8px 32px rgba(0,0,0,0.35) !important; }'
 - type: entities
   state_color: true
   grid_options:
