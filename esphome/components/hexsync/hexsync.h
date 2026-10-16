@@ -164,6 +164,10 @@ class HexSync : public Component {
   void set_priority(int p) { priority_ = p; }
   void set_static_leader(int id) { static_leader_ = id; }
   void set_budget(int ma, float ma_led, float max_scale) { budget_ma_ = ma; ma_led_ = ma_led; max_scale_ = max_scale; }
+  // Runtime: HA "Max brightness" (0..1, also the light's correction) and "Current limit" switch (default off).
+  void set_max_scale(float k) { max_scale_ = k < 0 ? 0 : (k > 1 ? 1 : k); }
+  void set_budget_enabled(bool on) { budget_enabled_ = on; }
+  bool budget_enabled() const { return budget_enabled_; }
   void set_timing(uint32_t beacon, uint32_t timeout) { beacon_ms_ = beacon; timeout_ms_ = timeout; }
 
   void setup() override;
@@ -236,6 +240,7 @@ class HexSync : public Component {
   int priority_{1}, static_leader_{0};
   int budget_ma_{1500};
   float ma_led_{60.0f}, max_scale_{1.0f};
+  bool budget_enabled_{false};
   uint32_t beacon_ms_{100}, timeout_ms_{1500};
 
   HxParams params_;

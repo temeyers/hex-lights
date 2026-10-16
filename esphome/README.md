@@ -45,9 +45,17 @@ data: {effect: 5, palette: 2, speed: 300, scale: 100, hue: 18, saturation: 215, 
 Or use the master's Wall effect / Wall palette / Wall speed / Wall wipe axis entities.
 Each tile's **LED count** number (1-60, default 44) changes the active LEDs without reflashing. Then turn the 20 lights on with effect **HexSync**.
 
+## Brightness and current
+
+> **⚠ Power warning (full output is now the default).** At full white, 44 LEDs draw about **2.6 A per tile**, roughly **53 A for the wall** (60 mA/LED estimate). Feed 5 V to each strip **directly** from the supply bus, **not through the S3 Super Mini's 5V pin**. Keep the **3 A per-tile fuses** and the **5 V 60 A supply**. The firmware no longer caps output by default. To limit it, use the per-tile **Max brightness** number or turn on the **Current limit** switch.
+
+- 100% on the light slider means full LED output. There's no compile-time cap any more (the 55% `color_correct` was removed).
+- `number.hex_NN_max_brightness`, **Max brightness** (0-100%, default 100, restored after reboot): a runtime ceiling on everything the light shows (effects and solid colours). No reflash needed.
+- `switch.hex_NN_current_limit`, **Current limit** (default off, restored after reboot): turns on the hexsync per-tile budget (`tile_budget_ma`, 1200 mA estimated model; HexSync effects only). The **Effect current estimate** sensor reports the estimate either way.
+
 ## Tuning
 Per-tile substitutions (in tiles.csv → generator, or the shared defaults in `templates/tile-common.yaml`):
-`led_pin` (GPIO13), `num_leds` (44), `max_scale`/`max_scale_pct` (0.55 hard ceiling),
+`led_pin` (GPIO13), `num_leds` (44), `max_scale` (1.0, first-boot value for the current model; `max_scale_pct` is no longer used),
 `tile_budget_ma` (1200), `static_leader` (0 = auto failover), `rotation`.
 
 ## Changing the layout without reflashing

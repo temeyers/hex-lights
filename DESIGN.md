@@ -306,19 +306,25 @@ sync is the pragmatic choice and is the fallback if hexsync misbehaves on hardwa
 | Case | Per tile | Wall (20) |
 |---|---|---|
 | Full white, uncapped (60 mA/LED **[EST, datasheet-typical]**) | 2.64 A | **52.8 A / 264 W** |
-| Hard firmware cap `color_correct 55%` | 1.45 A | 29 A |
-| hexsync effect budget (`tile_budget_ma 1200`) | ≤1.2 A | ≤24 A |
+| Max brightness 55% (optional, HA number) | 1.45 A | 29 A |
+| hexsync effect budget (`tile_budget_ma 1200`, only if "Current limit" is on) | ≤1.2 A | ≤24 A |
 | Typical radial wave / rainbow (44 LEDs) at value ~180 **[EST 15–30 % of full white]** | 0.4–0.8 A | 8–16 A |
 | LED idle quiescent ~0.6–1 mA/LED **[EST]** | ~40 mA | ~0.9 A (even when "off") |
 | ESP32-S3, Wi-Fi on, no power save: ~100 mA avg, ~350 mA peaks **[EST]** | 0.1–0.35 A | 2–7 A peak |
 
-**Design load (capped): ~29 A LEDs + ~3 A boards/idle ≈ 32 A [EST].**
+**Default is UNCAPPED ("max it out"): design for ~53 A LEDs + ~3 A boards/idle ≈ 56 A [EST].**
+With Max brightness at 55%: ~29 A + ~3 A ≈ 32 A.
 
-### Firmware limits (two layers, both in `tile-common.yaml`)
-1. `color_correct: [55%,55%,55%]` – hard per-channel ceiling on **everything** the
-   light shows, including solid colours from HA → max ~1.45 A/tile **[EST]**.
-2. `hexsync` `tile_budget_ma: 1200` – each frame estimates current
-   (`Σ(r+g+b)/765 × 60 mA × 0.55`) and scales the frame down if it exceeds the budget.
+> **⚠ Power warning (full output is now the default).** At full white, 44 LEDs draw about **2.6 A per tile**, roughly **53 A for the wall** (60 mA/LED estimate). Feed 5 V to each strip **directly** from the supply bus, **not through the S3 Super Mini's 5V pin**. Keep the **3 A per-tile fuses** and the **5 V 60 A supply**. The firmware no longer caps output by default. To limit it, use the per-tile **Max brightness** number or turn on the **Current limit** switch.
+
+
+### Firmware limits (two optional layers, both in `tile-common.yaml`, both default to full output)
+1. **Max brightness** (`number.hex_NN_max_brightness`, 0–100 %, default 100, restore_value) sets the
+   light's per-channel correction at runtime, a ceiling on **everything** the light shows, including
+   solid colours from HA. At 55 % it's ~1.45 A/tile **[EST]**.
+2. **Current limit** (`switch.hex_NN_current_limit`, default **off**, restored): when on, `hexsync`
+   `tile_budget_ma: 1200` estimates current each frame
+   (`Σ(r+g+b)/765 × 60 mA × max brightness`) and scales the frame down if it exceeds the budget.
    Exposed as the "Effect current estimate" sensor. **Model is linear and
    unmeasured; check with a clamp meter and adjust.**
    (ESPHome's `power_supply` component only switches an enable pin; it is not a

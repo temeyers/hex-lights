@@ -45,7 +45,7 @@ CONFIG_SCHEMA = cv.Schema(
         # Firmware current budget for the strip on this tile (ESTIMATED model).
         cv.Optional(CONF_BUDGET, default=1500): cv.int_range(min=100, max=5000),
         cv.Optional(CONF_MA_PER_LED, default=60.0): cv.positive_float,
-        # Must match the light's color_correct (0..1), used in the current model.
+        # First-boot ceiling for the current model; the HA "Max brightness" number overrides it at runtime.
         cv.Optional(CONF_MAX_SCALE, default=1.0): cv.float_range(min=0.05, max=1.0),
         cv.Optional(CONF_BEACON, default="100ms"): cv.positive_time_period_milliseconds,
         cv.Optional(CONF_TIMEOUT, default="1500ms"): cv.positive_time_period_milliseconds,

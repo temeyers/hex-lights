@@ -41,7 +41,7 @@ Leader: hexsync picks the **lowest** `leader_priority` (1-250). Hardware's gener
 | static_leader | "0" (failover); master tile_num with `--pin-leader` |
 | leader_priority | tile.priority, else 1 for the master and tile_num + 1 for the others |
 | tile_budget_ma | led.budgetMa (otherwise the template default 1200) |
-| max_scale, max_scale_pct | led.maxScale (otherwise the template default 0.55 / 55%) |
+| max_scale, max_scale_pct | led.maxScale (optional; the template default is now 1.0 = full output, and `max_scale_pct` is ignored. Runtime ceiling: `number.hex_NN_max_brightness`) |
 
 device_name and friendly_name are not emitted: the template derives them from the row number (`hex-${hex_nn}`, `Hex ${hex_nn}`, e.g. hex-01 / Hex 01). The axial id stays internal.
 

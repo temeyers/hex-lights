@@ -17,9 +17,11 @@ substitutions:
   wall_controls_internal: "true"   # generator sets "false" on the master tile
   leader_priority: ${tile_num}
   static_leader: "0"        # 0 = automatic failover; set to a tile_num to pin the leader
-  max_scale: "0.55"         # hard per-channel ceiling: 44 x 60 mA x 0.55 ~= 1.45 A per tile (ESTIMATE)
-  max_scale_pct: "55%"
-  tile_budget_ma: "1200"    # hexsync effect current budget per tile (ESTIMATED model)
+  # Full output by default: 100% on the slider = full LED drive. Runtime ceiling = HA number "Max brightness".
+  # WARNING: full white ~= 44 x 60 mA ~= 2.6 A per tile (~53 A wall). Feed the strip directly (not via the
+  # S3 Super Mini 5V pin); keep 3 A per-tile fuses and the 60 A PSU. See README / DESIGN.md.
+  max_scale: "1.0"          # first-boot value for hexsync's current model (Max brightness overrides at boot)
+  tile_budget_ma: "1200"    # hexsync effect current budget per tile (ESTIMATED model); OFF unless "Current limit" switch is on
 
 esphome:
   name: hex-${hex_nn}
@@ -137,8 +139,7 @@ light:
     chipset: WS2812
     rgb_order: GRB   # 2025.9.x lacks channel_colors; 2026.x accepts rgb_order (deprecated, removed 2027.3.0) -> switch to "channel_colors: GRB" once 2025.9 support is dropped
     default_transition_length: 0s
-    # Hard ceiling for EVERYTHING this light shows (HA solid colors too).
-    color_correct: ["${max_scale_pct}", "${max_scale_pct}", "${max_scale_pct}"]
+    # No compile-time cap: the "Max brightness" number sets the correction (ceiling) at runtime.
     restore_mode: RESTORE_DEFAULT_OFF
     effects:
       - addressable_lambda:
@@ -201,6 +202,26 @@ sensor:
 # use restore_value together with a lambda), so the effect is the same:
 # compile-time substitutions are first-boot defaults, later changes survive reboot.
 number:
+  # Runtime ceiling for EVERYTHING this light shows (effects and HA solid colors), 0-100 %.
+  - platform: template
+    name: Max brightness
+    id: max_brightness
+    entity_category: config
+    icon: mdi:brightness-percent
+    unit_of_measurement: "%"
+    min_value: 0
+    max_value: 100
+    step: 1
+    initial_value: 100
+    optimistic: true
+    restore_value: true
+    on_value:
+      - lambda: |-
+          float k = x / 100.0f;
+          auto *out = static_cast<light::AddressableLight *>(id(tile_leds).get_output());
+          out->set_correction(k, k, k);
+          out->update_state(id(tile_leds));   // re-render a static color now (effects pick it up next frame)
+          id(hex_sync).set_max_scale(k);
   - platform: template
     name: LED count
     id: led_count_number
@@ -265,6 +286,20 @@ number:
     lambda: 'return id(hex_sync).order();'
     set_action:
       - lambda: 'id(hex_sync).set_order((int) x);'
+
+switch:
+  # Per-tile current budget (ESTIMATED model, hexsync effects only). Off = no firmware current cap.
+  - platform: template
+    name: Current limit
+    id: current_limit
+    entity_category: config
+    icon: mdi:current-dc
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - lambda: 'id(hex_sync).set_budget_enabled(true);'
+    turn_off_action:
+      - lambda: 'id(hex_sync).set_budget_enabled(false);'
 
 select:
   - platform: template

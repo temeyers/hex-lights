@@ -835,7 +835,7 @@ void HexSync::render(light::AddressableLight &it) {
   }
   // Current cap (ESTIMATED linear model) over the N active LEDs.
   float est = sum / 765.0f * ma_led_ * max_scale_;
-  float k = est > budget_ma_ ? budget_ma_ / est : 1.0f;
+  float k = (budget_enabled_ && est > budget_ma_) ? budget_ma_ / est : 1.0f;  // cap only if switch on
   if (k < 1.0f) {
     for (int i = 0; i < n; i++) {
       Color c = it[i].get();
