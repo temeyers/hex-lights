@@ -125,6 +125,7 @@ One panel drives the whole wall or a single tile:
 
 ## Troubleshooting
 - **A tile isn't syncing.** Make sure every tile runs the same build (device info shows `Project temeyers.hex-lights` and the version). Re-flash any odd one out. Tiles on different Wi-Fi APs may be on different channels and then can't hear each other over ESP-NOW (`sensor.hex_NN_peers_seen` = 0).
+- **Onboard LED blinking.** The ESP32-S3 Super Mini's onboard LED (GPIO48) is claimed by the firmware and held off (`onboard_led`, internal). If it still blinks, it's the hardwired red power LED, which firmware can't control.
 - **Tiles reboot at full-brightness white.** All 44 LEDs at full white draw far more than any colour. If the supply can't keep up, the tile browns out and restarts at 30 %. Turn on **Current limit** or use a bigger supply.
 - **"Invalid api_key" when compiling.** ESPHome 2026.x rejects placeholder keys. Generate a real one with `openssl rand -base64 32`.
 - **A tile doesn't show up in HA.** Add it by hand with the button above, using `hex-NN.local` or its IP address. Check that it's on the same network or VLAN.
