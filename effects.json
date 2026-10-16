@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "notes": "Pure functions of (params, tile, tMs). Tile fields come from out/layout.json: x, y in 0..1, ring, angle (deg from master, 0 = +x, counter-clockwise in screen math), index, q, r. hsv(h,1,1) is standard HSV->RGB with h in degrees. Output per tile is [r,g,b] 0..255. Reference implementation: tools/effects.js.",
+  "effects": [
+    {"name": "solid", "label": "Solid color",
+     "params": {"color": {"type": "color", "default": [255, 140, 40]}},
+     "formula": "rgb = color"},
+    {"name": "breathe", "label": "Breathe",
+     "params": {"color": {"type": "color", "default": [255, 140, 40]},
+                "periodS": {"type": "number", "min": 0.5, "max": 30, "default": 4}},
+     "formula": "k = 0.5 - 0.5*cos(2*pi*t/(periodS*1000)); rgb = round(color*k)"},
+    {"name": "rainbow_sweep", "label": "Rainbow sweep",
+     "params": {"speed": {"type": "number", "min": 0.01, "max": 5, "default": 0.25, "unit": "cycles/s"},
+                "axis": {"type": "enum", "options": ["x", "y"], "default": "x"}},
+     "formula": "h = (tile[axis]*360 + t/1000*speed*360) mod 360; rgb = hsv(h,1,1)"},
+    {"name": "ripple", "label": "Ripple",
+     "params": {"color": {"type": "color", "default": [40, 120, 255]},
+                "speed": {"type": "number", "min": 0.1, "max": 10, "default": 2, "unit": "rings/s"},
+                "origin": {"type": "tileId", "default": null, "note": "null = master"}},
+     "formula": "d = hexDistance(tile, origin); P = maxD + 2; ph = (t/1000*speed) mod P; k = max(0, 1 - |ph - d|); rgb = round(color*k)"},
+    {"name": "spiral", "label": "Spiral",
+     "params": {"speed": {"type": "number", "min": 0.01, "max": 5, "default": 0.2, "unit": "rev/s"}},
+     "formula": "h = (tile.angle + tile.ring*30 + t/1000*speed*360) mod 360; rgb = hsv(h,1,1)"},
+    {"name": "sparkle", "label": "Sparkle",
+     "params": {"color": {"type": "color", "default": [255, 255, 255]},
+                "density": {"type": "number", "min": 0, "max": 1, "default": 0.15}},
+     "formula": "frameN = floor(t/100); u = hash01(tile.index, frameN) with hash01(a,b) = (((a*73856093) xor (b*19349663)) mod 1000003)/1000003 using 32-bit unsigned ints; rgb = u < density ? color : [0,0,0]"}
+  ]
+}

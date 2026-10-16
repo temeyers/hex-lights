@@ -3,3 +3,7 @@ secrets.yaml
 *.bin
 node_modules/
 .env
+out/
+__pycache__/
+.pytest_cache/
+esphome/generated/

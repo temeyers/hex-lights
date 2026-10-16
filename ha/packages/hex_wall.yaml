@@ -1,0 +1,67 @@
+# Hex wall helpers (static). Synced effects use the master tile's set_wall_effect
+# action + the HexSync light effect; Coordinate-driven scripts + light group live in
+# ha/hex_wall.generated.yaml (regenerate with tools/gen_tiles.py). Install both
+# under config/packages/ with `homeassistant: packages: !include_dir_named packages`.
+input_select:
+  hex_wall_effect:
+    name: Hex wall effect
+    options: [none, solid, breathe, rainbow_sweep, ripple, spiral, sparkle]
+    initial: none
+
+input_boolean:
+  hex_wall_use_sync:
+    name: Hex wall use synced firmware effects
+    initial: true
+
+script:
+  hex_wall_on:
+    alias: Hex wall on
+    sequence:
+      - action: light.turn_on
+        target: {entity_id: light.hex_wall}
+  hex_wall_off:
+    alias: Hex wall off
+    sequence:
+      - action: input_select.select_option
+        target: {entity_id: input_select.hex_wall_effect}
+        data: {option: none}
+      - action: light.turn_off
+        target: {entity_id: light.hex_wall}
+        data: {transition: 1}
+  hex_wall_brightness:
+    alias: Hex wall brightness
+    fields: {brightness_pct: {example: 60}}
+    sequence:
+      - action: light.turn_on
+        target: {entity_id: light.hex_wall}
+        data: {brightness_pct: "{{ brightness_pct | default(100) }}"}
+
+automation:
+  - id: hex_wall_run_effect
+    alias: Hex wall - run selected effect
+    mode: restart
+    triggers:
+      - trigger: state
+        entity_id: input_select.hex_wall_effect
+    actions:
+      - variables:
+          eff: "{{ trigger.to_state.state }}"
+          synced: [solid, ripple, rainbow_sweep, breathe]   # HexSync: 0 solid, 1 radial wave, 2 rainbow sweep, 3 pulse
+          all: [script.hex_wall_synced, script.hex_wall_solid, script.hex_wall_breathe,
+                script.hex_wall_rainbow_sweep, script.hex_wall_ripple, script.hex_wall_spiral,
+                script.hex_wall_sparkle]
+      - choose:
+          - conditions: "{{ eff == 'none' }}"
+            sequence:
+              - action: script.turn_off
+                target: {entity_id: "{{ all }}"}
+          # Preferred: ESP-NOW synced HexSync effect rendered in firmware
+          - conditions: "{{ is_state('input_boolean.hex_wall_use_sync', 'on') and eff in synced }}"
+            sequence:
+              - action: script.turn_on
+                target: {entity_id: script.hex_wall_synced}
+                data: {variables: {effect: "{{ eff }}"}}
+        # Fallback: per-tile HA scripts (spiral, sparkle, or sync disabled)
+        default:
+          - action: script.turn_on
+            target: {entity_id: "script.hex_wall_{{ eff }}"}
