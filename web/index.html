@@ -46,7 +46,14 @@
 </div>
 <div id="pFx" class="pane">
  <p class="mu small" id="fxSrc"></p>
- <label>Preview source<select id="fxSrcSel"><option value="be">Back End effects</option><option value="fw">Firmware reference</option></select></label>
+ <label>Preview source<select id="fxSrcSel"><option value="be">Back End effects</option><option value="fw">Firmware reference</option><option value="ha">Live (Home Assistant)</option></select></label>
+ <div id="haBox" hidden>
+  <p class="small mu">Read-only: subscribes to each hex's <span class="mono">sensor.hex_NN_displayed_color</span> (fallback <span class="mono">light.hex_NN_light</span> rgb_color). No service calls. The token is kept only in this tab (sessionStorage).</p>
+  <label>Home Assistant URL<input id="haUrl" placeholder="http://homeassistant.local:8123" autocapitalize="off" spellcheck="false" inputmode="url"></label>
+  <label>Long-lived access token<input id="haTok" type="password" autocomplete="off" spellcheck="false"></label>
+  <div class="row2"><button class="btn pr" id="haGo">Connect</button><button class="btn" id="haStop">Disconnect</button></div>
+  <p id="haStatus" class="pill" role="status">Not connected</p>
+ </div>
  <label>Effect<select id="fxSel"></select></label>
  <p id="fxFwMsg" class="small err"></p>
  <div id="fxParams"></div>

@@ -193,6 +193,48 @@ const OUT = __dirname + '/screenshots/'; const URL = 'http://localhost:8411/web/
     const fl = await p.evaluate(() => { HexApp.state().hex.orientation = 'flat'; return HexApp.derived(); });
     console.log('flat sample', JSON.stringify(fl.slice(0, 3).map(t => [t.id, +t.x.toFixed(4), +t.y.toFixed(4), +t.angle.toFixed(2)])));
     await ctx.close(); }
+  // Live (Home Assistant) with a mocked websocket, both widths
+  for (const w of [375, 1280]) {
+    const ctx = await b.newContext({ viewport: { width: w, height: w === 375 ? 812 : 800 }, hasTouch: w === 375 }); const p = await ctx.newPage();
+    const logs = []; p.on('console', m => logs.push(m.text())); const sent = [];
+    let sock = null;
+    await p.routeWebSocket(/\/api\/websocket$/, ws => { sock = ws; ws.send(JSON.stringify({ type: 'auth_required', ha_version: '2026.10.0' }));
+      ws.onMessage(raw => { const m = JSON.parse(raw); sent.push(m.type);
+        if (m.type === 'auth') ws.send(JSON.stringify(m.access_token === 'tok-good' ? { type: 'auth_ok' } : { type: 'auth_invalid', message: 'Invalid access token or password' }));
+        if (m.type === 'subscribe_entities') { sent.ids = m.entity_ids; ws.send(JSON.stringify({ id: m.id, type: 'result', success: true, result: null }));
+          ws.send(JSON.stringify({ id: m.id, type: 'event', event: { a: {
+            'sensor.hex_01_displayed_color': { s: '#ff2000', a: {} }, 'light.hex_01_light': { s: 'on', a: { rgb_color: [0, 255, 0], brightness: 255 } },
+            'sensor.hex_02_displayed_color': { s: 'unavailable', a: {} }, 'light.hex_02_light': { s: 'on', a: { rgb_color: [0, 255, 0], brightness: 128 } },
+            'light.hex_03_light': { s: 'off', a: {} } } } })); } }); });
+    await p.goto(URL); await p.evaluate(() => localStorage.clear());
+    await p.click('#tabFile'); await p.setInputFiles('#imp', '/workspace/hex-lights/layout.json'); await p.waitForTimeout(400); await p.click('#tabFile');
+    await p.click('#tabFx'); await p.selectOption('#fxSrcSel', 'ha'); ok(await p.isVisible('#haBox'), w + ' live: HA box shown');
+    await p.fill('#haUrl', 'http://ha.test:8123'); await p.fill('#haTok', 'tok-bad'); await p.click('#haGo');
+    await p.waitForFunction(() => document.getElementById('haStatus').textContent.includes('Authentication failed'));
+    ok((await p.textContent('#haStatus')).includes('Authentication failed: Invalid access token'), w + ' live: auth failure message');
+    await p.fill('#haTok', 'tok-good'); await p.click('#haGo');
+    await p.waitForFunction(() => window.HexApp.fx.mode === 'live');
+    const c = await p.evaluate(() => HexApp.fx.colors);
+    ok(JSON.stringify(c.c0) === '[255,32,0]', w + ' live: Hex 01 colour from sensor (#ff2000), not the green light');
+    ok(JSON.stringify(c['r1-e']) === '[0,128,0]', w + ' live: Hex 02 sensor unavailable -> light rgb_color x brightness');
+    ok(JSON.stringify(c['r1-ne']) === '[0,0,0]', w + ' live: Hex 03 light off -> black');
+    const src = await p.$$eval('.hx .lv', g => g.map(x => x.dataset.src)); ok(src.length === 20 && src[0] === 'sensor' && src[1] === 'light' && src.filter(x => x === 'none').length === 17, w + ' live: per-hex S/L markers ' + src.slice(0, 4).join(','));
+    ok((await p.textContent('#haStatus')).includes('1 sensor, 2 light fallback'), w + ' live: status ' + await p.textContent('#haStatus'));
+    ok(sent.ids && sent.ids.length === 40 && sent.ids.includes('sensor.hex_20_displayed_color') && sent.ids.includes('light.hex_01_light') && !sent.ids.some(x => x.startsWith('text_sensor.')), w + ' live: subscribed to sensor.hex_NN_displayed_color + light.hex_NN_light');
+    await p.screenshot({ path: OUT + 'live-ha-' + w + '.png' });
+    sock.send(JSON.stringify({ id: 1, type: 'event', event: { c: { 'sensor.hex_01_displayed_color': { '+': { s: 'unknown' } }, 'light.hex_01_light': { '+': { a: { rgb_color: [255, 0, 0] } } } } } }));
+    await p.waitForFunction(() => JSON.stringify(HexApp.fx.colors.c0) === '[255,0,0]');
+    ok(await p.$eval('.hx .lv', g => g.dataset.src) === 'light', w + ' live: sensor -> unknown switches Hex 01 to light fallback');
+    sock.send(JSON.stringify({ id: 1, type: 'event', event: { c: { 'sensor.hex_01_displayed_color': { '+': { s: '#00ff00' } } } } }));
+    await p.waitForFunction(() => JSON.stringify(HexApp.fx.colors.c0) === '[0,255,0]'); ok(await p.$eval('.hx .lv', g => g.dataset.src) === 'sensor', w + ' live: back to sensor');
+    ok(sent.every(t => t === 'auth' || t === 'subscribe_entities'), w + ' live: read-only (sent only ' + [...new Set(sent)].join(',') + ')');
+    const store = await p.evaluate(() => [sessionStorage.getItem('hexlights.ha'), JSON.stringify(localStorage)]);
+    ok(store[0].includes('tok-good') && !store[1].includes('tok-good') && !logs.join(' ').includes('tok-'), w + ' live: token only in sessionStorage, not logged');
+    ok(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth), w + ' live: no sideways scroll');
+    sock.close(); await p.waitForFunction(() => document.getElementById('haStatus').textContent.includes('Disconnected'));
+    ok(true, w + ' live: disconnect shown');
+    await ctx.close();
+  }
   // pinch on touch (CDP synthesized)
   const ctx = await b.newContext({ viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true }); const p = await ctx.newPage(); await p.goto(URL);
   const v0 = await p.evaluate(() => document.getElementById('svg').getAttribute('viewBox'));

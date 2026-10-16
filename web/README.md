@@ -95,3 +95,14 @@ rainbow_flow and the palettes.
   3 angle) is a required argument in 9b55813's template, so the snippet always includes it.
 - UI text says "hex" everywhere ("Add hex", "Hex panel", "LEDs per hex", "Master hex", …). The file format keeps `tiles`, `ledCount`
   and the code identifiers. New hexes get ids `h1`, `h2`, … (previously `tile-N`).
+
+## Live (Home Assistant) preview source (read-only)
+Preview source **Live (Home Assistant)**: enter the HA URL and a long-lived access token, then Connect. The token is kept only in this tab's
+`sessionStorage` (`hexlights.ha`). It's never in localStorage, the repo or logs. Websocket only (`<url>/api/websocket`), no REST. The editor
+sends only `auth` and one `subscribe_entities` filtered to the ids below. No service calls and no history: live state only, since the sensor isn't recorded.
+- Ids derived from `esphome/tiles.csv` (NN = row): primary `sensor.hex_NN_displayed_color` (`#RRGGBB`, ESPHome text_sensor → HA
+  `sensor` domain; `group.hex_wall_displayed_colors` lists them). Fallback when the sensor is missing / `unavailable` / `unknown` / not
+  `#RRGGBB`: `light.hex_NN_light` `rgb_color` × `brightness`/255 (off = black). No `sensor.hex_NN_light_rgb`, no `out/ha_entities.json`.
+- Each hex gets a marker: **S** = sensor, **L** = light fallback, **–** = no data. The status line shows connected, the counts, auth failures and disconnects.
+- Browser websockets aren't subject to HA's CORS. REST would need `http: cors_allowed_origins: [http://<host>:<port>]` (the editor's origin)
+  in HA's configuration. An **https** editor page cannot connect to **http** HA (mixed content). The UI reports this as a connection error instead of trying.

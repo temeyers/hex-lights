@@ -67,7 +67,7 @@
       h += '<g class="hx' + (i === sel ? ' sel' : '') + (bad[i] ? ' bad' : '') + '" data-i="' + i + '"><path d="' + corners(p[0], p[1], R - 2) + '"' + fill + '/>' +
         '<line class="rotmark" x1="' + (p[0] + Math.cos(a) * R * 0.55).toFixed(1) + '" y1="' + (p[1] + Math.sin(a) * R * 0.55).toFixed(1) + '" x2="' + (p[0] + Math.cos(a) * R * 0.8).toFixed(1) + '" y2="' + (p[1] + Math.sin(a) * R * 0.8).toFixed(1) + '"/>' +
         dots + (D ? '' : '<text x="' + p[0] + '" y="' + (p[1] - 5) + '">' + esc(hexLabel(t)) + '</text><text class="sub" x="' + p[0] + '" y="' + (p[1] + 9) + '">' + esc(lab.length > 10 ? lab.slice(0, 9) + '…' : lab) + '</text>') +
-        syncBadge(i, p) + (i === mi ? '<text class="star" x="' + p[0] + '" y="' + (p[1] - R * 0.5) + '">★</text>' : '') + '</g>';
+        syncBadge(i, p) + (fx.mode === 'live' && D ? liveBadge(fx.src[D[i].id], p) : '') + (i === mi ? '<text class="star" x="' + p[0] + '" y="' + (p[1] - R * 0.5) + '">★</text>' : '') + '</g>';
     }
     gT.innerHTML = h;
     $('count').textContent = st.tiles.length + (st.tiles.length === 1 ? ' hex' : ' hexes');
@@ -80,6 +80,8 @@
     return { src: j ? 'jumper' : 'espnow', color: j ? '#B45309' : '#2563EB', lead: lead,
       why: j ? (lead ? 'leader: pulses the sync line every 100 ms' : 'follows the leader\'s pulses; falls back to espnow (jumper-lost) after >1 s without edges') : (lead ? 'leader: clock source over ESP-NOW' : 'clock from the leader over ESP-NOW') }; }
   function nid(id) { id = String(id || ''); return /^([0-9a-f]{2}[:-]){5}[0-9a-f]{2}$/i.test(id) ? id.toLowerCase().replace(/[^0-9a-f]/g, '') : id.replace(/-/g, '_'); }
+  function liveBadge(s, p) { var tx = s === 'sensor' ? 'S' : s === 'light' ? 'L' : '–', col = s === 'sensor' ? '#16A34A' : s === 'light' ? '#B45309' : '#6B7280', y = p[1] - R * 0.62;
+    return '<g class="sb lv" data-src="' + s + '"><title>Colour from ' + (s === 'sensor' ? 'displayed_color sensor' : s === 'light' ? 'light rgb_color (fallback)' : 'no data') + '</title><rect x="' + (p[0] - 7).toFixed(1) + '" y="' + y.toFixed(1) + '" width="14" height="12" rx="6" fill="' + col + '"/><text x="' + p[0].toFixed(1) + '" y="' + (y + 6).toFixed(1) + '">' + tx + '</text></g>'; }
   function syncBadge(i, p) { var s = syncSrc(i), tx = (s.src === 'jumper' ? 'J' : 'W') + (s.lead ? '·L' : ''), w = s.lead ? 22 : 14, x = p[0] - w / 2, y = p[1] + R * 0.38;
     return '<g class="sb"><title>Sync source (expected): ' + s.src + '</title><rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + w + '" height="12" rx="6" fill="' + s.color + '"/><text x="' + p[0].toFixed(1) + '" y="' + (y + 6).toFixed(1) + '">' + tx + '</text></g>'; }
   /* jumper wiring per DESIGN.md "Sync mode": one shared line + GND, 330 R series at each tile, one 4.7 k pull-up to 3.3 V */
@@ -289,7 +291,57 @@
   if (window.fetch && location.protocol !== 'file:') fetch('../esphome/tools/effects-ref.js', { cache: 'no-store' }).then(function (r) { if (!r.ok) throw 0; return r.text(); }).then(function (src) {
     var mo = { exports: {} }; (new Function('module', 'exports', src))(mo, mo.exports); if (typeof mo.exports.frame === 'function') FWREF = mo.exports;
   }).then(null, function () {}).then(function () { if (!FWREF) { $('fxSrcSel').value = 'be'; $('fxSrcSel').options[1].disabled = true; $('fxSrcSel').options[1].text = 'Firmware reference (not found)'; } });
-  bind('fxSrcSel', 'change', function () { fx.fw = this.value === 'fw'; $('fxFwMsg').textContent = ''; });
+  bind('fxSrcSel', 'change', function () { fx.fw = this.value === 'fw'; $('fxFwMsg').textContent = ''; $('haBox').hidden = this.value !== 'ha'; if (this.value !== 'ha') haStop(); });
+  /* ---- Live (Home Assistant): websocket only, read-only (sends just auth + subscribe_entities), live state only ---- */
+  var ha = { ws: null, ents: {}, ids: [], status: 'idle', idn: 1 };
+  try { var hs = JSON.parse(sessionStorage.getItem('hexlights.ha') || 'null'); if (hs) { $('haUrl').value = hs.url || ''; $('haTok').value = hs.token || ''; } } catch (e) {}
+  function haSet(st2, msg) { ha.status = st2; $('haStatus').textContent = msg; $('haStatus').className = 'pill' + (st2 === 'error' ? ' bad' : ''); }
+  function haIds() { var ids = [], i, n; for (i = 0; i < st.tiles.length; i++) { n = hexNum(st.tiles[i]); if (n) ids.push('sensor.hex_' + pad2(n) + '_displayed_color', 'light.hex_' + pad2(n) + '_light'); } return ids; }
+  function haStop() { if (ha.ws) { ha.ws.onclose = null; try { ha.ws.close(); } catch (e) {} } ha.ws = null; ha.ents = {}; if (fx.mode === 'live') { fx.play = false; fx.colors = null; fx.leds = null; fx.mode = ''; render(); } if (ha.status !== 'error') haSet('idle', 'Not connected'); }
+  function haStart() {
+    haStop(); var url = $('haUrl').value.trim().replace(/\/+$/, ''), tok = $('haTok').value.trim();
+    if (!/^https?:\/\/[^\s]+$/i.test(url)) return haSet('error', 'Enter the HA URL, e.g. http://homeassistant.local:8123');
+    if (!tok) return haSet('error', 'Enter a long-lived access token');
+    if (location.protocol === 'https:' && /^http:/i.test(url)) return haSet('error', 'Blocked: this page is https and HA is http (mixed content). Open the editor over http or give HA an https URL.');
+    if (!csv) return haSet('error', 'tiles.csv not loaded, so hex_NN entity ids are unknown');
+    try { sessionStorage.setItem('hexlights.ha', JSON.stringify({ url: url, token: tok })); } catch (e) {}
+    ha.ids = haIds(); var want = {}; for (var i = 0; i < ha.ids.length; i++) want[ha.ids[i]] = 1;
+    var ws; try { ws = new WebSocket(url.replace(/^http/i, 'ws') + '/api/websocket'); } catch (e) { return haSet('error', 'Could not open websocket: ' + e.message); }
+    ha.ws = ws; haSet('connecting', 'Connecting…'); var authed = false;
+    ws.onmessage = function (ev) {
+      var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+      if (m.type === 'auth_required') ws.send(JSON.stringify({ type: 'auth', access_token: tok }));
+      else if (m.type === 'auth_invalid') { haSet('error', 'Authentication failed: ' + (m.message || 'invalid token')); ws.onclose = null; ws.close(); ha.ws = null; }
+      else if (m.type === 'auth_ok') { authed = true; haSet('connected', 'Connected · waiting for states'); ws.send(JSON.stringify({ id: ha.idn++, type: 'subscribe_entities', entity_ids: ha.ids })); }
+      else if (m.type === 'result' && m.success === false) haSet('error', 'HA error: ' + ((m.error && m.error.message) || 'subscribe failed'));
+      else if (m.type === 'event' && m.event) { var e = m.event, k, x;
+        if (e.a) for (k in e.a) if (want[k]) ha.ents[k] = { s: e.a[k].s, a: e.a[k].a || {} };
+        if (e.c) for (k in e.c) if (want[k]) { x = ha.ents[k] || (ha.ents[k] = { s: undefined, a: {} }); var p = e.c[k]['+'], mi = e.c[k]['-'];
+          if (p) { if ('s' in p) x.s = p.s; if (p.a) for (var ak in p.a) x.a[ak] = p.a[ak]; }
+          if (mi && mi.a) for (var j = 0; j < mi.a.length; j++) delete x.a[mi.a[j]]; }
+        if (e.r) for (k = 0; k < e.r.length; k++) delete ha.ents[e.r[k]];
+        haApply(); }
+    };
+    ws.onerror = function () { if (ha.status !== 'error') haSet('error', 'Websocket error (check the URL, that HA is reachable, and http vs https)'); };
+    ws.onclose = function () { ha.ws = null; if (ha.status !== 'error') haSet('error', authed ? 'Disconnected from HA' : 'Connection closed before auth'); };
+  }
+  /* per hex: sensor.hex_NN_displayed_color ('#RRGGBB'); else light.hex_NN_light rgb_color (x brightness, off = black) */
+  function haColor(t) {
+    var n = hexNum(t); if (!n) return { src: 'none' };
+    var s = ha.ents['sensor.hex_' + pad2(n) + '_displayed_color'], l = ha.ents['light.hex_' + pad2(n) + '_light'];
+    if (s && /^#[0-9a-f]{6}$/i.test(String(s.s || '').trim())) { var v = parseInt(String(s.s).trim().slice(1), 16); return { src: 'sensor', c: [v >> 16 & 255, v >> 8 & 255, v & 255] }; }
+    if (l && l.s === 'off') return { src: 'light', c: [0, 0, 0] };
+    if (l && l.s === 'on' && l.a && l.a.rgb_color) { var k = l.a.brightness == null ? 1 : l.a.brightness / 255, rc = l.a.rgb_color; return { src: 'light', c: [rc[0] * k | 0, rc[1] * k | 0, rc[2] * k | 0] }; }
+    return { src: 'none' };
+  }
+  function haApply() {
+    var D = derived(), cs = {}, src = {}, ns = 0, nl = 0;
+    for (var i = 0; i < st.tiles.length; i++) { var r = haColor(st.tiles[i]); src[D[i].id] = r.src; if (r.src === 'sensor') ns++; else if (r.src === 'light') nl++; cs[D[i].id] = r.c || [40, 40, 40]; }
+    fx.play = false; fx.mode = 'live'; fx.colors = cs; fx.leds = null; fx.src = src;
+    if (ha.status === 'connected') $('haStatus').textContent = 'Connected · ' + ns + ' sensor, ' + nl + ' light fallback, ' + (st.tiles.length - ns - nl) + ' no data';
+    render();
+  }
+  bind('haGo', 'click', haStart); bind('haStop', 'click', function () { ha.status = 'idle'; haStop(); });
   /* firmware ref wants numeric ids (tile_id from tiles.csv, else index+1), q, r, order; one ledCount -> use max, slice per tile */
   function fwFrame(D, tMs) {
     var r = fwParams(); if (r.error) throw new Error(r.error);
@@ -343,7 +395,7 @@
     render(); requestAnimationFrame(tick);
   }
   function startFx() { if (fx.play) return; fx.play = true; fx.last = 0; requestAnimationFrame(tick); }
-  bind('fxPlay', 'click', startFx);
+  bind('fxPlay', 'click', function () { if ($('fxSrcSel').value === 'ha') { $('fxFwMsg').textContent = 'Live mode shows Home Assistant state; Connect instead.'; return; } startFx(); });
   bind('fxStop', 'click', function () { fx.play = false; fx.colors = null; fx.leds = null; render(); });
 
   /* ---- Hardware push (generate only; nothing is sent) ---- */
@@ -430,6 +482,6 @@
   bind('hwCsvLoad', 'click', function () { try { csv = parseCsv($('hwCsv').value, 'pasted'); $('hwMsg').textContent = ''; render(); } catch (e) { $('hwMsg').textContent = 'tiles.csv: ' + e.message; } hwSync(); });
   if (window.fetch && location.protocol !== 'file:') fetch('../esphome/tiles.csv', { cache: 'no-store' }).then(function (r) { if (!r.ok) throw 0; return r.text(); }).then(function (t) { csv = parseCsv(t, 'esphome/tiles.csv'); render(); syncPanels(); }, function () {});
 
-  window.HexApp = { state: function () { return st; }, derived: derived, fx: fx, FX: function () { return FX; }, hw: hwBuild, fwParams: fwParams, fwRef: function () { return FWREF; } }; // test hook
+  window.HexApp = { state: function () { return st; }, derived: derived, fx: fx, FX: function () { return FX; }, ha: ha, haColor: haColor, hw: hwBuild, fwParams: fwParams, fwRef: function () { return FWREF; } }; // test hook
   lbl(); setVB(); fit(); render(); loadRemote(buildFx);
 })();
