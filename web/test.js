@@ -9,7 +9,7 @@ const OUT = __dirname + '/screenshots/'; const URL = 'http://localhost:8411/web/
     await p.goto(URL); await p.evaluate(() => localStorage.clear()); await p.reload();
     for (let i = 0; i < 20; i++) await p.click('#add');
     ok(await p.evaluate(() => HexApp.state().led.count) === 44, w + ' new layout default led.count 44');
-    ok(await p.textContent('#count') === '20 tiles', w + ' 20 tiles counter');
+    ok(await p.textContent('#count') === '20 hexes', w + ' 20 hexes counter');
     // assign IDs via panel on a few tiles by tapping, rest via UI fields too
     const n = await p.locator('.hx').count();
     await p.click('#zfit');
@@ -71,7 +71,7 @@ const OUT = __dirname + '/screenshots/'; const URL = 'http://localhost:8411/web/
     ok(JSON.stringify(Object.keys(o)) === '["version","name","hex","led","master","tiles","sync"]' && !('x' in o.tiles[0]) && !('ring' in o.tiles[0]), w + ' export has no derived fields');
     // reimport after clearing
     await p.evaluate(() => { localStorage.clear(); }); await p.reload();
-    ok(await p.textContent('#count') === '0 tiles', w + ' cleared');
+    ok(await p.textContent('#count') === '0 hexes', w + ' cleared');
     await p.click('#tabFile'); await p.setInputFiles('#imp', file); await p.waitForTimeout(300);
     const re = await p.evaluate(() => LayoutFormat.serialize(HexApp.state()));
     ok(re === exp, w + ' round-trip identical');
@@ -129,8 +129,14 @@ const OUT = __dirname + '/screenshots/'; const URL = 'http://localhost:8411/web/
     const src = JSON.parse(fs.readFileSync('/workspace/hex-lights/layout.json', 'utf8')), back = JSON.parse(await p.evaluate(() => LayoutFormat.serialize(HexApp.state())));
     ok(JSON.stringify(back) === JSON.stringify(src), 'Back End layout.json round-trips unchanged');
     await p.evaluate(() => { const s = HexApp.state(); s.sync = { mode: 'jumper', pin: 'GPIO12' }; });
-    await p.locator('.hx').first().click(); ok((await p.textContent('#tSync')).includes('jumper') && (await p.textContent('#tSync')).includes('expected') && (await p.textContent('#tSync')).includes('sensor.hex_c0_sync_source'), 'tile panel: expected jumper + live sensor name');
+    await p.locator('.hx').first().click(); ok((await p.textContent('#tSync')).includes('jumper') && (await p.textContent('#tSync')).includes('expected') && (await p.textContent('#tSync')).includes('sensor.hex_01_sync_source'), 'tile panel: expected jumper + live sensor name');
     await p.click('#tabHw'); { const y = await p.inputValue('#hwYaml'); ok(y.includes('option: "Jumper wire"'), 'push YAML sync mode follows layout (Jumper wire)'); } await p.click('#tabHw');
+    { const ts = await p.textContent('#tSync'); ok(ts.includes('binary_sensor.hex_01_sync_leader') && !ts.includes('this_tile'), 'sync_leader entity (no _this_tile)'); }
+    await p.locator('.hx').first().click(); ok((await p.textContent('#shTitle')) === 'Hex 01 · c0', 'panel title Hex 01 · c0 got ' + await p.textContent('#shTitle'));
+    ok(await p.$$eval('.hx text:not(.sub):not(.star)', t => t.map(x => x.textContent).filter(x => /^Hex \d\d$/.test(x)).length === 20) && await p.$$eval('.hx text.sub', t => t.some(x => x.textContent === 'Center')), 'grid shows Hex 01..20 with name/id secondary');
+    { const hl = await p.$$eval('.hx text:not(.sub):not(.star)', t => t.map(x => x.textContent).sort()); ok(hl[0] === 'Hex 01' && hl[19] === 'Hex 20', 'Hex 01..Hex 20'); }
+    { const body = await p.evaluate(() => { const s = document.getElementById('sheet'); const all = [...document.querySelectorAll('button,label,h1,h2,h3,p,li,summary,.pill,option,svg text')].map(e => e.textContent).join(' | '); return all; });
+      const bad = body.match(/[^|]{0,30}\btiles?\b(?!\.csv)[^|]{0,30}/gi) || []; ok(bad.length === 0, 'no user-visible "tile" ' + bad.slice(0, 5).join(' ;; ')); }
     const rj = await p.evaluate(() => LayoutFormat.parse(LayoutFormat.serialize(HexApp.state())).layout.sync); ok(rj.mode === 'jumper' && rj.pin === 'GPIO12', 'sync round-trips via parse');
     await p.evaluate(() => { HexApp.state().sync = { mode: 'wireless', pin: 'GPIO12' }; }); await p.click('#tabFile');
     const imp = JSON.parse(JSON.stringify(src)); imp.led.count = 60; imp.tiles[1].ledCount = 12;
@@ -141,22 +147,22 @@ const OUT = __dirname + '/screenshots/'; const URL = 'http://localhost:8411/web/
     await p.click('#tabFx'); await p.click('#fxPlay'); await p.waitForTimeout(200); seen = await p.evaluate(() => window.__seen); await p.click('#fxStop');
     ok(seen && seen[1] === 12 && seen[0] === 60, 'frame() receives effective leds');
     // led.count limit
-    await p.click('#tabLayout'); await p.fill('#lCount', '61'); ok((await p.textContent('#errList')).includes('LEDs per tile must be 1-60'), 'led.count > 60 flagged'); await p.fill('#lCount', '44');
+    await p.click('#tabLayout'); await p.fill('#lCount', '61'); ok((await p.textContent('#errList')).includes('LEDs per hex must be 1-60'), 'led.count > 60 flagged'); await p.fill('#lCount', '44');
     // wall effect snippet + firmware reference
     await p.click('#tabFx'); await p.selectOption('#fxSel', 'solid'); await p.fill('#fxParams input[type=color]', '#ff0000'); await p.fill('#bri', '100');
     await p.click('#tabHw'); await p.fill('#hwDelay', '25000');
     const fy = await p.inputValue('#hwFx');
-    ok(fy.includes('action: esphome.hex_c0_set_wall_fx') && fy.includes('effect: 0') && fy.includes('hue: 0') && fy.includes('saturation: 255') && fy.includes('value: 255') && fy.includes('start_delay_ms: 10000') && !(await p.isDisabled('#hwCopyFx')), 'wall fx YAML solid red, delay capped');
+    ok(fy.includes('action: esphome.hex_01_set_wall_fx') && fy.includes('effect: 0') && fy.includes('hue: 0') && fy.includes('saturation: 255') && fy.includes('value: 255') && fy.includes('start_delay_ms: 10000') && fy.includes('axis: 0') && !(await p.isDisabled('#hwCopyFx')), 'wall fx YAML solid red, delay capped');
     await p.click('#tabFx'); await p.$eval('#bri', e => { e.value = 50; e.dispatchEvent(new Event('input')); }); await p.fill('#fxParams input[type=color]', '#804020');
     ok(await p.evaluate(() => HexApp.fwParams().P.value) === 64, 'value = round(colourV 128 * 50%) = 64');
     await p.selectOption('#fxSel', 'rainbow_sweep'); ok(await p.evaluate(() => HexApp.fwParams().P.value) === 128, 'colourless value = round(255 * 50%) = 128');
     await p.$eval('#fxParams select[data-k=axis]', e => { e.value = 'ring'; e.dispatchEvent(new Event('change', { bubbles: true })); }); await p.click('#tabHw');
-    const sm = await p.textContent('#hwFxMsg'); ok(sm.includes('select.hex_c0_wall_wipe_axis to ring') && !/x\/y only/i.test(sm) && (await p.inputValue('#hwFx')).includes('value: 128'), 'sweep axis note (ring), no x/y-only warning, YAML value 128 ' + sm);
+    const sm = await p.textContent('#hwFxMsg'); ok(sm.includes('axis ring is sent as the axis arg') && sm.includes('select.hex_01_wall_wipe_axis') && !/x\/y only/i.test(sm) && (await p.inputValue('#hwFx')).includes('value: 128') && (await p.inputValue('#hwFx')).includes('\n  axis: 2'), 'sweep axis note (ring), no x/y-only warning, YAML value 128 ' + sm);
     await p.click('#tabFx'); await p.$eval('#bri', e => { e.value = 100; e.dispatchEvent(new Event('input')); });
     await p.selectOption('#fxSel', 'chase'); await p.click('#tabHw');
     let P = await p.evaluate(() => HexApp.fwParams().P); ok(P.effect === 4 && P.speed === 3000 && P.scale === 300 && P.palette === 0, 'chase -> id 4, speed 3000, scale 300 ' + JSON.stringify(P));
     await p.click('#tabFx'); await p.selectOption('#fxSel', 'breathe'); P = await p.evaluate(() => HexApp.fwParams().P); ok(P.effect === 3 && P.speed === 250, 'breathe -> pulse 3, speed 250');
-    await p.selectOption('#fxSel', 'wipe'); await p.click('#tabHw'); ok((await p.textContent('#hwFxMsg')).includes('select.hex_c0_wall_wipe_axis'), 'wipe axis note'); await p.click('#tabFx');
+    await p.selectOption('#fxSel', 'wipe'); await p.click('#tabHw'); ok((await p.textContent('#hwFxMsg')).includes('select.hex_01_wall_wipe_axis'), 'wipe axis note'); await p.click('#tabFx');
     await p.selectOption('#fxSel', 'snake'); P = await p.evaluate(() => HexApp.fwParams().P); ok(P.effect === 10 && P.speed === 1000, 'snake -> id 10 (hexsyncId)');
     await p.selectOption('#fxSel', 'sparkle'); ok(!!(await p.evaluate(() => HexApp.fwParams().error)), 'sparkle has no firmware id -> disabled');
     await p.selectOption('#fxSel', 'spiral'); await p.click('#tabHw');
@@ -176,9 +182,9 @@ const OUT = __dirname + '/screenshots/'; const URL = 'http://localhost:8411/web/
     await p.click('#tabHw'); await p.waitForTimeout(300);
     const exp = fs.readFileSync('/workspace/hex-lights/esphome/layout_bulk.txt', 'utf8').trim();
     await p.evaluate(t => { document.getElementById('json').value = t; }, fs.readFileSync('/workspace/hex-lights/layout.json', 'utf8')); await p.click('#tabFile'); await p.click('#loadTxt'); await p.click('#tabHw');
-    { const y0 = await p.inputValue('#hwYaml'); ok(y0.includes('entity_id: select.hex_c0_sync_mode') && y0.includes('option: "Wireless (ESP-NOW)"'), 'push YAML has sync mode (wireless)'); }
+    { const y0 = await p.inputValue('#hwYaml'); ok(y0.includes('entity_id: select.hex_01_sync_mode') && y0.includes('option: "Wireless (ESP-NOW)"'), 'push YAML has sync mode (wireless)'); }
     const bulk = await p.inputValue('#hwBulk'); ok(bulk === exp, 'bulk string == esphome/layout_bulk.txt (' + bulk.length + ' chars)');
-    const yaml = await p.inputValue('#hwYaml'); ok(yaml.includes('action: esphome.hex_c0_set_layout_bulk') && yaml.includes('action: esphome.hex_c0_set_tile_layout\ndata: {tile_id: 20, q: 3, r: -1, rotation: 0, order: 19}') && !(await p.isDisabled('#hwCopy')), 'YAML snippets + copy enabled');
+    const yaml = await p.inputValue('#hwYaml'); ok(yaml.includes('action: esphome.hex_01_set_layout_bulk') && yaml.includes('# Hex 20 (r3-a)\naction: esphome.hex_01_set_hex_layout\ndata: {hex_num: 20, q: 3, r: -1, rotation: 0, order: 19}') && !(await p.isDisabled('#hwCopy')), 'YAML snippets + copy enabled');
     await p.click('#hwCopy'); ok((await p.textContent('#hwMsg')).includes('copied'), 'copy bulk');
     await p.evaluate(() => { const s = HexApp.state(); s.tiles.push({ id: 'ghost', name: '', mac: '', q: 9, r: 9, rot: 0, ledCount: '', order: null, rotDeg: null }); }); await p.click('#tabHw'); await p.click('#tabHw');
     ok((await p.textContent('#hwErr')).includes('ghost is not in tiles.csv') && await p.isDisabled('#hwCopy') && (await p.inputValue('#hwBulk')) === '', 'unknown tile flagged, push blocked');

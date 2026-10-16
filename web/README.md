@@ -48,8 +48,8 @@ it should send `rotationDeg` if present, else `rot*60`. Harmless today because e
 Builds `tile_id:q:r:rotation:order;…` where `tile_id` = 1-based row in `../esphome/tiles.csv`, matched by tile id,
 then by MAC (a `mac` column if tiles.csv has one, or a MAC-style id). Unknown tiles, out-of-range values or
 duplicate orders block the string and the Copy buttons, because a single bad entry makes the tile reject it all.
-YAML snippets for `esphome.hex_<master>_set_layout_bulk` and per-tile `..._set_tile_layout` (node name from the
-master id, `hex_c0` for the default layout). If tiles.csv can't be fetched, paste it into the panel.
+YAML snippets for `esphome.hex_NN (master row)_set_layout_bulk` and per-tile `..._set_hex_layout` (node name from the
+master id, `hex_01` for the default layout). If tiles.csv can't be fetched, paste it into the panel.
 For Back End's default layout, the output equals `esphome/layout_bulk.txt`.
 
 ## Effects (wall effects, 5dd5427)
@@ -61,11 +61,11 @@ rainbow_flow and the palettes.
 
 ## Firmware limits and wall effect (Hardware hexsync v2)
 - LED count: `led.count` and tile `ledCount` must be 1–60 (`number.hex_<id>_led_count`). Higher values are flagged, not clamped.
-- Push tab → **Wall effect**: YAML for `esphome.hex_<master>_set_wall_fx(effect, palette, speed, scale, hue, saturation, value, start_delay_ms)`
+- Push tab → **Wall effect**: YAML for `esphome.hex_NN (master row)_set_wall_fx(effect, palette, speed, scale, hue, saturation, value, start_delay_ms)`
   built from the current preview. effect = effects.json `hexsyncId` (fallback table 0 solid … 10 snake). palette = index 0–5.
   speed = cycles/s ×1000 (breathe: 1000/periodS), capped 0–10000. scale ×100 (chase tail, rainbow_flow scale), else 100.
   hue/sat 0–255 from the colour; value = round(colourV × preview brightness), 0–255 (no colour → V 255). start_delay_ms capped at 10000. Effects without an id (spiral, sparkle)
-  disable the snippet and show a message. The axis for wipe and rainbow_sweep (x, y, ring, angle) is `select.hex_c0_wall_wipe_axis`, not a service field.
+  disable the snippet and show a message. The axis for wipe and rainbow_sweep (x, y, ring, angle) is `select.hex_01_wall_wipe_axis`, not a service field.
 - Preview source **Firmware reference** uses `../esphome/tools/effects-ref.js` `frame(P, tiles, tMs, ledCount)`. Tiles get numeric
   ids from tiles.csv rows. It's called once with the largest led count, then sliced per tile. firmwareOnly effects (random_ripple,
   twinkle, color_cycle, snake) always preview through it.
@@ -74,7 +74,7 @@ rainbow_flow and the palettes.
 - **Storage:** DESIGN.md/layout.json define no key, so the editor uses an optional top-level
   `"sync": {"mode": "wireless" | "jumper", "pin": "GPIO<n>"}`. It's written only when not the default (wireless, GPIO12), so Back End's
   layout.json round-trips unchanged. gen_tiles.py `validate()` accepts it and `derive()` copies it through (checked). It does not yet
-  feed the `sync_pin` substitution. On the device the mode is the master's `select.hex_c0_sync_mode`
+  feed the `sync_pin` substitution. On the device the mode is the master's `select.hex_01_sync_mode`
   (`Wireless (ESP-NOW)` / `Jumper wire`) and sync_pin is a compile-time substitution (default GPIO12).
 - **Sync pin** uses the same rule as the data pin (`GPIO<n>`, not 0/3/45/46 strapping, 19/20 USB, 48 RGB LED, same as gen_tiles
   `check_pin`), and is flagged if it equals the LED data pin.
@@ -83,4 +83,15 @@ rainbow_flow and the palettes.
 - **Sync source badge** (grid `W`/`J`, `·L` = expected leader; tile panel): *expected* value only. Wireless → `espnow`, Jumper →
   `jumper` (the leader also reports `jumper`). The live value, including `jumper-lost`, comes from `sensor.hex_<id>_sync_source` in HA, which the editor doesn't read.
   The expected leader is the master (gen_tiles gives it leader_priority 1); failover can move it.
-- **Push YAML** adds a `select.select_option` on `select.hex_c0_sync_mode`. Wall-fx YAML is unchanged (the mode isn't a set_wall_fx field).
+- **Push YAML** adds a `select.select_option` on `select.hex_01_sync_mode`. Wall-fx YAML is unchanged (the mode isn't a set_wall_fx field).
+
+## Hex NN naming (branch web-hex-nn, matches Hardware 9b55813)
+- A hex is shown as **Hex NN**, where NN is its 1-based row in `esphome/tiles.csv` (c0 = Hex 01 … r3-a = Hex 20). The layout id/name is
+  shown second. Hexes missing from tiles.csv show `Hex ?`.
+- HA ids use `hex_NN_*`: `sensor.hex_NN_sync_source`, `binary_sensor.hex_NN_sync_leader`, `select.hex_01_sync_mode`,
+  `select.hex_01_wall_wipe_axis`. The service prefix comes from the **master's tiles.csv row** (`hex_01`), not its id. Push is blocked if the master isn't in tiles.csv.
+- Services: `esphome.hex_01_set_layout_bulk`, `esphome.hex_01_set_hex_layout(hex_num, q, r, rotation, order)`,
+  `esphome.hex_01_set_wall_fx(effect, palette, speed, scale, hue, saturation, value, start_delay_ms, axis)`. `axis` (0 x, 1 y, 2 ring,
+  3 angle) is a required argument in 9b55813's template, so the snippet always includes it.
+- UI text says "hex" everywhere ("Add hex", "Hex panel", "LEDs per hex", "Master hex", …). The file format keeps `tiles`, `ledCount`
+  and the code identifiers. New hexes get ids `h1`, `h2`, … (previously `tile-N`).

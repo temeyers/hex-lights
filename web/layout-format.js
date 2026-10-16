@@ -82,12 +82,12 @@
       else ords[od] = i;
       if (t.mac && !MAC.test(t.mac)) e.push({ tile: i, field: 'mac', msg: 'MAC looks wrong' });
       var k = t.q + ',' + t.r;
-      if (pos[k] != null) e.push({ tile: i, field: 'pos', msg: 'Two tiles at ' + k });
+      if (pos[k] != null) e.push({ tile: i, field: 'pos', msg: 'Two hexes at ' + k });
       pos[k] = i;
     }
-    if (s.tiles.length && !s.master) e.push({ tile: null, field: 'master', msg: 'No master tile chosen' });
-    else if (s.master && ids[s.master] == null) e.push({ tile: null, field: 'master', msg: 'Master "' + s.master + '" is not a tile ID' });
-    if (!(s.led.count >= 1 && s.led.count <= MAXLED)) e.push({ tile: null, field: 'led', msg: 'LEDs per tile must be 1-' + MAXLED + ' (firmware limit)' });
+    if (s.tiles.length && !s.master) e.push({ tile: null, field: 'master', msg: 'No master hex chosen' });
+    else if (s.master && ids[s.master] == null) e.push({ tile: null, field: 'master', msg: 'Master "' + s.master + '" is not a hex ID' });
+    if (!(s.led.count >= 1 && s.led.count <= MAXLED)) e.push({ tile: null, field: 'led', msg: 'LEDs per hex must be 1-' + MAXLED + ' (firmware limit)' });
     var pe = pinErr(s.led.pin, 'LED data pin'); if (pe) e.push({ tile: null, field: 'led', msg: pe });
     var sy = s.sync || {}, se = pinErr(sy.pin || 'GPIO12', 'Sync pin'); if (se) e.push({ tile: null, field: 'sync', msg: se });
     else if (pin(sy.pin || 'GPIO12') === pin(s.led.pin)) e.push({ tile: null, field: 'sync', msg: 'Sync pin must not be the LED data pin (' + pin(s.led.pin) + ')' });

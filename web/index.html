@@ -2,20 +2,20 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Hex lights layout</title><link rel="stylesheet" href="app.css"></head>
 <body>
-<header class="top"><h1>Hex wall</h1><span id="count" class="pill num">0 tiles</span><span id="errs" class="pill bad" hidden></span></header>
+<header class="top"><h1>Hex wall</h1><span id="count" class="pill num">0 hexes</span><span id="errs" class="pill bad" hidden></span></header>
 <main id="stage"><svg id="svg" xmlns="http://www.w3.org/2000/svg" role="application" aria-label="Hex grid"><g id="grid"></g><g id="tiles"></g></svg>
 <div class="zoom"><button class="iconbtn" id="zin" aria-label="Zoom in">+</button><button class="iconbtn" id="zout" aria-label="Zoom out">−</button><button class="iconbtn" id="zfit" aria-label="Fit">⤢</button></div></main>
 <nav class="tabs">
-<button class="btn pr" id="add">+ Add tile</button>
+<button class="btn pr" id="add">+ Add hex</button>
 <button class="btn" id="tabLayout">Layout</button>
 <button class="btn" id="tabFx">Preview</button>
 <button class="btn" id="tabFile">File</button>
 <button class="btn" id="tabHw">Push</button>
 </nav>
 <section id="sheet" class="sheet" hidden>
-<div class="sh-head"><h2 id="shTitle">Tile</h2><button class="iconbtn" id="shClose" aria-label="Close">✕</button></div>
+<div class="sh-head"><h2 id="shTitle">Hex</h2><button class="iconbtn" id="shClose" aria-label="Close">✕</button></div>
 <div id="pTile" class="pane">
- <label>Tile ID (slug or MAC)<input id="tId" autocomplete="off" autocapitalize="off" spellcheck="false"></label><p id="tIdErr" class="err"></p>
+ <label>Hex ID (slug or MAC)<input id="tId" autocomplete="off" autocapitalize="off" spellcheck="false"></label><p id="tIdErr" class="err"></p>
  <label>Name (optional)<input id="tName"></label>
  <label>MAC (optional)<input id="tMac" autocapitalize="off" placeholder="aa:bb:cc:dd:ee:ff"></label>
  <div class="row2"><label>Grid q<input id="tQ" type="number" min="-50" max="50" step="1" inputmode="numeric"></label>
@@ -35,9 +35,9 @@
  <label>Hex size (mm)<input id="lSize" type="number" min="1" inputmode="decimal"></label></div>
  <h3>LEDs</h3>
  <div class="row2"><label>Data pin<input id="lPin" placeholder="GPIO13" autocapitalize="characters"></label>
- <label>LEDs per tile<input id="lCount" type="number" min="1" max="60" inputmode="numeric"></label></div>
+ <label>LEDs per hex<input id="lCount" type="number" min="1" max="60" inputmode="numeric"></label></div>
  <div class="row2"><label>Type<select id="lType"></select></label><label>Colour order<select id="lOrder"></select></label></div>
- <label>Master tile<select id="lMaster"></select></label>
+ <label>Master hex<select id="lMaster"></select></label>
  <h3>Sync</h3>
  <div class="seg" role="radiogroup" aria-label="Sync mode"><button type="button" class="btn" id="syW" role="radio">Wireless (ESP-NOW)</button><button type="button" class="btn" id="syJ" role="radio">Jumper wire</button></div>
  <label>Sync pin (jumper mode)<input id="lSyncPin" placeholder="GPIO12" autocapitalize="characters"></label>
@@ -53,13 +53,13 @@
  <label>Brightness <span id="briV" class="num"></span><input id="bri" type="range" min="0" max="100" value="80"></label>
  <label>Preview speed <span id="spdV" class="num"></span><input id="spd" type="range" min="0" max="300" value="100"></label>
  <div class="row2"><button class="btn pr" id="fxPlay">Play</button><button class="btn" id="fxStop">Stop</button></div>
- <p class="mu small">Local simulation only. Tap a tile to set the ripple origin.</p>
+ <p class="mu small">Local simulation only. Tap a hex to set the ripple origin.</p>
 </div>
 <div id="pHw" class="pane">
  <p class="small mu">Hardware push string for the master's <span class="mono">set_layout_bulk</span> service. Nothing is sent from here; copy it into Home Assistant yourself.</p>
  <p id="hwSrc" class="small mu"></p>
  <ul id="hwErr" class="errlist"></ul>
- <label>Bulk layout (tile_id:q:r:rotation:order;…)<textarea id="hwBulk" rows="4" readonly class="mono"></textarea></label>
+ <label>Bulk layout (hex_num:q:r:rotation:order;…)<textarea id="hwBulk" rows="4" readonly class="mono"></textarea></label>
  <button class="btn pr" id="hwCopy">Copy bulk string</button>
  <label>Service calls (YAML)<textarea id="hwYaml" rows="10" readonly class="mono"></textarea></label>
  <button class="btn" id="hwCopyYaml">Copy YAML</button>

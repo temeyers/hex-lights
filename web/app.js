@@ -66,11 +66,11 @@
       var a = Math.PI / 180 * (deg + (st.hex.orientation === 'flat' ? 30 : 0) - 90);
       h += '<g class="hx' + (i === sel ? ' sel' : '') + (bad[i] ? ' bad' : '') + '" data-i="' + i + '"><path d="' + corners(p[0], p[1], R - 2) + '"' + fill + '/>' +
         '<line class="rotmark" x1="' + (p[0] + Math.cos(a) * R * 0.55).toFixed(1) + '" y1="' + (p[1] + Math.sin(a) * R * 0.55).toFixed(1) + '" x2="' + (p[0] + Math.cos(a) * R * 0.8).toFixed(1) + '" y2="' + (p[1] + Math.sin(a) * R * 0.8).toFixed(1) + '"/>' +
-        dots + (D ? '' : '<text x="' + p[0] + '" y="' + p[1] + '">' + esc(lab.length > 9 ? lab.slice(0, 8) + '…' : lab) + '</text>') +
+        dots + (D ? '' : '<text x="' + p[0] + '" y="' + (p[1] - 5) + '">' + esc(hexLabel(t)) + '</text><text class="sub" x="' + p[0] + '" y="' + (p[1] + 9) + '">' + esc(lab.length > 10 ? lab.slice(0, 9) + '…' : lab) + '</text>') +
         syncBadge(i, p) + (i === mi ? '<text class="star" x="' + p[0] + '" y="' + (p[1] - R * 0.5) + '">★</text>' : '') + '</g>';
     }
     gT.innerHTML = h;
-    $('count').textContent = st.tiles.length + (st.tiles.length === 1 ? ' tile' : ' tiles');
+    $('count').textContent = st.tiles.length + (st.tiles.length === 1 ? ' hex' : ' hexes');
     $('errs').hidden = !errs.length; $('errs').textContent = errs.length + ' issue' + (errs.length > 1 ? 's' : '');
   }
   /* expected sync source per DESIGN.md (live value only from sensor.hex_<id>_sync_source: espnow / jumper / jumper-lost).
@@ -85,18 +85,18 @@
   /* jumper wiring per DESIGN.md "Sync mode": one shared line + GND, 330 R series at each tile, one 4.7 k pull-up to 3.3 V */
   function wiring(pinName, n) {
     var cols = [70, 165, 260], h = '<svg viewBox="0 0 340 250" role="img" aria-label="Jumper wire sync wiring">';
-    h += '<text x="18" y="16">3.3V (any one tile)</text><line class="ln" x1="40" y1="22" x2="40" y2="36"/>';
+    h += '<text x="18" y="16">3.3V (any one hex)</text><line class="ln" x1="40" y1="22" x2="40" y2="36"/>';
     h += '<rect class="pu" x="30" y="36" width="20" height="34" rx="3"/><text x="56" y="52">4.7 kΩ pull-up</text><text class="mu" x="56" y="65">one only (optional*)</text>';
     h += '<line class="ln" x1="40" y1="70" x2="40" y2="90"/><line class="ln" x1="14" y1="90" x2="330" y2="90"/><text x="6" y="106">SYNC</text>';
     for (var k = 0; k < 3; k++) { var x = cols[k];
       h += '<circle cx="' + x + '" cy="90" r="3" fill="currentColor"/><line class="ln" x1="' + x + '" y1="90" x2="' + x + '" y2="104"/>';
       h += '<rect class="res" x="' + (x - 10) + '" y="104" width="20" height="30" rx="3"/><text x="' + (x + 14) + '" y="123">330 Ω</text>';
       h += '<line class="ln" x1="' + x + '" y1="134" x2="' + x + '" y2="150"/><rect class="tile" x="' + (x - 34) + '" y="150" width="68" height="44" rx="8"/>';
-      h += '<text x="' + (x - 26) + '" y="168">' + esc(pinName) + '</text><text class="mu" x="' + (x - 26) + '" y="184">tile ' + (k + 1) + '</text>';
+      h += '<text x="' + (x - 26) + '" y="168">' + esc(pinName) + '</text><text class="mu" x="' + (x - 26) + '" y="184">Hex ' + pad2(k + 1) + '</text>';
       h += '<line class="gnd" x1="' + x + '" y1="194" x2="' + x + '" y2="214"/><text class="mu" x="' + (x + 4) + '" y="208">GND</text>'; }
     h += '<text x="300" y="175">… ×' + Math.max(n, 1) + '</text><line class="gnd" x1="14" y1="214" x2="330" y2="214"/><text x="14" y="232">GND bus (LED power GND is fine)</text></svg>';
-    h += '<ul><li>Each tile: ' + esc(pinName) + ' → 330 Ω series resistor → shared SYNC line. Plus a shared GND.</li><li>One 4.7 kΩ pull-up to 3.3 V on one tile. *DESIGN.md: optional, internal ~45 kΩ pull-ups also work for short lines [EST].</li>' +
-      '<li>Twisted pair (sync + GND) or ribbon, kept short and away from the 5 V branch runs. Open-drain: tiles only pull low.</li><li>Then set <span class="mono">select.' + nodeName() + '_sync_mode</span> to "Jumper wire". sync_pin is a compile-time substitution (regenerate and flash to change it).</li></ul>';
+    h += '<ul><li>Each hex: ' + esc(pinName) + ' → 330 Ω series resistor → shared SYNC line. Plus a shared GND.</li><li>One 4.7 kΩ pull-up to 3.3 V on one hex. *DESIGN.md: optional, internal ~45 kΩ pull-ups also work for short lines [EST].</li>' +
+      '<li>Twisted pair (sync + GND) or ribbon, kept short and away from the 5 V branch runs. Open-drain: hexes only pull low.</li><li>Then set <span class="mono">select.' + nodeName() + '_sync_mode</span> to "Jumper wire". sync_pin is a compile-time substitution (regenerate and flash to change it).</li></ul>';
     return h;
   }
   function refresh() { render(); save(); syncPanels(); }
@@ -106,7 +106,7 @@
   function show(p) {
     var wasOpen = !$('sheet').hidden; cur = p; $('sheet').hidden = !p;
     for (var k in panes) $(panes[k]).className = 'pane' + (k === p ? ' show' : '');
-    $('shTitle').textContent = { tile: 'Tile', layout: 'Layout & LEDs', fx: 'Effect preview', file: 'Import / export', hw: 'Hardware push' }[p] || '';
+    $('shTitle').textContent = { tile: 'Hex panel', layout: 'Layout & LEDs', fx: 'Effect preview', file: 'Import / export', hw: 'Hardware push' }[p] || '';
     $('tabLayout').className = 'btn' + (p === 'layout' ? ' on' : ''); $('tabFx').className = 'btn' + (p === 'fx' ? ' on' : ''); $('tabFile').className = 'btn' + (p === 'file' ? ' on' : ''); $('tabHw').className = 'btn' + (p === 'hw' ? ' on' : '');
     syncPanels(); if (wasOpen !== !!p) { clearTimeout(fitTimer); fitTimer = setTimeout(function () { fitTimer = 0; fit(); }, 0); } // refit only when the panel opens/closes
   }
@@ -119,7 +119,8 @@
       setv($('tId'), t.id); setv($('tName'), t.name); setv($('tMac'), t.mac); setv($('tQ'), t.q); setv($('tR'), t.r); setv($('tDeg'), LF.rotDeg(t)); setv($('tOrd'), t.order == null || t.order === '' ? '' : t.order); $('tOrd').placeholder = 'default (' + sel + ')'; $('tOrdDef').disabled = t.order == null || t.order === ''; setv($('tLed'), t.ledCount); $('tLed').placeholder = 'default (' + st.led.count + ')'; $('tLedDef').disabled = t.ledCount === '';
       for (var i = 0; i < errs.length; i++) if (errs[i].tile === sel) e.push(errs[i].msg);
       $('tIdErr').textContent = e.join(' · ');
-      var ss = syncSrc(sel); $('tSync').innerHTML = '<span class="badge" style="background:' + ss.color + '">' + ss.src + '</span>expected · ' + esc(ss.why) + '. Live value: <span class="mono">sensor.hex_' + esc(nid(t.id)) + '_sync_source</span>';
+      var ss = syncSrc(sel); $('tSync').innerHTML = '<span class="badge" style="background:' + ss.color + '">' + ss.src + '</span>expected · ' + esc(ss.why) + '. Live: <span class="mono">' + (hexNum(t) ? 'sensor.' + ent(t) + '_sync_source, binary_sensor.' + ent(t) + '_sync_leader' : '(not in tiles.csv, no entities)') + '</span>';
+      $('shTitle').textContent = hexLabel(t) + (t.id ? ' · ' + t.id : '');
       $('tPos').textContent = 'q ' + t.q + ', r ' + t.r + (t.id && t.id === st.master ? ' · master' : '');
       $('tMaster').textContent = t.id && t.id === st.master ? 'Is master ★' : 'Make master';
     } else if (cur === 'tile') show(null);
@@ -130,8 +131,8 @@
       setv($('lSyncPin'), sy.pin); $('wireBox').hidden = !jm; if (jm) $('wireBox').innerHTML = wiring(LF.normPin(sy.pin || 'GPIO12'), st.tiles.length);
       setv($('lName'), st.name); $('lOri').value = st.hex.orientation; setv($('lSize'), st.hex.sizeMm); setv($('lPin'), st.led.pin); setv($('lCount'), st.led.count);
       opts($('lType'), LF.TYPES, st.led.type); opts($('lOrder'), LF.ORDERS, st.led.order);
-      var m = [{ v: '', t: '— none —' }]; for (var j = 0; j < st.tiles.length; j++) if (st.tiles[j].id) m.push(st.tiles[j].id); opts($('lMaster'), m, st.master || '');
-      var h = ''; for (var k = 0; k < errs.length; k++) h += '<li>' + (errs[k].tile != null ? 'Tile at ' + st.tiles[errs[k].tile].q + ',' + st.tiles[errs[k].tile].r + ': ' : '') + esc(errs[k].msg) + '</li>';
+      var m = [{ v: '', t: '— none —' }]; for (var j = 0; j < st.tiles.length; j++) if (st.tiles[j].id) m.push({ v: st.tiles[j].id, t: hexLabel(st.tiles[j]) + ' · ' + st.tiles[j].id }); opts($('lMaster'), m, st.master || '');
+      var h = ''; for (var k = 0; k < errs.length; k++) h += '<li>' + (errs[k].tile != null ? hexLabel(st.tiles[errs[k].tile]) + ' (' + st.tiles[errs[k].tile].q + ',' + st.tiles[errs[k].tile].r + '): ' : '') + esc(errs[k].msg) + '</li>';
       $('errList').innerHTML = h;
     }
   }
@@ -149,7 +150,7 @@
   bind('tOrdDef', 'click', function () { $('tOrd').value = ''; tset('order', null); });
   bind('tLed', 'input', function () { tset('ledCount', this.value === '' ? '' : Math.max(1, parseInt(this.value, 10) || 1)); });
   bind('tLedDef', 'click', function () { $('tLed').value = ''; tset('ledCount', ''); });
-  bind('tMaster', 'click', function () { var t = st.tiles[sel]; if (!t) return; if (!t.id) { $('tIdErr').textContent = 'Give the tile an ID first'; return; } st.master = t.id; refresh(); });
+  bind('tMaster', 'click', function () { var t = st.tiles[sel]; if (!t) return; if (!t.id) { $('tIdErr').textContent = 'Give the hex an ID first'; return; } st.master = t.id; refresh(); });
   bind('tDel', 'click', function () { if (sel < 0) return; if (st.tiles[sel].id === st.master) st.master = null; st.tiles.splice(sel, 1); sel = -1; show(null); refresh(); });
   bind('lName', 'input', function () { st.name = this.value; refresh(); });
   bind('lOri', 'change', function () { st.hex.orientation = this.value; drawGrid(); refresh(); fit(); });
@@ -177,7 +178,7 @@
       if (!best && at(c[0] + q, c[1] + r) < 0) best = [c[0] + q, c[1] + r];
     }
     if (!best) return;
-    var n = st.tiles.length + 1, id = 'tile-' + n; while (st.tiles.some(function (t) { return t.id === id; })) id = 'tile-' + (++n);
+    var n = st.tiles.length + 1, id = 'h' + n; while (st.tiles.some(function (t) { return t.id === id; })) id = 'h' + (++n);
     st.tiles.push({ id: id, name: '', mac: '', q: best[0], r: best[1], rot: 0, ledCount: '' });
     if (!st.master) st.master = id;
     sel = st.tiles.length - 1; refresh();
@@ -187,7 +188,7 @@
   /* ---- file ---- */
   function download(name, text) { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' })); a.download = name; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
   function importText(text) {
-    try { var res = LF.parse(text); st = res.layout; sel = -1; save(); drawGrid(); render(); fit(); $('json').value = LF.serialize(st); $('fileMsg').textContent = 'Imported ' + st.tiles.length + ' tiles' + (res.errors.length ? ' with ' + res.errors.length + ' issue(s)' : '') + '.'; }
+    try { var res = LF.parse(text); st = res.layout; sel = -1; save(); drawGrid(); render(); fit(); $('json').value = LF.serialize(st); $('fileMsg').textContent = 'Imported ' + st.tiles.length + ' hexes' + (res.errors.length ? ' with ' + res.errors.length + ' issue(s)' : '') + '.'; }
     catch (e) { $('fileMsg').textContent = 'Import failed: ' + e.message; }
   }
   bind('exp', 'click', function () { var t = LF.serialize(st); $('json').value = t; download('layout.json', t); $('fileMsg').textContent = errs.length ? 'Exported, but fix ' + errs.length + ' issue(s) before Back End uses it.' : 'Exported layout.json'; });
@@ -195,7 +196,7 @@
   bind('imp', 'change', function () { var f = this.files[0]; if (!f) return; var rd = new FileReader(); rd.onload = function () { importText(rd.result); }; rd.readAsText(f); this.value = ''; });
   bind('loadTxt', 'click', function () { importText($('json').value); });
   bind('copy', 'click', function () { var t = $('json'); t.value = LF.serialize(st); t.select(); try { navigator.clipboard.writeText(t.value); } catch (e) { document.execCommand('copy'); } $('fileMsg').textContent = 'Copied.'; });
-  bind('clear', 'click', function () { if (confirm('Clear all tiles?')) { st = LF.defaults(); sel = -1; refresh(); } });
+  bind('clear', 'click', function () { if (confirm('Clear all hexes?')) { st = LF.defaults(); sel = -1; refresh(); } });
 
   /* ---- pan / zoom / drag (pointer events; touch handled via pointerType touch + touch-action:none) ---- */
   var ptrs = {}, drag = null, pinch = null;
@@ -309,7 +310,7 @@
     for (k in p) if (p.hasOwnProperty(k)) {
       var d = p[k] || {}, v = d['default'], ty = d.type || (typeof v === 'number' ? 'number' : 'string');
       if (k === 'origin' || ty === 'tile' || ty === 'tileId') { v = st.master || (st.tiles[0] && st.tiles[0].id) || ''; var tl = []; for (var i = 0; i < st.tiles.length; i++) if (st.tiles[i].id) tl.push(st.tiles[i].id);
-        h += '<label>' + k + '<select id="fxp-origin" data-k="' + k + '">' + tl.map(function (x) { return '<option' + (x === v ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('') + '</select></label>'; }
+        h += '<label>' + k + '<select id="fxp-origin" data-k="' + k + '">' + tl.map(function (x) { var tt = null; for (var z = 0; z < st.tiles.length; z++) if (st.tiles[z].id === x) tt = st.tiles[z]; return '<option value="' + esc(x) + '"' + (x === v ? ' selected' : '') + '>' + esc((tt ? hexLabel(tt) + ' · ' : '') + x) + '</option>'; }).join('') + '</select></label>'; }
       else if (ty === 'color') { var arr = Object.prototype.toString.call(v) === '[object Array]'; h += '<label>' + k + '<input type="color" data-k="' + k + '"' + (arr ? ' data-rgb="1"' : '') + ' value="' + esc(toHex(v)) + '"></label>'; }
       else if (k === 'palette' && (d.options || d['enum'])) { var po = d.options || d['enum'];
         h += '<label>palette</label><div class="sw" role="radiogroup" aria-label="palette">' + po.map(function (x) { return '<button type="button" role="radio" class="swb' + (x === v ? ' on' : '') + '" aria-checked="' + (x === v) + '" data-pal="' + esc(x) + '" style="background:' + palCss(x) + '">' + esc(x) + '</button>'; }).join('') + '</div>'; }
@@ -353,18 +354,27 @@
     var hd = lines[0].split(',').map(function (x) { return x.trim().toLowerCase(); }), ii = hd.indexOf('id'), mi = hd.indexOf('mac'); if (ii < 0) throw new Error('tiles.csv needs an id column');
     return { rows: lines.slice(1).map(function (l) { var c = l.split(','); return { id: (c[ii] || '').trim(), mac: mi >= 0 ? (c[mi] || '').trim() : '' }; }), src: src };
   }
-  function nodeName() { var m = st.master || 'c0'; return 'hex_' + (/^([0-9a-f]{2}[:-]){5}[0-9a-f]{2}$/i.test(m) ? normMac(m) : m.replace(/-/g, '_')); }
-  /* tile_id = 1-based row in esphome/tiles.csv, matched by tile id, then by mac (tile mac or a MAC-style id) */
+  /* Hex NN = 1-based row in esphome/tiles.csv (matched by id, then MAC); HA prefix hex_NN, device hex-NN (Hardware 9b55813) */
+  function csvRow(t) { if (!csv || !t) return -1; var k;
+    for (k = 0; k < csv.rows.length; k++) if (t.id && csv.rows[k].id === t.id) return k + 1;
+    for (k = 0; k < csv.rows.length; k++) { var cm = normMac(csv.rows[k].mac || csv.rows[k].id), tm = normMac(t.mac) || normMac(t.id); if (cm.length === 12 && cm === tm) return k + 1; }
+    return -1; }
+  function pad2(n) { return n < 10 ? '0' + n : String(n); }
+  function hexNum(t) { var n = csvRow(t); return n > 0 ? n : 0; }
+  function hexLabel(t) { var n = hexNum(t); return n ? 'Hex ' + pad2(n) : 'Hex ?'; }
+  function ent(t) { return 'hex_' + pad2(hexNum(t)); }
+  function masterTile() { for (var i = 0; i < st.tiles.length; i++) if (st.tiles[i].id && st.tiles[i].id === st.master) return st.tiles[i]; return null; }
+  function nodeName() { var m = masterTile(); return m && hexNum(m) ? ent(m) : 'hex_??'; }
+  /* hex_num = 1-based row in esphome/tiles.csv (see csvRow) */
   function hwBuild() {
     var out = { entries: [], problems: [], perTile: [] }, i, t, v = LF.validate(st);
-    for (i = 0; i < v.length; i++) if (/^(pos|rotDeg|order)$/.test(v[i].field)) out.problems.push((v[i].tile != null ? (st.tiles[v[i].tile].id || 'tile ' + v[i].tile) + ': ' : '') + v[i].msg);
+    for (i = 0; i < v.length; i++) if (/^(pos|rotDeg|order)$/.test(v[i].field)) out.problems.push((v[i].tile != null ? hexLabel(st.tiles[v[i].tile]) + ' (' + (st.tiles[v[i].tile].id || '?') + '): ' : '') + v[i].msg);
     if (!csv) { out.problems.push('tiles.csv not loaded'); return out; }
+    if (nodeName() === 'hex_??') out.problems.push('Master hex is not in tiles.csv, so its hex_NN service prefix is unknown');
     for (i = 0; i < st.tiles.length; i++) {
-      t = st.tiles[i]; var num = -1, k;
-      for (k = 0; k < csv.rows.length && num < 0; k++) if (t.id && csv.rows[k].id === t.id) num = k + 1;
-      for (k = 0; k < csv.rows.length && num < 0; k++) { var cm = normMac(csv.rows[k].mac || csv.rows[k].id), tm = normMac(t.mac) || normMac(t.id); if (cm.length === 12 && cm === tm) num = k + 1; }
-      if (num < 0) { out.problems.push((t.id || 'tile at ' + t.q + ',' + t.r) + ' is not in tiles.csv'); continue; }
-      if (num > 250) { out.problems.push(t.id + ': tile_id ' + num + ' > 250'); continue; }
+      t = st.tiles[i]; var num = csvRow(t);
+      if (num < 0) { out.problems.push((t.id || 'hex at ' + t.q + ',' + t.r) + ' is not in tiles.csv'); continue; }
+      if (num > 250) { out.problems.push(t.id + ': hex_num ' + num + ' > 250'); continue; }
       var e = { tile_id: num, q: t.q, r: t.r, rotation: LF.rotDeg(t), order: LF.order(t, i), id: t.id };
       out.entries.push(e);
     }
@@ -374,11 +384,11 @@
   function hwSync() {
     var b = hwBuild(), nn = nodeName();
     $('hwSrc').textContent = csv ? 'tiles.csv: ' + csv.src + ' (' + csv.rows.length + ' rows) · service node: ' + nn + ' (master)' : 'tiles.csv not loaded yet.';
-    $('hwErr').innerHTML = b.problems.map(function (p) { return '<li>' + esc(p) + '</li>'; }).join('') + (b.problems.length ? '<li><b>Fix these first: one bad entry makes the tile reject the whole string.</b></li>' : '');
+    $('hwErr').innerHTML = b.problems.map(function (p) { return '<li>' + esc(p) + '</li>'; }).join('') + (b.problems.length ? '<li><b>Fix these first: one bad entry makes the hexes reject the whole string.</b></li>' : '');
     $('hwBulk').value = b.problems.length ? '' : b.bulk; $('hwCopy').disabled = !!b.problems.length; $('hwCopyYaml').disabled = !!b.problems.length;
-    $('hwYaml').value = b.problems.length ? '' : '# Bulk (all tiles)\naction: esphome.' + nn + '_set_layout_bulk\ndata:\n  layout: "' + b.bulk + '"\n\n# Per tile (resend one that did not ack)\n' +
+    $('hwYaml').value = b.problems.length ? '' : '# Bulk (all hexes)\naction: esphome.' + nn + '_set_layout_bulk\ndata:\n  layout: "' + b.bulk + '"\n\n' +
       '# Sync mode (DESIGN.md: master-only select; sync_pin ' + LF.normPin(st.sync.pin || 'GPIO12') + ' is a compile-time substitution)\naction: select.select_option\ntarget:\n  entity_id: select.' + nn + '_sync_mode\ndata:\n  option: "' + (st.sync.mode === 'jumper' ? 'Jumper wire' : 'Wireless (ESP-NOW)') + '"\n\n' +
-      b.entries.map(function (e) { return '# ' + e.id + '\naction: esphome.' + nn + '_set_tile_layout\ndata: {tile_id: ' + e.tile_id + ', q: ' + e.q + ', r: ' + e.r + ', rotation: ' + e.rotation + ', order: ' + e.order + '}'; }).join('\n---\n');
+      '# Per hex (resend one that did not ack)\n' + b.entries.map(function (e) { return '# Hex ' + pad2(e.tile_id) + ' (' + e.id + ')\naction: esphome.' + nn + '_set_hex_layout\ndata: {hex_num: ' + e.tile_id + ', q: ' + e.q + ', r: ' + e.r + ', rotation: ' + e.rotation + ', order: ' + e.order + '}'; }).join('\n---\n');
     $('hwCsvBox').open = !csv; hwFxSync(); return b;
   }
   /* ---- Wall effect snippet (esphome.hex_<master>_set_wall_fx), built from the preview ---- */
@@ -397,10 +407,10 @@
     var sp = n === 'breathe' ? 1 / (p.periodS || 4) : (p.speed != null ? p.speed : 1), sc = 100, notes = [];
     if (n === 'chase') sc = (p.tail || 3) * 100; else if (n === 'rainbow_flow') sc = (p.scale || 1) * 100;
     if (n === 'ripple' && p.origin && p.origin !== st.master) notes.push('firmware radial_wave always starts at q,r = 0,0, not the chosen origin');
-    if (n === 'wipe' || n === 'rainbow_sweep') notes.push('axis is not a service field: set select.' + nodeName() + '_wall_wipe_axis to ' + (p.axis || 'x') + ' (shared by wipe and rainbow_sweep; x, y, ring, angle)');
+    if (n === 'wipe' || n === 'rainbow_sweep') notes.push('axis ' + (p.axis || 'x') + ' is sent as the axis arg; it also sets select.' + nodeName() + '_wall_wipe_axis (shared by wipe and rainbow_sweep)');
     var hsv = p.color ? rgbToHsv255(p.color) : [0, 255, 255], bri = clamp(($('bri').value | 0) / 100, 0, 1), pi = FW_PAL.indexOf(p.palette);
     var P = { effect: id, palette: pi < 0 ? (p.color ? 5 : 0) : pi, speed: clamp(Math.round(sp * 1000), 0, 10000), scale: clamp(Math.round(sc), 0, 65535),
-      hue: hsv[0], saturation: hsv[1], value: clamp(Math.round(hsv[2] * bri), 0, 255), start_delay_ms: clamp(parseInt($('hwDelay').value, 10) || 0, 0, 10000) };
+      hue: hsv[0], saturation: hsv[1], value: clamp(Math.round(hsv[2] * bri), 0, 255), start_delay_ms: clamp(parseInt($('hwDelay').value, 10) || 0, 0, 10000), axis: { x: 0, y: 1, ring: 2, angle: 3 }[p.axis] || 0 };
     if (sp * 1000 > 10000) notes.push('speed capped at 10000 mc/s');
     return { P: P, note: notes.join('; ') };
   }
@@ -408,8 +418,8 @@
     var r = fwParams(), nn = nodeName();
     $('hwCopyFx').disabled = !!r.error; $('hwFx').disabled = !!r.error;
     if (r.error) { $('hwFx').value = ''; $('hwFxMsg').textContent = r.error; return r; }
-    var P = r.P; $('hwFxMsg').textContent = 'Effect ' + fx.name + ' → firmware id ' + P.effect + '. Axis (wipe and rainbow_sweep) is select.' + nn + '_wall_wipe_axis, not a service field. value includes the preview brightness (' + $('bri').value + '%).' + (r.note ? ' Note: ' + r.note + '.' : '');
-    $('hwFx').value = 'action: esphome.' + nn + '_set_wall_fx\ndata:\n  effect: ' + P.effect + '\n  palette: ' + P.palette + '\n  speed: ' + P.speed + '\n  scale: ' + P.scale + '\n  hue: ' + P.hue + '\n  saturation: ' + P.saturation + '\n  value: ' + P.value + '\n  start_delay_ms: ' + P.start_delay_ms;
+    var P = r.P; $('hwFxMsg').textContent = 'Effect ' + fx.name + ' → firmware id ' + P.effect + '. axis (required arg: 0 x, 1 y, 2 ring, 3 angle) drives wipe and rainbow_sweep, same as select.' + nn + '_wall_wipe_axis. value includes the preview brightness (' + $('bri').value + '%).' + (r.note ? ' Note: ' + r.note + '.' : '');
+    $('hwFx').value = 'action: esphome.' + nn + '_set_wall_fx\ndata:\n  effect: ' + P.effect + '\n  palette: ' + P.palette + '\n  speed: ' + P.speed + '\n  scale: ' + P.scale + '\n  hue: ' + P.hue + '\n  saturation: ' + P.saturation + '\n  value: ' + P.value + '\n  start_delay_ms: ' + P.start_delay_ms + '\n  axis: ' + P.axis;
     return r;
   }
   bind('hwDelay', 'input', function () { if (+this.value > 10000) this.value = 10000; hwFxSync(); });
@@ -417,8 +427,8 @@
   function copyText(el, msg) { el.select(); try { navigator.clipboard.writeText(el.value); } catch (e) { document.execCommand('copy'); } $('hwMsg').textContent = msg; }
   bind('hwCopy', 'click', function () { copyText($('hwBulk'), 'Bulk string copied.'); });
   bind('hwCopyYaml', 'click', function () { copyText($('hwYaml'), 'YAML copied.'); });
-  bind('hwCsvLoad', 'click', function () { try { csv = parseCsv($('hwCsv').value, 'pasted'); $('hwMsg').textContent = ''; } catch (e) { $('hwMsg').textContent = 'tiles.csv: ' + e.message; } hwSync(); });
-  if (window.fetch && location.protocol !== 'file:') fetch('../esphome/tiles.csv', { cache: 'no-store' }).then(function (r) { if (!r.ok) throw 0; return r.text(); }).then(function (t) { csv = parseCsv(t, 'esphome/tiles.csv'); if (cur === 'hw') hwSync(); }, function () {});
+  bind('hwCsvLoad', 'click', function () { try { csv = parseCsv($('hwCsv').value, 'pasted'); $('hwMsg').textContent = ''; render(); } catch (e) { $('hwMsg').textContent = 'tiles.csv: ' + e.message; } hwSync(); });
+  if (window.fetch && location.protocol !== 'file:') fetch('../esphome/tiles.csv', { cache: 'no-store' }).then(function (r) { if (!r.ok) throw 0; return r.text(); }).then(function (t) { csv = parseCsv(t, 'esphome/tiles.csv'); render(); syncPanels(); }, function () {});
 
   window.HexApp = { state: function () { return st; }, derived: derived, fx: fx, FX: function () { return FX; }, hw: hwBuild, fwParams: fwParams, fwRef: function () { return FWREF; } }; // test hook
   lbl(); setVB(); fit(); render(); loadRemote(buildFx);
