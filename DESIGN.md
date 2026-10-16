@@ -35,7 +35,7 @@ ESP-NOW) was rejected: ~158 kB/s of broadcast on a shared channel is fragile.
 | Piece | File |
 |---|---|
 | Shared package | `esphome/templates/tile-common.yaml` |
-| Per-tile configs (generated) | `esphome/tiles/tile_01..20.yaml` |
+| Per-tile configs (generated) | `esphome/tiles/hex-01..20.yaml` |
 | Tile list (id,q,r,rot) | `esphome/tiles.csv` (exported from `layout.json`) |
 | Generator | `esphome/tools/gen_tiles.py` |
 | Sync component | `esphome/components/hexsync/{__init__.py,hexsync.h,hexsync.cpp}` |
@@ -88,7 +88,7 @@ below one frame (16.7 ms), so it's invisible.
 
 
 ### Sync mode: Wireless (default) or Jumper wire
-`select.hex_c0_sync_mode` (master only; options exactly **`Wireless (ESP-NOW)`** and
+`select.hex_01_sync_mode` (master only; options exactly **`Wireless (ESP-NOW)`** and
 **`Jumper wire`**). **Default: Wireless.** First-boot value = substitution `sync_mode_default` (`wireless`|`jumper`, set wall-wide by `tools/gen_tiles.py --sync-mode`); after that the mode saved in flash wins. The mode is saved in flash on every tile (same
 store as the layout numbers) and carried in the main packet's `flags` byte:
 **bit0 = 1 jumper, 0 wireless** (bits 1–7 reserved, 0). Every tile saves the mode it receives.
@@ -154,9 +154,9 @@ q, r, rotation and chase order are **live values** inside hexsync, saved to flas
 `order`, default order = optional `order` column in tiles.csv, else tile_num − 1) are only first-boot defaults.
 
 **Tile identity:** `tile_id` = `tile_num` = 1-based row in `esphome/tiles.csv`
-(c0 = 1, r1-e = 2 … r3-a = 20). It's fixed at compile time; position is not.
+(c0 = 1 = hex-01, r1-e = 2 = hex-02 … r3-a = 20 = hex-20). It's fixed at compile time; position is not.
 
-**HA entities per tile** (node `hex-<id>`, e.g. `hex-c0`):
+**HA entities per tile** (node `hex-NN`, friendly name `Hex NN`, e.g. `hex-01`):
 - `number.hex_<id>_grid_q`, `number.hex_<id>_grid_r` (−50..50),
   `number.hex_<id>_rotation` (0..359 °), `number.hex_<id>_chase_order` (0..254), entity_category config.
   Writing one changes and saves that tile only. They're template numbers polled
@@ -166,12 +166,12 @@ q, r, rotation and chase order are **live values** inside hexsync, saved to flas
   `sensor.hex_<id>_layout_generation`, `sensor.hex_<id>_neighbors` text `"2,7,19"`,
   `sensor.hex_<id>_peers_seen`.
 
-**Services** (exposed on every tile; call them on the master `hex-c0`):
+**Services** (exposed on every tile; call them on the master `hex-01`):
 ```yaml
-action: esphome.hex_c0_set_tile_layout
-data: {tile_id: 5, q: -1, r: 0, rotation: 60, order: 4}
+action: esphome.hex_01_set_hex_layout
+data: {hex_num: 5, q: -1, r: 0, rotation: 60, order: 4}
 
-action: esphome.hex_c0_set_layout_bulk
+action: esphome.hex_01_set_layout_bulk
 data: {layout: "1:0:0:0:0;2:1:0:0:1;3:1:-1:0:2"}
 ```
 Bulk grammar: `entry (";" entry)*`, `entry = tile_id ":" q ":" r ":" rotation ":" order`,
@@ -199,7 +199,7 @@ Tiles use it to keep a live peer table (dropped after 10 s of silence).
 **How the editor confirms:** after pushing, read each tile's `Layout` text sensor
 (or `Layout generation`) via HA/API; it updates within ~5 s **[EST, sensor poll
 interval]**. If a tile still shows old values after ~10 s, resend its entry with
-`set_tile_layout` (ESP-NOW broadcast can drop packets). HA sees the ack through
+`set_hex_layout` (ESP-NOW broadcast can drop packets). HA sees the ack through
 each tile's own API; tiles don't relay other tiles' status to HA.
 
 **Neighbors** are recomputed from live (q,r): a peer is a neighbor if its
@@ -207,9 +207,9 @@ position is one of the 6 axial offsets (+1,0) (+1,−1) (0,−1) (−1,0) (−1,
 There are no compile-time neighbor lists anywhere.
 
 ### Wall effects v2 (matches Back End `effects.json` / `tools/gen_ha.py`)
-Service on the master: `esphome.hex_c0_set_wall_fx(effect, palette, speed, scale, hue, saturation, value, start_delay_ms, axis)`
+Service on the master: `esphome.hex_01_set_wall_fx(effect, palette, speed, scale, hue, saturation, value, start_delay_ms, axis)`
 (speed milli-cycles/s, scale ×100, hue/sat/value 0–255, start_delay_ms 0–10000 → `start_ms = clock + delay`, axis 0 x 1 y 2 ring 3 angle — **required**: ESPHome API action variables cannot be optional).
-Legacy `esphome.hex_c0_set_wall_effect` still works (keeps palette, starts now).
+Legacy `esphome.hex_01_set_wall_effect` still works (keeps palette, starts now).
 
 | id | name | notes |
 |---|---|---|
@@ -231,9 +231,9 @@ the live bounding box of tile centres, ring/angle from (0,0). Effects 0–7, 9, 
 Assumption **[verify with Back End]**: their `x,y` in out/layout.json are normalized centre
 coordinates of the same pointy-top layout; if not, previews differ slightly.
 
-**Shared controls on the master** (internal on other tiles): `number.hex_c0_wall_speed`,
-`select.hex_c0_wall_effect` (names above), `select.hex_c0_wall_palette`,
-`select.hex_c0_wall_wipe_axis`. They call the same `set_wall_fx` path.
+**Shared controls on the master** (internal on other tiles): `number.hex_01_wall_speed`,
+`select.hex_01_wall_effect` (names above), `select.hex_01_wall_palette`,
+`select.hex_01_wall_wipe_axis`. They call the same `set_wall_fx` path.
 
 **LED count:** `number.hex_<id>_led_count` ("LED count", 1..60, default 44, saved in flash).
 The strip allocates 60 pixels; only the first N render, the rest stay black; the current
@@ -252,7 +252,7 @@ evenly spaced around the tile edge at radius 0.45, offset by `rotation`.
 Each tile: `light.hex_<id>_light` (effects: HexSync, local rainbow), estimated
 current, sync offset, leader id, "is leader", Wi-Fi signal. Wall control:
 ```yaml
-action: esphome.hex_c0_set_wall_effect
+action: esphome.hex_01_set_wall_effect
 data: {effect: 1, hue: 160, saturation: 255, value: 200, speed: 400, scale: 300}
 ```
 then turn all lights on with effect `HexSync` (the action already does this for the

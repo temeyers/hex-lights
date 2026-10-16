@@ -1,7 +1,8 @@
 # Shared package for every hex tile. Tested with ESPHome 2025.9.3 (see README).
 # Per-tile files in tiles/ only set substitutions and include this file.
 #
-# Required substitutions: tile_id, tile_num, q, r
+# Required substitutions: hex_nn ("01".. user-visible name), tile_num, q, r
+# (q/r/tile_num are internal; axial ids like c0 never reach HA)
 # Optional (defaults below): rotation, led_pin, num_leds, leader_priority,
 #   static_leader, max_scale, tile_budget_ma
 
@@ -21,8 +22,8 @@ substitutions:
   tile_budget_ma: "1200"    # hexsync effect current budget per tile (ESTIMATED model)
 
 esphome:
-  name: hex-${tile_id}
-  friendly_name: Hex ${tile_id}
+  name: hex-${hex_nn}
+  friendly_name: Hex ${hex_nn}
   min_version: 2025.9.0
 
 esp32:
@@ -58,9 +59,9 @@ api:
         - light.turn_on:
             id: tile_leds
             effect: HexSync
-    # Layout editor: call on the master tile (hex-c0). Entries for other tiles
+    # Layout editor: call on the master (hex-01). Entries for other tiles
     # go out as an ESP-NOW HX_LAYOUT broadcast; each tile applies its own and saves it.
-    # v2 wall effect (Back End interface): call on the master -> esphome.hex_c0_set_wall_fx
+    # v2 wall effect (Back End interface): call on the master -> esphome.hex_01_set_wall_fx
     - action: set_wall_fx
       variables:
         effect: int          # 0..10, see DESIGN.md
@@ -78,15 +79,15 @@ api:
         - light.turn_on:
             id: tile_leds
             effect: HexSync
-    - action: set_tile_layout
+    - action: set_hex_layout
       variables:
-        tile_id: int       # tile_num 1..N (row order of tiles.csv)
+        hex_num: int       # 1..N = NN in hex-NN (row order of tiles.csv)
         q: int
         r: int
         rotation: int      # degrees
         order: int         # chase index 0..254
       then:
-        - lambda: 'id(hex_sync).send_tile_layout(tile_id, q, r, rotation, order);'
+        - lambda: 'id(hex_sync).send_tile_layout(hex_num, q, r, rotation, order);'
     - action: set_layout_bulk
       variables:
         layout: string     # "id:q:r:rot:order;id:q:r:rot:order;..."
@@ -106,7 +107,7 @@ wifi:
   power_save_mode: none     # ESP-NOW latency suffers badly with modem sleep
   reboot_timeout: 0s       # don't reboot while sitting in fallback AP (default 15 min would drop the AP)
   ap:
-    ssid: hex-${tile_id}
+    ssid: hex-${hex_nn}
     ap_timeout: 30s        # fallback AP comes up 30 s after STA fails (default 1 min)
     password: !secret fallback_ap_password   # must be 8+ chars or the AP won't start
 
@@ -327,6 +328,6 @@ text_sensor:
 
 binary_sensor:
   - platform: template
-    name: Sync leader (this tile)
+    name: Sync leader
     entity_category: diagnostic
     lambda: 'return id(hex_sync).is_leader();'

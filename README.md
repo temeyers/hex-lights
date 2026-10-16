@@ -22,8 +22,8 @@ Work in progress.
 ## Run (workflow)
 1. Edit `layout.json` (canonical).
 2. `python3 tools/gen_tiles.py --emit-csv esphome/tiles.csv` writes the CSV plus `out/layout.json`, `out/neighbors.json` and `ha/hex_wall.generated.yaml`.
-3. `python3 esphome/tools/gen_tiles.py $(python3 tools/gen_tiles.py --print-hw-args)` runs Hardware's generator with the wall-wide `--sync-pin`/`--sync-mode` from layout.json `sync`. It writes `esphome/tiles/tile_NN.yaml`, the only tile YAML set.
-4. `cp secrets.example.yaml esphome/tiles/secrets.yaml`, fill it in (it's gitignored), then `esphome config esphome/tiles/tile_01.yaml`.
+3. `python3 esphome/tools/gen_tiles.py $(python3 tools/gen_tiles.py --print-hw-args)` runs Hardware's generator with the wall-wide `--sync-pin`/`--sync-mode` from layout.json `sync`. It writes `esphome/tiles/hex-NN.yaml`, the only tile YAML set.
+4. `cp secrets.example.yaml esphome/tiles/secrets.yaml`, fill it in (it's gitignored), then `esphome config esphome/tiles/hex-01.yaml`.
 
 Other flags: `--check` (exit 1 if stale), `--secrets-template`, `--tile-yaml` (opt-in: also writes `esphome/generated/<id>.yaml` straight from layout.json with the full map below), `--pin-leader` (with `--tile-yaml`: static_leader = the master's tile_num). Tests: `python -m pytest tests && node tests/effects.test.mjs`.
 
@@ -43,7 +43,7 @@ Leader: hexsync picks the **lowest** `leader_priority` (1-250). Hardware's gener
 | tile_budget_ma | led.budgetMa (otherwise the template default 1200) |
 | max_scale, max_scale_pct | led.maxScale (otherwise the template default 0.55 / 55%) |
 
-device_name and friendly_name are not emitted: the template derives them (`hex-${tile_id}`, `Hex ${tile_id}`).
+device_name and friendly_name are not emitted: the template derives them from the row number (`hex-${hex_nn}`, `Hex ${hex_nn}`, e.g. hex-01 / Hex 01). The axial id stays internal.
 
 ## Effects / Home Assistant
 `effects.json` is the catalogue, and `tools/effects.js` has `frame(effect, params, tiles, tMs)`. HA: install `ha/packages/hex_wall.yaml` and `ha/hex_wall.generated.yaml` in HA `packages/`. Tile lights are `light.hex_<id>_light`, and the group is `light.hex_wall`.
@@ -52,18 +52,18 @@ device_name and friendly_name are not emitted: the template derives them (`hex-$
 
 ## Whole-wall effects + runtime LED count (v2, PROPOSED interface, not yet verified on hardware)
 - New effects: `chase` (tile to tile in index/order), `wipe` (axis x|y|ring|angle), `rainbow_flow`. Palettes: rainbow, ocean, sunset, forest, fire, mono. Every effect takes `speed`, and most take `palette`. Formulas are in `effects.json`, and `tools/effects.js` has `frame()` (`{id:[r,g,b]}`) plus `frameLeds()` (`{id:[[r,g,b] x leds]}`, where `leds` is the tile's `leds`, default 44).
-- HexSync ids (Hardware df1ad9b): 0 solid, 1 radial_wave (our ripple), 2 rainbow_sweep, 3 pulse (our breathe), 4 chase, 5 wipe, 6 rainbow_flow, 7 random_ripple, 8 twinkle, 9 color_cycle, 10 snake (7-10 firmware-only, not in effects.js). Axis is sent via `select.hex_c0_wall_wipe_axis`; speed is capped at 10000, start delay at 10 s.
+- HexSync ids (Hardware df1ad9b): 0 solid, 1 radial_wave (our ripple), 2 rainbow_sweep, 3 pulse (our breathe), 4 chase, 5 wipe, 6 rainbow_flow, 7 random_ripple, 8 twinkle, 9 color_cycle, 10 snake (7-10 firmware-only, not in effects.js). Axis is sent via `select.hex_01_wall_wipe_axis`; speed is capped at 10000, start delay at 10 s.
 - HA (generated): `input_select.hex_wall_fx`, `input_select.hex_wall_palette`, `input_number.hex_wall_speed` (cycles/s; sent as milli-cycles), `input_number.hex_wall_led_count` (default `led.count`). These call `esphome.hex_<master>_set_wall_fx` and set the per-tile `number.hex_<id>_led_count`. Every firmware name is in `INTERFACE` in `tools/gen_ha.py`, and `layout.json` `"ha": {...}` can override any of them.
 - Generator (`--tile-yaml` only): `num_leds` = compile-time max (`led.maxCount`, 60), `rotation` = rot × 60 degrees (also in the emitted CSV), and `led_count` = runtime default. tiles.csv is unchanged.
 
 ### set_wall_fx axis argument (`wallFxAxisArg`)
-Hardware's newer firmware signature is `set_wall_fx(effect, palette, speed, scale, hue, saturation, value, start_delay_ms, axis)`, with axis 0 x, 1 y, 2 ring, 3 angle. Once it's flashed, **axis is required**. Set `"ha": {"wallFxAxisArg": true}` in layout.json and regenerate. HA then passes `axis` from `input_select.hex_wall_axis` on every call and skips `select.hex_c0_wall_wipe_axis`. With the default (`false`), no axis argument is sent and the select is set instead, which matches older firmware.
+Hardware's newer firmware signature is `set_wall_fx(effect, palette, speed, scale, hue, saturation, value, start_delay_ms, axis)`, with axis 0 x, 1 y, 2 ring, 3 angle. Once it's flashed, **axis is required**. Set `"ha": {"wallFxAxisArg": true}` in layout.json and regenerate. HA then passes `axis` from `input_select.hex_wall_axis` on every call and skips `select.hex_01_wall_wipe_axis`. With the default (`false`), no axis argument is sent and the select is set instead, which matches older firmware.
 
 ### tiles.csv order column
 `--emit-csv` writes `id,q,r,rot` (it matches the committed file). Add `--csv-order` to also write `order` (empty = Hardware's default of row − 1). Hardware's generator reads it.
 
 ### Sync mode (Hardware d3aeb8b)
-- `select.hex_c0_sync_mode` (master only) has the options `Wireless (ESP-NOW)` (default) and `Jumper wire` (GPIO12, `sync.pin`). The generator rejects a sync pin equal to the LED pin (GPIO13) or to any tile's pin.
+- `select.hex_01_sync_mode` (master only) has the options `Wireless (ESP-NOW)` (default) and `Jumper wire` (GPIO12, `sync.pin`). The generator rejects a sync pin equal to the LED pin (GPIO13) or to any tile's pin.
 - Per tile: `sensor.hex_<id>_sync_source` (`espnow` | `jumper` | `jumper-lost`), `sensor.hex_<id>_sync_pulse_jitter` (µs), `sensor.hex_<id>_sync_pulse_offset` (ms).
 - Automation `hex_wall_sync_jumper_lost` alerts when any tile is `jumper-lost` for 15 s while the mode is `Jumper wire`. It notifies `notifyService` (default `notify.notify`), which you can override with `"ha": {"notifyService": "notify.mobile_app_x"}`. After an alert it waits 10 minutes before alerting again.
 - Dashboard: `ha/hex_wall_dashboard.generated.yaml` is a Lovelace dashboard in YAML mode. It has the wall controls, the sync mode select and a sync glance card for each tile.

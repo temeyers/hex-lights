@@ -172,7 +172,7 @@ void HexSync::handle_(const HxPacket &p, uint32_t rx_local) {
   }
   if (!accept) return;
   if (p.sender != leader_id_) {
-    ESP_LOGI(TAG, "leader -> tile %u", p.sender);
+    ESP_LOGI(TAG, "leader -> hex-%02u", p.sender);
     have_leader_seq_ = false;
     offset_locked_ = false;
   }
@@ -259,7 +259,7 @@ void HexSync::loop() {
 
   if (i_should_lead_()) {
     if (leader_id_ != tile_id_) {
-      ESP_LOGI(TAG, "I am leader (tile %d)", tile_id_);
+      ESP_LOGI(TAG, "I am leader (hex-%02d)", tile_id_);
       leader_id_ = tile_id_;
       leader_prio_ = priority_;
     }
@@ -827,7 +827,7 @@ void HexSync::render(light::AddressableLight &it) {
 }
 
 void HexSync::dump_config() {
-  ESP_LOGCONFIG(TAG, "HexSync tile %d at q=%d r=%d rot=%d", tile_id_, q_, r_, rot_deg_);
+  ESP_LOGCONFIG(TAG, "HexSync hex-%02d at q=%d r=%d rot=%d", tile_id_, q_, r_, rot_deg_);
   ESP_LOGCONFIG(TAG, "  priority %d, static leader %d, beacon %ums, timeout %ums", priority_, static_leader_,
                 beacon_ms_, timeout_ms_);
   ESP_LOGCONFIG(TAG, "  budget %d mA (model %.0f mA/LED x %.2f)", budget_ma_, ma_led_, max_scale_);
