@@ -674,47 +674,59 @@ static inline int hexdist(int q1, int r1, int q2, int r2) {
   return (abs(dq) + abs(dr) + abs(dq + dr)) / 2;
 }
 
-Color HexSync::pixel_(int led, int n, float t_s, int index, int count, float xn, float yn, int ring, int max_ring,
-                      float angle, int origin_d, int max_d, int head_d) {
+// LED geometry: LED i sits on the tile ring at angle 2*pi*i/n + rotation, radius LED_R (centre spacing sqrt3).
+static const float LED_R = 0.85f;
+static const float SQ3 = 1.7320508f;
+static const float SPIRAL = 0.5f;  // ring/ripple fronts also sweep around each tile (visible on a lone tile)
+
+// Chase/snake: one comet travels LED-by-LED through tiles in chase order (index*n + led), speed in tiles/s.
+static inline float chase_k(float t_s, float spd, float sc, int index, int count, int led, int n) {
+  float total = (float) count * n;
+  float headg = fmodf(t_s * spd * n, total);
+  float d = fmodf(headg - (float) (index * n + led) + total, total);
+  float tail = std::max(2.0f, std::min((float) n, n * 0.25f * std::max(sc, 0.04f)));
+  return d < tail ? 1.0f - d / tail : 0.0f;
+}
+
+Color HexSync::pixel_(int led, int n, float t_s, int index, int count, float xn, float yn, float ringw,
+                      float max_ringw, float angle, float od, float max_od, int head_d) {
   const HxParams &P = params_;
   const float spd = P.speed / 1000.0f;
   const float sc = P.scale / 100.0f;
   const int pid = P.palette;
+  const float lf = (float) led / std::max(1, n);
   Color c(0, 0, 0);
   switch (P.effect) {
     case FX_SOLID:
       c = pal(PAL_MONO, 0, P.hue, P.sat);
       break;
     case FX_RADIAL_WAVE: {  // effects.json "ripple" from the master (0,0)
-      float per = max_ring + 2;
+      float per = max_ringw + 2;
       float ph = fmodf(t_s * spd, per);
-      float k = std::max(0.0f, 1.0f - fabsf(ph - ring));
-      c = scale_c(pal(pid, (float) ring / std::max(1, max_ring), P.hue, P.sat), k);
+      float k = std::max(0.0f, 1.0f - fabsf(ph - ringw));
+      c = scale_c(pal(pid, ringw / max_ringw, P.hue, P.sat), k);
       break;
     }
     case FX_RAINBOW_SWEEP: {
-      float u = (P.axis == AX_Y ? yn : P.axis == AX_RING ? (float) ring / std::max(1, max_ring)
-                 : P.axis == AX_ANGLE ? angle / 360.0f : xn) + t_s * spd;
+      float u = (P.axis == AX_Y ? yn : P.axis == AX_RING ? ringw / max_ringw : P.axis == AX_ANGLE ? angle / 360.0f : xn) +
+                t_s * spd;
       c = pal(pid, u, P.hue, P.sat);
       break;
     }
-    case FX_PULSE: {  // effects.json "breathe"
+    case FX_PULSE: {  // effects.json "breathe" (uniform by design)
       float k = 0.5f - 0.5f * cosf(6.2831853f * t_s * spd);
       c = scale_c(pal(pid, 0, P.hue, P.sat), k);
       break;
     }
     case FX_CHASE:
     case FX_SNAKE: {
-      float head = fmodf(t_s * spd, (float) count);
-      float d = fmodf(head - index + count, (float) count);
-      float k = std::max(0.0f, 1.0f - d / std::max(1.0f, sc));
+      float k = chase_k(t_s, spd, sc, index, count, led, n);
       if (P.effect == FX_SNAKE && k <= 0 && head_d == 1) k = 0.25f;  // live neighbours of the head glow
-      c = scale_c(pal(pid, (float) index / count, P.hue, P.sat), k);
+      c = scale_c(pal(pid, (index + lf) / count, P.hue, P.sat), k);
       break;
     }
     case FX_WIPE: {
-      float u = P.axis == AX_Y ? yn : P.axis == AX_RING ? (float) ring / std::max(1, max_ring)
-                : P.axis == AX_ANGLE ? angle / 360.0f : xn;
+      float u = P.axis == AX_Y ? yn : P.axis == AX_RING ? ringw / max_ringw : P.axis == AX_ANGLE ? angle / 360.0f : xn;
       float ph = fmodf(t_s * spd, 2.0f);
       bool on = ph < 1 ? u <= ph : u > ph - 1;
       c = on ? pal(pid, u, P.hue, P.sat) : Color(0, 0, 0);
@@ -724,10 +736,10 @@ Color HexSync::pixel_(int led, int n, float t_s, int index, int count, float xn,
       c = pal(pid, ((xn + yn) / 2.0f) * sc - t_s * spd, P.hue, P.sat);
       break;
     case FX_RIPPLE: {
-      float per = max_d + 2;
+      float per = max_od + 2;
       float ph = fmodf(t_s * spd, per);
-      float k = std::max(0.0f, 1.0f - fabsf(ph - origin_d));
-      c = scale_c(pal(pid, (float) origin_d / std::max(1, max_d), P.hue, P.sat), k);
+      float k = std::max(0.0f, 1.0f - fabsf(ph - od));
+      c = scale_c(pal(pid, od / max_od, P.hue, P.sat), k);
       break;
     }
     case FX_TWINKLE: {
@@ -741,7 +753,7 @@ Color HexSync::pixel_(int led, int n, float t_s, int index, int count, float xn,
       break;
     }
     case FX_COLOR_CYCLE:
-      c = pal(pid, (float) index / count + t_s * spd, P.hue, P.sat);
+      c = pal(pid, (index + lf) / count + t_s * spd, P.hue, P.sat);
       break;
     default:
       break;
@@ -763,20 +775,18 @@ void HexSync::render(light::AddressableLight &it) {
   float minx = 1e9, maxx = -1e9, miny = 1e9, maxy = -1e9;
   int max_ring = 0, max_order = 0, diam = 0;
   for (int i = 0; i < nt; i++) {
-    float x = 1.7320508f * (tiles[i].q + tiles[i].r / 2.0f), y = 1.5f * tiles[i].r;
+    float x = SQ3 * (tiles[i].q + tiles[i].r / 2.0f), y = 1.5f * tiles[i].r;
     minx = std::min(minx, x); maxx = std::max(maxx, x);
     miny = std::min(miny, y); maxy = std::max(maxy, y);
     max_ring = std::max(max_ring, hexdist(tiles[i].q, tiles[i].r, 0, 0));
     max_order = std::max(max_order, tiles[i].order);
     for (int j = i + 1; j < nt; j++) diam = std::max(diam, hexdist(tiles[i].q, tiles[i].r, tiles[j].q, tiles[j].r));
   }
+  // pad the bounding box by one tile radius so LEDs of a lone tile still span 0..1
+  minx -= 1; maxx += 1; miny -= 1; maxy += 1;
   const int count = std::max(nt, max_order + 1);
-  float cx = 1.7320508f * (q_ + r_ / 2.0f), cy = 1.5f * r_;
-  float xn = maxx > minx ? (cx - minx) / (maxx - minx) : 0.5f;
-  float yn = maxy > miny ? (cy - miny) / (maxy - miny) : 0.5f;
-  int ring = hexdist(q_, r_, 0, 0);
-  float angle = atan2f(cy, cx) * 57.29578f;  // screen y down -> clockwise
-  if (angle < 0) angle += 360.0f;
+  const float cx = SQ3 * (q_ + r_ / 2.0f), cy = 1.5f * r_;
+  const float max_ringw = max_ring + 1.0f;
 
   int32_t tms = (int32_t) (effect_clock() - params_.start_ms);
   if (tms < 0) tms = 0;  // before a delayed start: hold frame 0
@@ -784,33 +794,42 @@ void HexSync::render(light::AddressableLight &it) {
   const float spd = params_.speed / 1000.0f;
 
   // random_ripple: origin for cycle k = tiles[hash(seed,k) % nt]
-  int origin_d = 0, max_d = 0;
+  float ox = 0, oy = 0, max_od = 1;
+  float t_eff = t_s;
   if (params_.effect == FX_RIPPLE) {
-    float per = diam + 2;
+    float per = diam + 3;
     uint32_t k = (uint32_t) floorf(t_s * spd / per);
     int oi = (int) (hash01(seed_, k) * nt) % nt;
-    origin_d = hexdist(q_, r_, tiles[oi].q, tiles[oi].r);
-    for (int i = 0; i < nt; i++) max_d = std::max(max_d, hexdist(tiles[oi].q, tiles[oi].r, tiles[i].q, tiles[i].r));
-    // phase within this ripple's period, so the ring restarts at each new origin
-    // (pixel_ uses fmod(t*spd, max_d+2); feed it the time since this cycle began)
+    ox = SQ3 * (tiles[oi].q + tiles[oi].r / 2.0f); oy = 1.5f * tiles[oi].r;
+    int md = 0;
+    for (int i = 0; i < nt; i++) md = std::max(md, hexdist(tiles[oi].q, tiles[oi].r, tiles[i].q, tiles[i].r));
+    max_od = md + 1.0f;
+    if (spd > 0) {  // time since this ripple started, so the ring restarts at each new origin
+      float cyc = t_s * spd / per;
+      t_eff = (cyc - floorf(cyc)) * per / spd;
+    }
   }
   int head_d = 99;
-  if (params_.effect == FX_SNAKE) {
+  if (params_.effect == FX_SNAKE && n > 0) {
     int head = (int) floorf(fmodf(t_s * spd, (float) count));
     for (int i = 0; i < nt; i++)
       if (tiles[i].order == head) head_d = hexdist(q_, r_, tiles[i].q, tiles[i].r);
   }
-  float t_eff = t_s;
-  if (params_.effect == FX_RIPPLE && spd > 0) {
-    float per = diam + 2;
-    float cyc = t_s * spd / per;
-    t_eff = (cyc - floorf(cyc)) * per / spd;  // time since this ripple started
-  }
 
   uint32_t sum = 0;
   for (int i = 0; i < size; i++) {
-    Color c = i < n ? pixel_(i, n, t_eff, order_, count, xn, yn, ring, max_ring, angle, origin_d, max_d, head_d)
-                    : Color(0, 0, 0);  // pixels beyond LED count stay black
+    Color c(0, 0, 0);  // pixels beyond LED count stay black
+    if (i < n) {
+      float lf = (float) i / n;
+      float th = 6.2831853f * lf + rot_deg_ * 0.017453293f;
+      float px = cx + LED_R * cosf(th), py = cy + LED_R * sinf(th);
+      float xn = (px - minx) / (maxx - minx), yn = (py - miny) / (maxy - miny);
+      float ringw = sqrtf(px * px + py * py) / SQ3 + SPIRAL * lf;
+      float angle = atan2f(py, px) * 57.29578f;  // screen y down -> clockwise
+      if (angle < 0) angle += 360.0f;
+      float od = sqrtf((px - ox) * (px - ox) + (py - oy) * (py - oy)) / SQ3 + SPIRAL * lf;
+      c = pixel_(i, n, t_eff, order_, count, xn, yn, ringw, max_ringw, angle, od, max_od, head_d);
+    }
     it[i] = c;
     sum += c.r + c.g + c.b;
   }

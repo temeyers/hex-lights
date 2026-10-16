@@ -22,56 +22,64 @@ const hash01 = (a, b) => (((Math.imul(a, 73856093) ^ Math.imul(b, 19349663)) >>>
 const hexd = (q1, r1, q2, r2) => (Math.abs(q1-q2) + Math.abs(r1-r2) + Math.abs(q1-q2+r1-r2)) / 2;
 const fmod = (a, b) => a - b * Math.trunc(a / b);   // C fmodf
 
-// Returns {tileId: [[r,g,b] x ledCount]}
+const LED_R = 0.85, SQ3 = Math.sqrt(3), SPIRAL = 0.5;
+// chase/snake comet: travels LED-by-LED through tiles in chase order (index*n + led), speed in tiles/s
+function chaseK(ts, spd, sc, idx, count, led, n) {
+  const total = count * n, hg = fmod(ts * spd * n, total), d = fmod(hg - (idx * n + led) + total, total);
+  const tail = Math.max(2, Math.min(n, n * 0.25 * Math.max(sc, 0.04)));
+  return d < tail ? 1 - d / tail : 0; }
+
+// Returns {tileId: [[r,g,b] x ledCount]}. T.rot (deg) optional. Per-LED geometry: LED i sits on the
+// tile ring at angle 2*pi*i/n + rot, so every effect also animates within a lone tile.
 function frame(P, tiles, tMs, ledCount = 44) {
   tiles = [...tiles].sort((a, b) => a.id - b.id);
-  const xy = t => [Math.sqrt(3) * (t.q + t.r / 2), 1.5 * t.r];
+  const xy = t => [SQ3 * (t.q + t.r / 2), 1.5 * t.r];
   const xs = tiles.map(t => xy(t)[0]), ys = tiles.map(t => xy(t)[1]);
-  const [minx, maxx, miny, maxy] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
-  const maxRing = Math.max(...tiles.map(t => hexd(t.q, t.r, 0, 0)));
+  const minx = Math.min(...xs) - 1, maxx = Math.max(...xs) + 1, miny = Math.min(...ys) - 1, maxy = Math.max(...ys) + 1;
+  const maxRing = Math.max(...tiles.map(t => hexd(t.q, t.r, 0, 0))), maxRingW = maxRing + 1;
   const count = Math.max(tiles.length, Math.max(...tiles.map(t => t.order)) + 1);
   let diam = 0; for (const a of tiles) for (const b of tiles) diam = Math.max(diam, hexd(a.q, a.r, b.q, b.r));
   const spd = P.speed / 1000, sc = P.scale / 100, seed = P.seed >>> 0, s16 = seed & 0xffff;
-  let ts = Math.max(0, tMs) / 1000, origin = null;
+  let ts = Math.max(0, tMs) / 1000, ox = 0, oy = 0, maxOd = 1;
   if (P.effect === 7) {                        // random_ripple
-    const per = diam + 2, cyc = ts * spd / per, k = Math.floor(cyc);
-    origin = tiles[Math.floor(hash01(seed, k) * tiles.length) % tiles.length];
+    const per = diam + 3, cyc = ts * spd / per, k = Math.floor(cyc);
+    const o = tiles[Math.floor(hash01(seed, k) * tiles.length) % tiles.length];
+    [ox, oy] = xy(o); maxOd = Math.max(...tiles.map(t => hexd(o.q, o.r, t.q, t.r))) + 1;
     if (spd > 0) ts = frac(cyc) * per / spd;
   }
   const head = Math.floor(fmod(ts * spd, count));
   const headT = tiles.find(t => t.order === head);
-  const out = {};
+  const out = {}, n = ledCount;
   for (const T of tiles) {
-    const [cx, cy] = xy(T);
-    const xn = maxx > minx ? (cx - minx) / (maxx - minx) : 0.5, yn = maxy > miny ? (cy - miny) / (maxy - miny) : 0.5;
-    const ring = hexd(T.q, T.r, 0, 0);
-    let angle = Math.atan2(cy, cx) * 180 / Math.PI; if (angle < 0) angle += 360;
-    const od = origin ? hexd(T.q, T.r, origin.q, origin.r) : 0;
-    const maxD = origin ? Math.max(...tiles.map(t => hexd(origin.q, origin.r, t.q, t.r))) : 0;
+    const [cx, cy] = xy(T), idx = T.order, leds = [];
     const headD = headT ? hexd(T.q, T.r, headT.q, headT.r) : 99;
-    const idx = T.order, leds = [];
-    for (let led = 0; led < ledCount; led++) {
+    for (let led = 0; led < n; led++) {
+      const lf = led / n, th = 2 * Math.PI * lf + (T.rot || 0) * Math.PI / 180;
+      const px = cx + LED_R * Math.cos(th), py = cy + LED_R * Math.sin(th);
+      const xn = (px - minx) / (maxx - minx), yn = (py - miny) / (maxy - miny);
+      const ringw = Math.hypot(px, py) / SQ3 + SPIRAL * lf;
+      let angle = Math.atan2(py, px) * 180 / Math.PI; if (angle < 0) angle += 360;
+      const od = Math.hypot(px - ox, py - oy) / SQ3 + SPIRAL * lf;
+      const axisU = P.axis === 1 ? yn : P.axis === 2 ? ringw / maxRingW : P.axis === 3 ? angle / 360 : xn;
       let c = [0, 0, 0];
       switch (P.effect) {
         case 0: c = pal(5, 0, P.hue, P.sat); break;                                    // solid
-        case 1: { const ph = fmod(ts*spd, maxRing+2);                                  // radial_wave
-          c = scaleC(pal(P.palette, ring/Math.max(1,maxRing), P.hue, P.sat), Math.max(0, 1-Math.abs(ph-ring))); break; }
-        case 2: { const u = P.axis === 1 ? yn : P.axis === 2 ? ring/Math.max(1,maxRing) : P.axis === 3 ? angle/360 : xn; // rainbow_sweep
-          c = pal(P.palette, u + ts*spd, P.hue, P.sat); break; }
-        case 3: c = scaleC(pal(P.palette, 0, P.hue, P.sat), 0.5 - 0.5*Math.cos(2*Math.PI*ts*spd)); break; // pulse
-        case 4: case 10: { const h = fmod(ts*spd, count), d = fmod(h - idx + count, count); // chase / snake
-          let k = Math.max(0, 1 - d / Math.max(1, sc)); if (P.effect === 10 && k <= 0 && headD === 1) k = 0.25;
-          c = scaleC(pal(P.palette, idx/count, P.hue, P.sat), k); break; }
-        case 5: { const u = P.axis === 1 ? yn : P.axis === 2 ? ring/Math.max(1,maxRing) : P.axis === 3 ? angle/360 : xn; // wipe
-          const ph = fmod(ts*spd, 2), on = ph < 1 ? u <= ph : u > ph - 1;
-          c = on ? pal(P.palette, u, P.hue, P.sat) : [0,0,0]; break; }
+        case 1: { const ph = fmod(ts*spd, maxRingW+2);                                 // radial_wave
+          c = scaleC(pal(P.palette, ringw/maxRingW, P.hue, P.sat), Math.max(0, 1-Math.abs(ph-ringw))); break; }
+        case 2: c = pal(P.palette, axisU + ts*spd, P.hue, P.sat); break;                // rainbow_sweep
+        case 3: c = scaleC(pal(P.palette, 0, P.hue, P.sat), 0.5 - 0.5*Math.cos(2*Math.PI*ts*spd)); break; // pulse (uniform)
+        case 4: case 10: { let k = chaseK(ts, spd, sc, idx, count, led, n);             // chase / snake
+          if (P.effect === 10 && k <= 0 && headD === 1) k = 0.25;
+          c = scaleC(pal(P.palette, (idx + lf)/count, P.hue, P.sat), k); break; }
+        case 5: { const ph = fmod(ts*spd, 2), on = ph < 1 ? axisU <= ph : axisU > ph - 1; // wipe
+          c = on ? pal(P.palette, axisU, P.hue, P.sat) : [0,0,0]; break; }
         case 6: c = pal(P.palette, ((xn+yn)/2)*sc - ts*spd, P.hue, P.sat); break;           // rainbow_flow
-        case 7: { const ph = fmod(ts*spd, maxD+2);                                          // random_ripple
-          c = scaleC(pal(P.palette, od/Math.max(1,maxD), P.hue, P.sat), Math.max(0, 1-Math.abs(ph-od))); break; }
+        case 7: { const ph = fmod(ts*spd, maxOd+2);                                         // random_ripple
+          c = scaleC(pal(P.palette, od/maxOd, P.hue, P.sat), Math.max(0, 1-Math.abs(ph-od))); break; }
         case 8: { const g = idx*64 + led, u = ts*spd + hash01(g, s16), slot = Math.floor(u), f = u - slot; // twinkle
           const on = hash01(g, (slot + s16) >>> 0) < Math.min(1, sc/10);
           c = on ? scaleC(pal(P.palette, hash01(slot, g), P.hue, P.sat), Math.sin(Math.PI*f)) : [0,0,0]; break; }
-        case 9: c = pal(P.palette, idx/count + ts*spd, P.hue, P.sat); break;               // color_cycle
+        case 9: c = pal(P.palette, (idx + lf)/count + ts*spd, P.hue, P.sat); break;        // color_cycle
       }
       leds.push(scaleC(c, P.value / 255));
     }

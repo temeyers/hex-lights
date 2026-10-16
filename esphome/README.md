@@ -92,3 +92,7 @@ The layout service is now `set_hex_layout(hex_num, q, r, rotation, order)`, rena
 2. `esphome run tiles/hex-01.yaml`. It uploads to hex-c0.local and reboots as hex-01.
 3. Comment the block out again. Re-running gen_tiles.py restores it commented out.
 4. In HA, the old `hex-c0` device goes offline. Delete it and adopt `hex-01`, which comes with new entity ids. Then update any dashboards or automations.
+
+## Effects on a single tile
+
+Every LED has its own position on the tile ring: angle `2*pi*i/n + rotation`, where `n` is the runtime LED count. So each effect animates within one tile, not just from tile to tile. Chase and snake run a comet LED by LED through the tiles in chase order. With no peers it circles the ring. Only solid and pulse are uniform, by design. Host check: `node tools/check-effects.js` (it uses `tools/effects-ref.js`, which mirrors the firmware math).

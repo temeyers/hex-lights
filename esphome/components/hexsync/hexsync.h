@@ -176,8 +176,10 @@ class HexSync : public Component {
   // Called from an addressable_lambda effect every frame.
   void render(light::AddressableLight &it);
   // Pure tile/LED colour, exposed so it can be unit-tested against tools/effects-ref.js.
-  Color pixel_(int led, int n, float t_s, int index, int count, float xn, float yn, int ring, int max_ring,
-               float angle, int origin_d, int max_d, int head_d);
+  // Per-LED geometry: xn/yn/ringw/angle/od are for THIS LED (position on the tile's ring), so every
+  // effect animates within a single tile, not just tile-to-tile.
+  Color pixel_(int led, int n, float t_s, int index, int count, float xn, float yn, float ringw, float max_ringw,
+               float angle, float od, float max_od, int head_d);
 
   bool is_leader() const { return leader_id_ == tile_id_; }
   int leader_id() const { return leader_id_; }
