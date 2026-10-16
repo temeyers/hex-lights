@@ -48,6 +48,8 @@ def test_generate_check_idempotent(tmp_path):
     assert run("--check").returncode == 1
     assert run("--secrets-template").returncode == 0
     assert run("--check", "--secrets-template").returncode == 0
+    assert not (tmp_path / "esphome/generated").exists()   # off by default
+    assert run("--tile-yaml").returncode == 0 and run("--check", "--tile-yaml").returncode == 0
     y = (tmp_path / "esphome/generated/r1-e.yaml").read_text()
     assert "!include ../templates/tile-common.yaml" in y
     for k in ("wifi:", "api:", "ota:", "!secret"): assert k not in y
@@ -55,7 +57,7 @@ def test_generate_check_idempotent(tmp_path):
     for k in g.SECRETS_SHARED: assert f"{k}:" in s
     assert "api_key_" not in s
     (tmp_path / "esphome/generated/stale.yaml").write_text("x")
-    assert run("--check").returncode == 1 and run().returncode == 0 and not (tmp_path / "esphome/generated/stale.yaml").exists()
+    assert run("--check", "--tile-yaml").returncode == 1 and run("--tile-yaml").returncode == 0 and not (tmp_path / "esphome/generated/stale.yaml").exists()
 
 def test_yaml_layout_accepted(tmp_path):
     import yaml
@@ -67,7 +69,9 @@ def test_substitution_map():
     d = g.derive(lay()); t = {x["id"]: x for x in d["tiles"]}
     s = g.substitutions(d, t["r1-e"])
     assert s == {"tile_id": "r1-e", "tile_num": 2, "q": 1, "r": 0, "rotation": 0,
-                 "led_pin": "GPIO4", "num_leds": 44, "static_leader": 1}
+                 "led_pin": "GPIO4", "num_leds": 44, "static_leader": 0, "leader_priority": 3}
+    assert g.substitutions(d, t["c0"])["leader_priority"] == 1
+    assert g.substitutions(d, t["r1-e"], pin_leader=True)["static_leader"] == 1
     assert g.substitutions(d, t["r3-a"])["num_leds"] == 42
     L = lay(); L["led"].update(budgetMa=900, maxScale=0.4); L["tiles"][1]["priority"] = 7
     s = g.substitutions(g.derive(L), g.derive(L)["tiles"][1])
@@ -95,3 +99,7 @@ def test_ha_entities():
     ents = h["light"][0]["entities"]
     assert len(ents) == 20 and "light.hex_c0_light" in ents and "light.hex_r2_a_light" in ents
     assert "esphome.hex_c0_set_wall_effect" in open(os.path.join(ROOT, "ha/hex_wall.generated.yaml")).read()
+
+def test_master_not_first_warns():
+    L = lay(); L["master"] = "r1-e"
+    assert any("not the first tile" in w for w in g.validate(L))

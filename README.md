@@ -19,13 +19,15 @@ Work in progress.
 - `out/layout.json` adds these fields to each tile: `s ring x y angle index isMaster leds neighbors`. `out/neighbors.json` is `{id:[ids]}`.
 - **`esphome/tiles.csv` can be generated from layout.json**: `--emit-csv [PATH]`, default `out/tiles.csv`. A test checks that it matches Hardware's CSV.
 
-## Run
-    python3 tools/gen_tiles.py [--secrets-template] [--emit-csv] [--check]
-    python -m pytest tests && node tests/effects.test.mjs
-    cp secrets.example.yaml esphome/generated/secrets.yaml   # fill in (gitignored)
-    esphome config esphome/generated/c0.yaml
+## Run (workflow)
+1. Edit `layout.json` (canonical).
+2. `python3 tools/gen_tiles.py --emit-csv esphome/tiles.csv` writes the CSV plus `out/layout.json`, `out/neighbors.json` and `ha/hex_wall.generated.yaml`.
+3. `python3 esphome/tools/gen_tiles.py` is Hardware's generator. It writes `esphome/tiles/tile_NN.yaml`, the only tile YAML set.
+4. `cp secrets.example.yaml esphome/tiles/secrets.yaml`, fill it in (it's gitignored), then `esphome config esphome/tiles/tile_01.yaml`.
 
-Tile configs go to `esphome/generated/<id>.yaml` (gitignored, one level below `esphome/` so the template's `../components` path resolves). Each one sets substitutions and includes `../templates/tile-common.yaml` (Hardware's template, the source of truth). Secrets are Hardware's shared names: `wifi_ssid wifi_password fallback_ap_password ota_password api_key`.
+Other flags: `--check` (exit 1 if stale), `--secrets-template`, `--tile-yaml` (opt-in: also writes `esphome/generated/<id>.yaml` straight from layout.json with the full map below), `--pin-leader` (with `--tile-yaml`: static_leader = the master's tile_num). Tests: `python -m pytest tests && node tests/effects.test.mjs`.
+
+Leader: hexsync picks the **lowest** `leader_priority` (1-250). Hardware's generator defaults it to tile_num, so **keep the master as the first tile** in layout.json (validation warns otherwise). `static_leader` stays "0" (automatic failover).
 
 ## Substitution map (layout.json -> Hardware template)
 | template | from |
@@ -36,8 +38,8 @@ Tile configs go to `esphome/generated/<id>.yaml` (gitignored, one level below `e
 | rotation | tile.rot |
 | led_pin | tile.pin or led.pin |
 | num_leds | tile.ledCount or led.count |
-| static_leader | tile_num of `master` |
-| leader_priority | tile.priority (otherwise the template default `${tile_num}`) |
+| static_leader | "0" (failover); master tile_num with `--pin-leader` |
+| leader_priority | tile.priority, else 1 for the master and tile_num + 1 for the others |
 | tile_budget_ma | led.budgetMa (otherwise the template default 1200) |
 | max_scale, max_scale_pct | led.maxScale (otherwise the template default 0.55 / 55%) |
 
