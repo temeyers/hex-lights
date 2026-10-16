@@ -37,7 +37,7 @@ void HexSync::on_recv_(const uint8_t *mac, const uint8_t *data, int len) {
   uint16_t magic;
   memcpy(&magic, data, 2);
   if (magic != HX_MAGIC) return;
-  if (data[2] != HX_VERSION) {
+  if (data[2] < HX_VERSION_MIN || data[2] > HX_VERSION) {
     static uint32_t last_log = 0;
     uint32_t now = millis();
     if (now - last_log > 30000) {  // wifi task: keep it rare
@@ -132,6 +132,7 @@ void HexSync::send_(uint8_t type) {
   p.start_ms = params_.start_ms;
   p.flags = params_.flags & 1;
   p.seed = seed_;
+  memcpy(p.rgb, params_.rgb, 3);
   esp_now_send(BCAST, (const uint8_t *) &p, sizeof(p));
 }
 
@@ -152,6 +153,7 @@ void HexSync::handle_(const HxPacket &p, uint32_t rx_local) {
     params_.palette = p.palette < PAL_COUNT ? p.palette : 0;
     params_.axis = p.axis;
     params_.start_ms = p.start_ms;
+    memcpy(params_.rgb, p.rgb, 3);
     if ((p.flags & 1) != (params_.flags & 1)) {
       params_.flags = p.flags & 1;
       save_pending_ = true;  // every tile saves the mode it receives
@@ -215,6 +217,11 @@ void HexSync::loop() {
     if (wifi::global_wifi_component != nullptr && wifi::global_wifi_component->is_connected())
       espnow_ok_ = init_espnow_();
     if (!espnow_ok_) return;
+  }
+  if (rgb_pending_ && millis() - rgb_sent_ms_ >= 100) {  // colour picker drags: <= 10 SETs/s
+    rgb_pending_ = false;
+    rgb_sent_ms_ = millis();
+    send_(HX_SET);
   }
   uint8_t prim = 0;
   wifi_second_chan_t sec;
@@ -401,6 +408,11 @@ void HexSync::dispatch_(const uint8_t *buf, int len, uint32_t t) {
         HxPacket p;
         memcpy(&p, buf, sizeof(p));
         handle_(p, t);
+      } else if (len == HX_PACKET_V2_LEN) {  // v2 sender (not yet OTA'd): no rgb, keep ours
+        HxPacket p{};
+        memcpy(&p, buf, HX_PACKET_V2_LEN);
+        memcpy(p.rgb, params_.rgb, 3);
+        handle_(p, t);
       }
       break;
     case HX_LAYOUT:
@@ -565,7 +577,7 @@ std::string HexSync::layout_string() const {
 // ---------------- wall controls ----------------
 static const char *const FX_NAMES[FX_COUNT] = {"solid", "radial_wave", "rainbow_sweep", "pulse", "chase", "wipe",
                                                "rainbow_flow", "random_ripple", "twinkle", "color_cycle", "snake"};
-static const char *const PAL_NAMES[PAL_COUNT] = {"rainbow", "ocean", "sunset", "forest", "fire", "mono"};
+static const char *const PAL_NAMES[PAL_COUNT] = {"rainbow", "ocean", "sunset", "forest", "fire", "mono", "light color"};
 
 const char *HexSync::effect_name(int id) { return (id >= 0 && id < FX_COUNT) ? FX_NAMES[id] : "solid"; }
 int HexSync::effect_id(const std::string &n) {
@@ -616,6 +628,17 @@ void HexSync::set_wall_effect_id(int v) {
 void HexSync::set_wall_axis(int v) {
   params_.axis = (uint8_t) (v & 3);
   set_wall_fx(params_.effect, params_.palette, params_.speed, params_.scale, params_.hue, params_.sat, params_.value, 0);
+}
+
+void HexSync::set_wall_rgb(float r, float g, float b) {
+  uint8_t c[3] = {(uint8_t) lroundf(std::max(0.0f, std::min(1.0f, r)) * 255),
+                  (uint8_t) lroundf(std::max(0.0f, std::min(1.0f, g)) * 255),
+                  (uint8_t) lroundf(std::max(0.0f, std::min(1.0f, b)) * 255)};
+  if (memcmp(c, params_.rgb, 3) == 0) return;
+  memcpy(params_.rgb, c, 3);
+  uint32_t now = effect_clock();
+  params_.gen = (now > params_.gen) ? now : params_.gen + 1;  // newest wins wall-wide; phase (start_ms) kept
+  rgb_pending_ = true;
 }
 
 // ---------------- colour helpers (mirror tools/effects-ref.js) ----------------
@@ -698,7 +721,12 @@ Color HexSync::pixel_(int led, int n, float t_s, int index, int count, float xn,
   // Palette-free colour = this tile's HA light colour (current_values, set every frame by the effect lambda).
   // Brightness is applied by the light's own correction (slider x Max brightness), not here.
   const bool mono = pid == PAL_MONO || pid < 0 || pid >= PAL_COUNT;
-  auto lpal = [&](float u) { return mono ? light_c_ : pal(pid, u, P.hue, P.sat); };
+  // PAL_LIGHT: shades of the master's chosen RGB (synced), 25..100 % along the palette coordinate.
+  const Color lc(P.rgb[0], P.rgb[1], P.rgb[2]);
+  auto lpal = [&](float u) {
+    if (pid == PAL_LIGHT) return scale_c(lc, 0.625f + 0.375f * cosf(6.2831853f * u));
+    return mono ? light_c_ : pal(pid, u, P.hue, P.sat);
+  };
   Color c(0, 0, 0);
   switch (P.effect) {
     case FX_SOLID:
@@ -835,6 +863,7 @@ void HexSync::render(light::AddressableLight &it) {
     }
     it[i] = c;
     sum += c.r + c.g + c.b;
+    dc_sum_[0] += c.r; dc_sum_[1] += c.g; dc_sum_[2] += c.b;
   }
   // Current cap (ESTIMATED linear model) over the N active LEDs.
   float est = sum / 765.0f * ma_led_ * max_scale_;
@@ -846,6 +875,29 @@ void HexSync::render(light::AddressableLight &it) {
     }
   }
   last_ma_ = est * k;
+  dc_frames_++;
+}
+
+std::string HexSync::displayed_color() {
+  float r, g, b;
+  if (params_.palette == PAL_LIGHT && params_.effect != FX_SOLID) {
+    r = params_.rgb[0]; g = params_.rgb[1]; b = params_.rgb[2];
+  } else if (params_.effect == FX_SOLID) {
+    r = light_c_.r; g = light_c_.g; b = light_c_.b;
+  } else {
+    if (dc_frames_ == 0) return "";  // effect not rendering (other effect / off): keep last value
+    r = dc_sum_[0]; g = dc_sum_[1]; b = dc_sum_[2];
+  }
+  dc_sum_[0] = dc_sum_[1] = dc_sum_[2] = 0;
+  dc_frames_ = 0;
+  float m = std::max(r, std::max(g, b));
+  float k = m > 0 ? 255.0f * light_level_ * max_scale_ / m : 0;
+  char buf[8];
+  snprintf(buf, sizeof(buf), "#%02X%02X%02X", (unsigned) lroundf(r * k), (unsigned) lroundf(g * k),
+           (unsigned) lroundf(b * k));
+  if (dc_last_ == buf) return "";
+  dc_last_ = buf;
+  return dc_last_;
 }
 
 void HexSync::dump_config() {

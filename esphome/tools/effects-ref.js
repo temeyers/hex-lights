@@ -2,6 +2,7 @@
 // Front End can use it for the preview. Pure functions; output [r,g,b] 0..255.
 // tiles: [{id, q, r, order}] (live layout). P: {effect, palette, speed (mc/s), scale (x100),
 // hue, sat, value (0-255), axis (0 x,1 y,2 ring,3 angle), seed (u32), rgb?: [r,g,b] light colour}.
+// Palette 6 'light color' = shades (25-100 %) of P.rgb, the master light's chosen colour synced in the v3 packet.
 // Firmware: solid = the tile's HA light colour (rgb), and the mono palette (5) uses rgb too; without rgb, hue/sat. tMs = clock - start_ms (>=0).
 const STOPS = [null,
   [[0,40,120],[0,160,200],[40,220,180],[0,40,120]],   // ocean
@@ -62,7 +63,7 @@ function frame(P, tiles, tMs, ledCount = 44) {
       let angle = Math.atan2(py, px) * 180 / Math.PI; if (angle < 0) angle += 360;
       const od = Math.hypot(px - ox, py - oy) / SQ3 + SPIRAL * lf;
       const axisU = P.axis === 1 ? yn : P.axis === 2 ? ringw / maxRingW : P.axis === 3 ? angle / 360 : xn;
-      const lpal = u => (P.palette === 5 || !STOPS[P.palette] && P.palette !== 0) && P.rgb ? P.rgb.slice() : pal(P.palette, u, P.hue, P.sat);
+      const lpal = u => P.palette === 6 ? scaleC(P.rgb || [255,255,255], 0.625 + 0.375*Math.cos(2*Math.PI*frac(u))) : (P.palette === 5 || !STOPS[P.palette] && P.palette !== 0) && P.rgb ? P.rgb.slice() : pal(P.palette, u, P.hue, P.sat);
       let c = [0, 0, 0];
       switch (P.effect) {
         case 0: c = P.rgb ? P.rgb.slice() : pal(5, 0, P.hue, P.sat); leds.push(c); continue;  // solid: light colour, no value scaling

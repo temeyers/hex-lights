@@ -30,6 +30,17 @@ for (const [wn, tiles] of Object.entries(walls)) for (const n of [1, 12, 44, 60]
     const s = [1,2,3].map(id => f[id].reduce((a, c) => a + c[0]+c[1]+c[2], 0)); lit.push(s.indexOf(Math.max(...s)) + 1); }
   const seq = lit.filter((v, i) => i === 0 || v !== lit[i-1]).join('');
   if (!seq.includes('1231')) bad('chase hand-off order ' + seq); }
+// palette 6 'light color': every effect uses only shades of P.rgb, and follows a new rgb live
+for (let e = 1; e < NAMES.length; e++) for (const rgb of [[255,0,0],[0,80,255]]) {
+  const P = {effect:e, palette:6, speed:500, scale:e === 8 ? 500 : 150, hue:0, sat:255, value:255, axis:0, seed:7, rgb};
+  let lit = 0;
+  for (let t = 0; t < 4000; t += 50) for (const c of frame(P, walls.three, t, 44)[1]) {
+    if (c[0]+c[1]+c[2] === 0) continue; lit++;
+    const k = Math.max(...c) / Math.max(...rgb);
+    if (c.some((x, i) => Math.abs(x - rgb[i]*k) > 2)) { bad(`light color ${NAMES[e]} ${rgb} off-hue ${c}`); break; }
+  }
+  if (!lit) bad(`light color ${NAMES[e]} dark`);
+}
 // determinism
 { const P = {effect:7, palette:1, speed:700, scale:150, hue:0, sat:255, value:255, axis:0, seed:99};
   if (JSON.stringify(frame(P, walls.three, 4321, 44)) !== JSON.stringify(frame(P, walls.three, 4321, 44))) bad('not deterministic'); }

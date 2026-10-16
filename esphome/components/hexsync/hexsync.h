@@ -12,11 +12,13 @@
 namespace esphome {
 namespace hexsync {
 
-// ---- Wire format v2 (little-endian, packed). HxPacket = 36 bytes ----
+// ---- Wire format v3 (little-endian, packed). HxPacket = 40 bytes (v2 was 36: no rgb) ----
 // Every packet is a full state snapshot, so a lost packet costs nothing:
 // the next beacon (default every 100 ms) repairs it.
 static const uint16_t HX_MAGIC = 0x5848;  // "HX"
-static const uint8_t HX_VERSION = 2;  // v1 packets are ignored (logged)
+static const uint8_t HX_VERSION = 3;      // v3 = v2 + rgb[3] + reserved on BEACON/SET
+static const uint8_t HX_VERSION_MIN = 2;  // v2 still accepted (36-byte BEACON/SET keep our last rgb); v1 ignored (logged)
+static const int HX_PACKET_V2_LEN = 36;
 enum HxType : uint8_t { HX_BEACON = 1, HX_SET = 2, HX_LAYOUT = 3, HX_STATUS = 4 };
 static const int HX_MAX_LEN = 250;  // ESP-NOW v1 payload limit
 // Ids 0-6 match Back End effects.json / tools/gen_ha.py WALL_FX.
@@ -25,7 +27,8 @@ enum HxEffect : uint8_t {
   FX_WIPE = 5, FX_RAINBOW_FLOW = 6, FX_RIPPLE = 7, FX_TWINKLE = 8, FX_COLOR_CYCLE = 9, FX_SNAKE = 10,
   FX_COUNT = 11
 };
-enum HxPalette : uint8_t { PAL_RAINBOW = 0, PAL_OCEAN = 1, PAL_SUNSET = 2, PAL_FOREST = 3, PAL_FIRE = 4, PAL_MONO = 5, PAL_COUNT = 6 };
+enum HxPalette : uint8_t { PAL_RAINBOW = 0, PAL_OCEAN = 1, PAL_SUNSET = 2, PAL_FOREST = 3, PAL_FIRE = 4, PAL_MONO = 5, PAL_LIGHT = 6, PAL_COUNT = 7 };
+// PAL_LIGHT ("light color"): shades of the MASTER light's user-chosen RGB, synced in the packet (HxParams::rgb).
 enum HxAxis : uint8_t { AX_X = 0, AX_Y = 1, AX_RING = 2, AX_ANGLE = 3 };
 static const int HX_MAX_LEDS = 60;
 
@@ -50,8 +53,10 @@ struct __attribute__((packed)) HxPacket {
   uint8_t flags;       // v2: bit0 = sync mode jumper (1) / wireless (0); bits1-7 reserved 0
   uint32_t start_ms;   // v2: effect phase origin on the shared clock; t = clock - start_ms
   uint32_t seed;       // v2: leader random seed (ripple origin, twinkle)
+  uint8_t rgb[3];      // v3: master light's chosen colour (PAL_LIGHT); never read back from LEDs
+  uint8_t reserved3;   // v3: 0
 };
-static_assert(sizeof(HxPacket) == 36, "HxPacket size");
+static_assert(sizeof(HxPacket) == 40, "HxPacket size");
 
 // Layout entry, 6 bytes. rotation in degrees 0..359, order = chase index 0..254.
 struct __attribute__((packed)) HxLayoutEntry {
@@ -118,6 +123,7 @@ struct HxParams {
   uint8_t palette{PAL_RAINBOW}, axis{AX_X};
   uint32_t start_ms{0};
   uint8_t flags{0};  // bit0 jumper
+  uint8_t rgb[3]{255, 255, 255};  // PAL_LIGHT colour (master light remote_values)
 };
 
 class HexSync : public Component {
@@ -172,6 +178,13 @@ class HexSync : public Component {
   void set_light_color(float r, float g, float b) {
     light_c_ = Color((uint8_t) lroundf(r * 255), (uint8_t) lroundf(g * 255), (uint8_t) lroundf(b * 255));
   }
+  // Master only: the light's user-chosen colour for PAL_LIGHT. Bumps gen and broadcasts on change (rate-limited).
+  void set_wall_rgb(float r, float g, float b);
+  // Displayed colour (read-only diagnostic for HA / layout editor): '#RRGGBB' of the average lit LED colour since
+  // the last call, normalised to full chroma then scaled by on x brightness x Max brightness. In PAL_LIGHT mode it
+  // is the synced user colour x brightness. Returns "" when unchanged. Never written to the LightState.
+  void set_light_level(float k) { light_level_ = k < 0 ? 0 : (k > 1 ? 1 : k); }
+  std::string displayed_color();
   bool budget_enabled() const { return budget_enabled_; }
   float max_scale() const { return max_scale_; }
   int effect_value() const { return params_.value; }
@@ -250,6 +263,12 @@ class HexSync : public Component {
   float ma_led_{60.0f}, max_scale_{1.0f};
   bool budget_enabled_{false};
   Color light_c_{255, 255, 255};
+  bool rgb_pending_{false};
+  float light_level_{1.0f};
+  uint32_t dc_sum_[3]{0, 0, 0};
+  uint32_t dc_frames_{0};
+  std::string dc_last_;
+  uint32_t rgb_sent_ms_{0};
   uint32_t beacon_ms_{100}, timeout_ms_{1500};
 
   HxParams params_;

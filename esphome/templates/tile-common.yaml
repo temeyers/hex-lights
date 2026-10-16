@@ -100,7 +100,7 @@ api:
     - action: set_wall_fx
       variables:
         effect: int          # 0..10, see DESIGN.md
-        palette: int         # 0 rainbow 1 ocean 2 sunset 3 forest 4 fire 5 mono
+        palette: int         # 0 rainbow 1 ocean 2 sunset 3 forest 4 fire 5 mono 6 light color
         speed: int           # milli-cycles/s
         scale: int           # x100
         hue: int             # 0-255
@@ -183,6 +183,13 @@ light:
             // solid / mono palette follow THIS tile's light colour live (brightness via the light's correction)
             auto &v = id(tile_leds).current_values;
             id(hex_sync).set_light_color(v.get_red(), v.get_green(), v.get_blue());
+            id(hex_sync).set_light_level(v.is_on() ? v.get_brightness() : 0.0f);
+            // master: the user's chosen colour (remote_values = last HA/API call target, read-only) feeds the
+            // "light color" palette on every tile via the hexsync packet. Never written back to the light.
+            if (!${wall_controls_internal}) {
+              auto &rv = id(tile_leds).remote_values;
+              id(hex_sync).set_wall_rgb(rv.get_red(), rv.get_green(), rv.get_blue());
+            }
             id(hex_sync).render(it);
       - addressable_rainbow:
           name: Local rainbow (unsynced)
@@ -358,7 +365,7 @@ select:
   - platform: template
     name: Wall palette
     internal: ${wall_controls_internal}
-    options: [rainbow, ocean, sunset, forest, fire, mono]
+    options: [rainbow, ocean, sunset, forest, fire, mono, light color]
     update_interval: 2s
     lambda: 'return std::string(hexsync::HexSync::palette_name(id(hex_sync).wall_palette()));'
     set_action:
@@ -386,6 +393,17 @@ select:
       - lambda: 'id(hex_sync).set_sync_mode(x == "Jumper wire" ? 1 : 0);'
 
 text_sensor:
+  # Average colour the LEDs are showing ('#RRGGBB', 2 Hz, published only on change). Read-only: never fed back
+  # into the light or the "light color" palette. Not updated before on_boot(-100).
+  - platform: template
+    id: displayed_color   # HA: sensor.hex_NN_displayed_color (name + device hex-NN)
+    name: Displayed color
+    update_interval: 500ms
+    lambda: |-
+      if (!id(bright_ready)) return {};
+      std::string s = id(hex_sync).displayed_color();
+      if (s.empty()) return {};
+      return s;
   - platform: template
     name: Sync source
     entity_category: diagnostic
