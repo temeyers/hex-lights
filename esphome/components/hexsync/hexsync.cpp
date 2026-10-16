@@ -5,6 +5,9 @@
 #include <esp_now.h>
 #include <esp_wifi.h>
 #include <esp_random.h>
+#include <esp_timer.h>
+#include <driver/gpio.h>
+#include <rom/ets_sys.h>
 #include <cmath>
 #include <cstring>
 #include <cstdio>
@@ -53,15 +56,18 @@ void HexSync::on_recv_(const uint8_t *mac, const uint8_t *data, int len) {
 void HexSync::setup() {
   queue_ = xQueueCreate(8, sizeof(RxItem));
   leader_id_ = 0;
-  pref_ = global_preferences->make_preference<HxLayout>(0x48584C32UL ^ (uint32_t) tile_id_);  // "HXL2"
+  pref_ = global_preferences->make_preference<HxLayout>(0x48584C33UL ^ (uint32_t) tile_id_);  // "HXL3"
   seed_ = esp_random();
   params_.start_ms = 0;
   HxLayout l;
   if (pref_.load(&l)) {
     q_ = l.q; r_ = l.r; rot_deg_ = l.rotation; order_ = l.order; layout_gen_ = l.gen;
     if (l.led_count >= 1 && l.led_count <= HX_MAX_LEDS) led_count_ = l.led_count;
-    ESP_LOGI(TAG, "layout from flash: q=%d r=%d rot=%d order=%d gen=%u", q_, r_, rot_deg_, order_, layout_gen_);
+    params_.flags = (l.sync_mode & 1);  // default 0 = wireless; GPIO untouched unless 1
+    ESP_LOGI(TAG, "layout from flash: q=%d r=%d rot=%d order=%d gen=%u sync=%s", q_, r_, rot_deg_, order_,
+             layout_gen_, (params_.flags & 1) ? "jumper" : "wireless");
   }
+  apply_sync_mode_();  // wireless: does nothing to the sync pin
 }
 
 bool HexSync::init_espnow_() {
@@ -90,7 +96,11 @@ bool HexSync::init_espnow_() {
   return true;
 }
 
-uint32_t HexSync::effect_clock() const { return millis() + (uint32_t) offset_ms_; }
+uint32_t HexSync::effect_clock() const {
+  // esp_timer µs base (same source as millis()) + coarse ESP-NOW offset + fine jumper phase.
+  double ms = esp_timer_get_time() / 1000.0 + offset_ms_ + fine_ms_;
+  return (uint32_t) (int64_t) floor(ms);
+}
 
 bool HexSync::i_should_lead_() const {
   if (static_leader_ != 0) return static_leader_ == tile_id_;
@@ -120,6 +130,7 @@ void HexSync::send_(uint8_t type) {
   p.palette = params_.palette;
   p.axis = params_.axis;
   p.start_ms = params_.start_ms;
+  p.flags = params_.flags & 1;
   p.seed = seed_;
   esp_now_send(BCAST, (const uint8_t *) &p, sizeof(p));
 }
@@ -141,6 +152,12 @@ void HexSync::handle_(const HxPacket &p, uint32_t rx_local) {
     params_.palette = p.palette < PAL_COUNT ? p.palette : 0;
     params_.axis = p.axis;
     params_.start_ms = p.start_ms;
+    if ((p.flags & 1) != (params_.flags & 1)) {
+      params_.flags = p.flags & 1;
+      save_pending_ = true;  // every tile saves the mode it receives
+      save_at_ = millis();
+      apply_sync_mode_();
+    }
   }
   if (p.type != HX_BEACON) return;
 
@@ -175,6 +192,12 @@ void HexSync::handle_(const HxPacket &p, uint32_t rx_local) {
   // sample with the largest offset is the best one. Track it, but let it
   // decay slowly (1 ms per beacon) so crystal drift (~tens of ppm) is followed.
   int32_t sample = (int32_t)(p.clock_ms - rx_local) + 1;  // +1 ms ESTIMATED airtime
+  if (pulse_lock_ && !is_leader()) {
+    // Jumper owns the phase; ESP-NOW only carries the coarse ms count.
+    float total = offset_ms_ + fine_ms_;
+    if (fabsf(sample - total) > 50) { offset_ms_ = sample; fine_ms_ = 0; }
+    return;
+  }
   if (!offset_locked_) {
     offset_ms_ = sample;
     offset_locked_ = true;
@@ -204,7 +227,8 @@ void HexSync::loop() {
 
   uint32_t now_ms = millis();
   if (save_pending_ && now_ms - save_at_ > 1000) {  // debounce flash writes
-    HxLayout l{(int8_t) q_, (int8_t) r_, (uint16_t) rot_deg_, (uint8_t) order_, layout_gen_, (uint8_t) led_count_};
+    HxLayout l{(int8_t) q_, (int8_t) r_, (uint16_t) rot_deg_, (uint8_t) order_, layout_gen_, (uint8_t) led_count_,
+                (uint8_t) (params_.flags & 1)};
     pref_.save(&l);
     global_preferences->sync();
     save_pending_ = false;
@@ -220,6 +244,19 @@ void HexSync::loop() {
     if (now_ms - peers_[i].last_seen > 10000) peers_.erase(peers_.begin() + i); else i++;
   }
 
+  // ---- jumper sync line ----
+  if (line_on_) {
+    if (edge_new_) { edge_new_ = false; process_edge_(); }
+    int64_t now_us = esp_timer_get_time();
+    if (pulse_lock_ && !is_leader() && now_us - last_edge_us_ > 1000000) {  // 1 s ESTIMATED
+      ESP_LOGW(TAG, "sync pulses lost -> ESP-NOW clock");
+      pulse_lock_ = false;
+      int32_t whole = (int32_t) lroundf(fine_ms_);
+      offset_ms_ += whole;
+      fine_ms_ = 0;
+    }
+  }
+
   if (i_should_lead_()) {
     if (leader_id_ != tile_id_) {
       ESP_LOGI(TAG, "I am leader (tile %d)", tile_id_);
@@ -231,6 +268,128 @@ void HexSync::loop() {
       last_beacon_ = now;
       send_(HX_BEACON);
     }
+  }
+}
+
+// ================= jumper sync line =================
+// Only touched in jumper mode. In wireless mode the pin is never configured.
+void IRAM_ATTR HexSync::sync_isr_(void *arg) {
+  auto *self = (HexSync *) arg;
+  int64_t t = esp_timer_get_time();
+  if (t - self->edge_us_ < 50000) return;  // debounce: >= 50 ms between frames
+  self->edge_us_ = t;
+  self->edge_new_ = true;
+}
+
+void HexSync::pulse_timer_cb_(void *arg) {
+  auto *self = (HexSync *) arg;
+  if (!self->line_on_) return;
+  if (self->is_leader()) {
+    // open-drain: pull low ~50 µs, then release (the pull-up brings it back)
+    gpio_set_level((gpio_num_t) self->sync_pin_, 0);
+    ets_delay_us(50);
+    gpio_set_level((gpio_num_t) self->sync_pin_, 1);
+  }
+  self->schedule_pulse_();
+}
+
+void HexSync::schedule_pulse_() {
+  if (pulse_timer_ == nullptr) return;
+  // next effect-clock boundary where clock_ms % 100 == 0
+  double ms = esp_timer_get_time() / 1000.0 + offset_ms_ + fine_ms_;
+  double next = (floor(ms / 100.0) + 1) * 100.0;
+  int64_t wait_us = (int64_t) ((next - ms) * 1000.0);
+  if (wait_us < 1000) wait_us += 100000;
+  esp_timer_stop((esp_timer_handle_t) pulse_timer_);
+  esp_timer_start_once((esp_timer_handle_t) pulse_timer_, wait_us);
+}
+
+void HexSync::line_enable_() {
+  if (line_on_) return;
+  gpio_num_t pin = (gpio_num_t) sync_pin_;
+  gpio_config_t cfg{};
+  cfg.pin_bit_mask = 1ULL << sync_pin_;
+  cfg.mode = GPIO_MODE_INPUT_OUTPUT_OD;  // only ever pulls low; leader + followers share it
+  cfg.pull_up_en = GPIO_PULLUP_ENABLE;   // internal ~45 kΩ [EST]; add 4.7 kΩ external for long lines
+  cfg.pull_down_en = GPIO_PULLDOWN_DISABLE;
+  cfg.intr_type = GPIO_INTR_NEGEDGE;
+  gpio_config(&cfg);
+  gpio_set_level(pin, 1);  // released
+  gpio_install_isr_service(0);  // ESP_ERR_INVALID_STATE if already installed: fine
+  gpio_isr_handler_add(pin, sync_isr_, this);
+  if (pulse_timer_ == nullptr) {
+    esp_timer_create_args_t a{};
+    a.callback = pulse_timer_cb_;
+    a.arg = this;
+    a.name = "hexsync_pulse";
+    esp_timer_handle_t h;
+    if (esp_timer_create(&a, &h) == ESP_OK) pulse_timer_ = h;
+  }
+  line_on_ = true;
+  last_edge_us_ = esp_timer_get_time();
+  pulse_lock_ = false;
+  schedule_pulse_();
+  ESP_LOGI(TAG, "jumper sync ON (GPIO%d, open-drain)", sync_pin_);
+}
+
+void HexSync::line_disable_() {
+  if (!line_on_) return;
+  line_on_ = false;
+  if (pulse_timer_ != nullptr) esp_timer_stop((esp_timer_handle_t) pulse_timer_);
+  gpio_num_t pin = (gpio_num_t) sync_pin_;
+  gpio_intr_disable(pin);
+  gpio_isr_handler_remove(pin);
+  // release: no output, no pulls, no interrupt (high-Z)
+  gpio_set_direction(pin, GPIO_MODE_DISABLE);
+  gpio_set_pull_mode(pin, GPIO_FLOATING);
+  if (pulse_lock_) {
+    offset_ms_ += (int32_t) lroundf(fine_ms_);
+    fine_ms_ = 0;
+    pulse_lock_ = false;
+  }
+  ESP_LOGI(TAG, "jumper sync OFF (GPIO%d released)", sync_pin_);
+}
+
+void HexSync::apply_sync_mode_() {
+  if (params_.flags & 1) line_enable_(); else line_disable_();
+}
+
+void HexSync::set_sync_mode(int m) {
+  params_.flags = (params_.flags & ~1) | (m & 1);
+  uint32_t now = effect_clock();
+  params_.gen = (now > params_.gen) ? now : params_.gen + 1;
+  save_pending_ = true;
+  save_at_ = millis();
+  apply_sync_mode_();
+  for (int i = 0; i < 3; i++) send_(HX_SET);
+}
+
+const char *HexSync::sync_source() const {
+  if (!(params_.flags & 1)) return "espnow";
+  if (is_leader()) return "jumper";  // leader drives the line
+  return pulse_lock_ ? "jumper" : "jumper-lost";
+}
+
+void HexSync::process_edge_() {
+  int64_t t = edge_us_;
+  last_edge_us_ = t;
+  if (is_leader()) return;  // our own pulse
+  // effect clock at the edge; it should be on a 100 ms boundary
+  double e = t / 1000.0 + offset_ms_ + fine_ms_;
+  double err = e - round(e / 100.0) * 100.0;  // -50..+50 ms
+  if (!pulse_lock_) {
+    fine_ms_ -= err;  // snap
+    pulse_lock_ = true;
+    jitter_us_ = 0;
+    ESP_LOGI(TAG, "sync pulses locked (step %.2f ms)", -err);
+  } else {
+    fine_ms_ -= 0.2f * err;  // smoothing
+    jitter_us_ = 0.9f * jitter_us_ + 0.1f * fabsf(err * 1000.0f);
+  }
+  if (fabsf(fine_ms_) > 1000) {  // keep fine small
+    int32_t whole = (int32_t) lroundf(fine_ms_);
+    offset_ms_ += whole;
+    fine_ms_ -= whole;
   }
 }
 

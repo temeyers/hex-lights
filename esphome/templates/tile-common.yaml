@@ -10,6 +10,7 @@ substitutions:
   order: "-1"               # chase index; -1 = tile_num - 1
   led_pin: GPIO13            # S3 Super Mini: avoid 0/3/45/46 (strapping), 19/20 (USB), 48 (onboard RGB LED)
   num_leds: "60"            # pixels allocated (layout.json led.maxCount)
+  sync_pin: GPIO12           # jumper-mode sync line; untouched in wireless mode
   led_count: "44"           # pixels rendered by default; runtime number "LED count"
   wall_controls_internal: "true"   # generator sets "false" on the master tile
   leader_priority: ${tile_num}
@@ -115,6 +116,7 @@ hexsync:
   rotation: ${rotation}
   order: ${order}
   led_count: ${led_count}
+  sync_pin: ${sync_pin}
   leader_priority: ${leader_priority}
   static_leader: ${static_leader}
   tile_budget_ma: ${tile_budget_ma}
@@ -171,6 +173,20 @@ sensor:
     accuracy_decimals: 0
     update_interval: 10s
     lambda: 'return id(hex_sync).peer_count();'
+  - platform: template
+    name: Sync pulse jitter
+    entity_category: diagnostic
+    unit_of_measurement: "µs"
+    accuracy_decimals: 0
+    update_interval: 10s
+    lambda: 'return id(hex_sync).pulse_jitter_us();'
+  - platform: template
+    name: Sync pulse offset
+    entity_category: diagnostic
+    unit_of_measurement: ms
+    accuracy_decimals: 2
+    update_interval: 10s
+    lambda: 'return id(hex_sync).pulse_offset_ms();'
   - platform: wifi_signal
     name: Wi-Fi signal
     update_interval: 60s
@@ -277,7 +293,22 @@ select:
           int v = x == "y" ? 1 : x == "ring" ? 2 : x == "angle" ? 3 : 0;
           id(hex_sync).set_wall_axis(v);
 
+  - platform: template
+    name: Sync mode
+    internal: ${wall_controls_internal}
+    options: ["Wireless (ESP-NOW)", "Jumper wire"]
+    update_interval: 2s
+    lambda: 'return std::string(id(hex_sync).sync_mode() ? "Jumper wire" : "Wireless (ESP-NOW)");'
+    set_action:
+      - lambda: 'id(hex_sync).set_sync_mode(x == "Jumper wire" ? 1 : 0);'
+
 text_sensor:
+  - platform: template
+    name: Sync source
+    entity_category: diagnostic
+    update_interval: 5s
+    lambda: 'return std::string(id(hex_sync).sync_source());'
+
   - platform: template
     name: Layout
     entity_category: diagnostic

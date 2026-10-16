@@ -59,3 +59,13 @@ data: {layout: "<contents of layout_bulk.txt>"}
 ```
 Check each tile's **Layout** sensor to confirm; resend single tiles with
 `esphome.hex_c0_set_tile_layout`. Details: DESIGN.md → Runtime layout.
+
+## Optional: jumper-wire sync
+Default is **Wireless (ESP-NOW)**, and then GPIO12 is never touched. To use a wire:
+1. Join all tiles' GPIO12 through a 330 Ω resistor each onto one shared line, plus a shared GND,
+   and one 4.7 kΩ pull-up to 3.3 V (or rely on the internal pull-ups for short runs).
+2. On the master, set **Sync mode** (`select.hex_c0_sync_mode`) to `Jumper wire`.
+3. Check each tile's **Sync source** sensor reads `jumper` and **Sync pulse jitter** is small.
+   `jumper-lost` means no pulses for >1 s; it falls back to ESP-NOW automatically.
+Set it back to `Wireless (ESP-NOW)` to release the pin. Different pin: substitution `sync_pin`.
+See DESIGN.md → Sync mode.

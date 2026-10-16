@@ -46,7 +46,7 @@ struct __attribute__((packed)) HxPacket {
   uint8_t channel;     // sender's Wi-Fi channel (diagnostic / mismatch check)
   uint8_t palette;     // v2: HxPalette
   uint8_t axis;        // v2: wipe axis HxAxis
-  uint8_t flags;       // v2: reserved, 0
+  uint8_t flags;       // v2: bit0 = sync mode jumper (1) / wireless (0); bits1-7 reserved 0
   uint32_t start_ms;   // v2: effect phase origin on the shared clock; t = clock - start_ms
   uint32_t seed;       // v2: leader random seed (ripple origin, twinkle)
 };
@@ -97,6 +97,7 @@ struct HxLayout {
   uint8_t order;
   uint32_t gen;
   uint8_t led_count;
+  uint8_t sync_mode;  // 0 wireless (ESP-NOW), 1 jumper wire
 };
 
 struct HxPeer {
@@ -115,6 +116,7 @@ struct HxParams {
   uint16_t speed{500}, scale{300};
   uint8_t palette{PAL_RAINBOW}, axis{AX_X};
   uint32_t start_ms{0};
+  uint8_t flags{0};  // bit0 jumper
 };
 
 class HexSync : public Component {
@@ -181,6 +183,15 @@ class HexSync : public Component {
   int leader_id() const { return leader_id_; }
   uint32_t effect_clock() const;
   int32_t clock_offset() const { return offset_ms_; }
+  // ---- sync line (jumper mode) ----
+  void set_sync_pin(int pin) { sync_pin_ = pin; }
+  void set_sync_mode(int m);  // from the master's select; broadcast to all tiles
+  int sync_mode() const { return params_.flags & 1; }
+  const char *sync_source() const;  // "espnow" | "jumper" | "jumper-lost"
+  float pulse_jitter_us() const { return jitter_us_; }
+  float pulse_offset_ms() const { return fine_ms_; }
+  static void IRAM_ATTR sync_isr_(void *arg);
+  static void pulse_timer_cb_(void *arg);
   uint32_t rx_count() const { return rx_count_; }
   uint32_t drop_count() const { return drop_count_; }
   float last_est_ma() const { return last_ma_; }
@@ -229,7 +240,21 @@ class HexSync : public Component {
   uint32_t last_leader_rx_{0};
   uint16_t last_leader_seq_{0};
   bool have_leader_seq_{false};
-  int32_t offset_ms_{0};      // effect_clock = millis() + offset_ms_
+  int32_t offset_ms_{0};      // effect_clock = now_ms + offset_ms_ + fine_ms_
+  float fine_ms_{0};           // jumper-mode sub-ms phase correction
+  int sync_pin_{12};
+  bool line_on_{false};        // pin configured (jumper mode only)
+  bool pulse_lock_{false};     // followers: pulses seen in the last 1 s
+  volatile int64_t edge_us_{0};
+  volatile bool edge_new_{false};
+  int64_t last_edge_us_{0};
+  float jitter_us_{0};
+  void *pulse_timer_{nullptr};
+  void apply_sync_mode_();
+  void line_enable_();
+  void line_disable_();
+  void schedule_pulse_();
+  void process_edge_();
   bool offset_locked_{false};
   uint16_t seq_{0};
   uint32_t last_beacon_{0};

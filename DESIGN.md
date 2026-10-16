@@ -61,7 +61,7 @@ rate-limited log line (`ignoring hexsync v1 packet`). All tiles must run v2 firm
 | 24 | `channel` u8 | sender Wi-Fi channel (mismatch warning) |
 | 25 | `palette` u8 | v2: 0 rainbow 1 ocean 2 sunset 3 forest 4 fire 5 mono |
 | 26 | `axis` u8 | v2: wipe/sweep axis 0 x 1 y 2 ring 3 angle |
-| 27 | `flags` u8 | v2: 0 |
+| 27 | `flags` u8 | v2: bit0 = sync mode (1 jumper wire, 0 wireless); bits 1–7 = 0 |
 | 28 | `start_ms` u32 | v2: phase origin on the shared clock; `t = clock_ms − start_ms` (held at 0 until reached) |
 | 32 | `seed` u32 | v2: leader's random seed (random_ripple origin, twinkle); followers adopt the leader's |
 
@@ -85,6 +85,59 @@ below one frame (16.7 ms), so it's invisible.
 - Static option: set substitution `static_leader: "1"` → only tile 1 ever leads.
 - Parameter changes (`gen`) are accepted from any tile, so HA can call the
   action on any tile, not just the leader.
+
+
+### Sync mode: Wireless (default) or Jumper wire
+`select.hex_c0_sync_mode` (master only; options exactly **`Wireless (ESP-NOW)`** and
+**`Jumper wire`**). **Default: Wireless.** The mode is saved in flash on every tile (same
+store as the layout numbers) and carried in the main packet's `flags` byte:
+**bit0 = 1 jumper, 0 wireless** (bits 1–7 reserved, 0). Every tile saves the mode it receives.
+
+**Wireless mode never touches the sync pin:** no output, no pull, no ISR. The pin stays
+unconfigured (reset state) from boot. Switching to Jumper configures it; switching back
+removes the ISR and sets it to `GPIO_MODE_DISABLE`, floating (high-Z) again.
+
+**Jumper mode** (pin = substitution `sync_pin`, default **GPIO12**):
+- All tiles: `GPIO_MODE_INPUT_OUTPUT_OD` + internal pull-up + falling-edge ISR
+  (timestamp `esp_timer_get_time()`, 50 ms debounce).
+- Leader: an `esp_timer` one-shot fires at every effect-clock boundary where
+  `clock_ms % 100 == 0` and pulls the line low for ~50 µs (open-drain: it only ever pulls low).
+- Followers: each edge should land on a 100 ms boundary. First edge snaps the phase; after
+  that `fine -= 0.2 × error` (smoothing). ESP-NOW still carries all parameters and the
+  coarse ms count; while pulses are locked, a beacon only corrects the clock if it is >50 ms
+  off (wrong 100 ms bucket).
+- Failover: every tile is already open-drain on the line; only the current leader pulses.
+  A new leader starts pulsing, the old one stops. Overlap can only add an extra low pulse,
+  never a short circuit.
+- Fallback: no edge for >1 s **[EST]** → `jumper-lost`, back to ESP-NOW clock sync (fine phase
+  folded into the offset so nothing jumps). Next edge re-locks.
+- Sensors: `sensor.hex_<id>_sync_source` (text: `espnow` / `jumper` / `jumper-lost`; the
+  leader reports `jumper`), `sensor.hex_<id>_sync_pulse_jitter` (µs, EMA of |edge error|),
+  `sensor.hex_<id>_sync_pulse_offset` (ms, fine phase correction).
+
+GPIO12 on the ESP32-S3 is **not** a strapping pin (S3 straps: 0, 3, 45, 46), not USB
+(19/20), not flash/PSRAM (26–32, and 33–37 on octal-PSRAM parts). Safe on the S3 Super
+Mini **[verify it's broken out on Terry's board revision]**. (On the original ESP32, GPIO12
+*is* a strap – irrelevant here.)
+
+Wiring (one shared line + GND):
+```
+           3.3V (any one tile)
+             │
+           [4.7k]  single external pull-up (optional; internal ~45k pull-ups on every
+             │      tile also work for short lines [EST])
+ SYNC bus ───┴──────────┬──────────────┬──────────────┬───── … 20 tiles
+                      [330R]         [330R]         [330R]   series resistor at each tile
+                        │              │              │
+                     GPIO12         GPIO12         GPIO12
+                     tile 1         tile 2         tile 3 …
+ GND bus ───────────────┴──────────────┴──────────────┴───── (LED power GND is fine; keep
+                                                              the sync wire away from 5 V
+                                                              branch runs)
+```
+Twisted pair (sync + GND) or ribbon; keep total length short. Rise time ≈ 2.2·R·C: with
+4.7 kΩ and ~1 nF of wire/pin capacitance **[EST for ~5–10 m of wire]** ≈ 10 µs – fine for a
+50 µs pulse and a falling-edge trigger.
 
 ### Wi-Fi channel matching
 ESP-NOW is sent on the STA interface, so it uses the AP's current channel. All
