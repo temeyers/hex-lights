@@ -18,6 +18,7 @@ CONF_ROTATION = "rotation"
 CONF_ORDER = "order"
 CONF_LED_COUNT = "led_count"
 CONF_SYNC_PIN = "sync_pin"
+CONF_SYNC_MODE_DEFAULT = "sync_mode_default"
 CONF_PRIORITY = "leader_priority"
 CONF_STATIC_LEADER = "static_leader"
 CONF_BUDGET = "tile_budget_ma"
@@ -37,6 +38,7 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_ORDER, default=-1): cv.int_range(min=-1, max=254),
         cv.Optional(CONF_LED_COUNT, default=44): cv.int_range(min=1, max=60),
         cv.Optional(CONF_SYNC_PIN, default="GPIO12"): pins.internal_gpio_output_pin_number,
+        cv.Optional(CONF_SYNC_MODE_DEFAULT, default="wireless"): cv.one_of("wireless", "jumper", lower=True),
         cv.Optional(CONF_PRIORITY): cv.int_range(min=1, max=250),
         # If set, only this tile_id may lead (no failover).
         cv.Optional(CONF_STATIC_LEADER, default=0): cv.int_range(min=0, max=250),
@@ -67,6 +69,7 @@ async def to_code(config):
                           config[CONF_ORDER] if config[CONF_ORDER] >= 0 else config[CONF_TILE_ID] - 1))
     cg.add(var.set_default_led_count(config[CONF_LED_COUNT]))
     cg.add(var.set_sync_pin(config[CONF_SYNC_PIN]))
+    cg.add(var.set_sync_mode_default(1 if config[CONF_SYNC_MODE_DEFAULT] == "jumper" else 0))
     cg.add(var.set_priority(config.get(CONF_PRIORITY, config[CONF_TILE_ID])))
     cg.add(var.set_static_leader(config[CONF_STATIC_LEADER]))
     cg.add(var.set_budget(config[CONF_BUDGET], config[CONF_MA_PER_LED], config[CONF_MAX_SCALE]))

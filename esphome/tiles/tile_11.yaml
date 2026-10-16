@@ -7,6 +7,8 @@ substitutions:
   rotation: "0"
   order: "10"
   wall_controls_internal: "true"
+  sync_pin: GPIO12
+  sync_mode_default: "wireless"
 
 packages:
   tile: !include ../templates/tile-common.yaml

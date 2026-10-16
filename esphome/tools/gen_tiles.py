@@ -2,14 +2,42 @@
 """Generate esphome/tiles/tile_NN.yaml from tiles.csv (id,q,r[,rot][,order]).
 order (chase index) is optional; empty/missing -> row number - 1.
 
-Usage: python3 tools/gen_tiles.py [tiles.csv]
+Usage: python3 tools/gen_tiles.py [tiles.csv] [--sync-pin GPIO12] [--sync-mode wireless|jumper]
+  --sync-pin   wall-wide jumper sync pin (default GPIO12) -> substitution sync_pin
+  --sync-mode  first-boot sync mode (default wireless) -> substitution sync_mode_default
+               (the mode saved in each tile's flash wins after first boot)
 tile_num (1..N, CSV order) is the hexsync id and default leader priority,
 so the first row (the centre tile) is the preferred leader.
 """
-import csv, pathlib, re, sys
+import argparse, csv, pathlib, re, sys
 
 here = pathlib.Path(__file__).resolve().parent.parent
-src = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else here / "tiles.csv"
+LED_PIN = 13  # templates/tile-common.yaml led_pin
+# ESP32-S3: strapping 0/3/45/46, USB 19/20, onboard RGB 48, flash/PSRAM 26-37, nonexistent 22-25
+FORBIDDEN = {0: "strapping", 3: "strapping", 45: "strapping", 46: "strapping", 19: "USB D-", 20: "USB D+",
+             48: "onboard RGB LED", LED_PIN: "led_pin (LED data)"}
+FORBIDDEN.update({g: "flash/PSRAM" for g in range(26, 38)})
+FORBIDDEN.update({g: "not on ESP32-S3" for g in range(22, 26)})
+
+
+def sync_pin(v):
+    m = re.fullmatch(r"(?:GPIO)?(\d+)", v.strip().upper())
+    if not m:
+        raise argparse.ArgumentTypeError(f"bad pin {v!r} (use GPIO12 or 12)")
+    g = int(m.group(1))
+    if g > 48:
+        raise argparse.ArgumentTypeError(f"GPIO{g} does not exist on ESP32-S3")
+    if g in FORBIDDEN:
+        raise argparse.ArgumentTypeError(f"GPIO{g} not allowed as sync pin: {FORBIDDEN[g]}")
+    return f"GPIO{g}"
+
+
+ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+ap.add_argument("csv", nargs="?", default=str(here / "tiles.csv"))
+ap.add_argument("--sync-pin", type=sync_pin, default="GPIO12")
+ap.add_argument("--sync-mode", choices=["wireless", "jumper"], default="wireless")
+args = ap.parse_args()
+src = pathlib.Path(args.csv)
 out = here / "tiles"
 out.mkdir(exist_ok=True)
 rows = list(csv.DictReader(open(src)))
@@ -34,6 +62,8 @@ substitutions:
   rotation: "{rot}"
   order: "{order}"
   wall_controls_internal: "{'false' if n == 1 else 'true'}"
+  sync_pin: {args.sync_pin}
+  sync_mode_default: "{args.sync_mode}"
 
 packages:
   tile: !include ../templates/tile-common.yaml
@@ -43,4 +73,4 @@ bulk = ";".join(
     f"{n}:{int(r['q'])}:{int(r['r'])}:{int(r.get('rot') or 0)}:{r['_order']}" for n, r in enumerate(rows, 1)
 )
 (here / "layout_bulk.txt").write_text(bulk + "\n")
-print(f"wrote {len(rows)} tiles to {out}; set_layout_bulk string in layout_bulk.txt ({len(bulk)} chars)")
+print(f"wrote {len(rows)} tiles to {out} (sync {args.sync_mode} on {args.sync_pin}); set_layout_bulk string in layout_bulk.txt ({len(bulk)} chars)")

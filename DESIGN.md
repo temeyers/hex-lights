@@ -89,7 +89,7 @@ below one frame (16.7 ms), so it's invisible.
 
 ### Sync mode: Wireless (default) or Jumper wire
 `select.hex_c0_sync_mode` (master only; options exactly **`Wireless (ESP-NOW)`** and
-**`Jumper wire`**). **Default: Wireless.** The mode is saved in flash on every tile (same
+**`Jumper wire`**). **Default: Wireless.** First-boot value = substitution `sync_mode_default` (`wireless`|`jumper`, set wall-wide by `tools/gen_tiles.py --sync-mode`); after that the mode saved in flash wins. The mode is saved in flash on every tile (same
 store as the layout numbers) and carried in the main packet's `flags` byte:
 **bit0 = 1 jumper, 0 wireless** (bits 1–7 reserved, 0). Every tile saves the mode it receives.
 
@@ -97,7 +97,7 @@ store as the layout numbers) and carried in the main packet's `flags` byte:
 unconfigured (reset state) from boot. Switching to Jumper configures it; switching back
 removes the ISR and sets it to `GPIO_MODE_DISABLE`, floating (high-Z) again.
 
-**Jumper mode** (pin = substitution `sync_pin`, default **GPIO12**):
+**Jumper mode** (pin = substitution `sync_pin`, default **GPIO12**, set wall-wide by `tools/gen_tiles.py --sync-pin`; the generator rejects GPIO13/led_pin, 0/3/45/46, 19/20, 48, 22–37):
 - All tiles: `GPIO_MODE_INPUT_OUTPUT_OD` + internal pull-up + falling-edge ISR
   (timestamp `esp_timer_get_time()`, 50 ms debounce).
 - Leader: an `esp_timer` one-shot fires at every effect-clock boundary where

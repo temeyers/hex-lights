@@ -11,6 +11,7 @@ substitutions:
   led_pin: GPIO13            # S3 Super Mini: avoid 0/3/45/46 (strapping), 19/20 (USB), 48 (onboard RGB LED)
   num_leds: "60"            # pixels allocated (layout.json led.maxCount)
   sync_pin: GPIO12           # jumper-mode sync line; untouched in wireless mode
+  sync_mode_default: wireless # first-boot only; the mode saved in flash wins afterwards
   led_count: "44"           # pixels rendered by default; runtime number "LED count"
   wall_controls_internal: "true"   # generator sets "false" on the master tile
   leader_priority: ${tile_num}
@@ -117,6 +118,7 @@ hexsync:
   order: ${order}
   led_count: ${led_count}
   sync_pin: ${sync_pin}
+  sync_mode_default: ${sync_mode_default}
   leader_priority: ${leader_priority}
   static_leader: ${static_leader}
   tile_budget_ma: ${tile_budget_ma}

@@ -185,6 +185,8 @@ class HexSync : public Component {
   int32_t clock_offset() const { return offset_ms_; }
   // ---- sync line (jumper mode) ----
   void set_sync_pin(int pin) { sync_pin_ = pin; }
+  // First-boot value only: setup() applies it, then a saved flash value overrides it.
+  void set_sync_mode_default(int m) { params_.flags = (params_.flags & ~1) | (m & 1); }
   void set_sync_mode(int m);  // from the master's select; broadcast to all tiles
   int sync_mode() const { return params_.flags & 1; }
   const char *sync_source() const;  // "espnow" | "jumper" | "jumper-lost"

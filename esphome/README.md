@@ -67,5 +67,7 @@ Default is **Wireless (ESP-NOW)**, and then GPIO12 is never touched. To use a wi
 2. On the master, set **Sync mode** (`select.hex_c0_sync_mode`) to `Jumper wire`.
 3. Check each tile's **Sync source** sensor reads `jumper` and **Sync pulse jitter** is small.
    `jumper-lost` means no pulses for >1 s; it falls back to ESP-NOW automatically.
-Set it back to `Wireless (ESP-NOW)` to release the pin. Different pin: substitution `sync_pin`.
+Set it back to `Wireless (ESP-NOW)` to release the pin. Different pin or first-boot mode for the whole wall:
+`python3 tools/gen_tiles.py --sync-pin GPIO12 --sync-mode wireless` (writes `sync_pin` and `sync_mode_default`
+into every tile; the mode saved on a tile wins after its first boot).
 See DESIGN.md → Sync mode.
