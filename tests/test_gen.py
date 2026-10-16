@@ -326,14 +326,36 @@ def test_displayed_color_editor_and_recorder():
     for f in ("ha/hex_wall.generated.yaml", "ha/packages/hex_wall.yaml"):
         assert "recorder" not in yaml.safe_load(open(os.path.join(ROOT, f)))
 
-def test_light_color_palette():
+def test_light_color_palette_removed_manual_color():
     import yaml, gen_ha
-    assert gen_ha.PALETTES.index("light color") == 6
+    assert "light color" not in gen_ha.PALETTES and len(gen_ha.PALETTES) == 6
     h = yaml.safe_load(open(os.path.join(ROOT, "ha/hex_wall.generated.yaml")))
-    assert h["input_select"]["hex_wall_palette"]["options"][-1] == "light color"
-    tpl = open(os.path.join(ROOT, "esphome/templates/tile-common.yaml")).read()
-    if "light color]" in tpl:
-        assert "options: [rainbow, ocean, sunset, forest, fire, mono, light color]" in tpl
+    assert "light color" not in h["input_select"]["hex_wall_palette"]["options"]
+    assert h["input_boolean"]["hex_wall_manual_color"]["initial"] is False
+    c = json.dumps(h["script"]["hex_wall_manual_color_apply"])
+    assert "switch.hex_01_manual_color" in c and "switch.hex_20_manual_color" in c and "has_value" in c
+    assert any(a["id"] == "hex_wall_manual_color_changed" for a in h["automation"])
+    dash = yaml.safe_load(open(os.path.join(ROOT, "ha/hex_wall_dashboard.generated.yaml")))
+    cards = dash["views"][0]["cards"]
+    wall = cards[0]["entities"]; cond = cards[1]
+    assert "input_boolean.hex_wall_manual_color" in wall
+    assert not {"input_select.hex_wall_fx", "input_select.hex_wall_palette", "input_select.hex_wall_axis",
+                "input_number.hex_wall_speed"} & set(wall)
+    assert cond["type"] == "conditional" and cond["conditions"][0]["state_not"] == "on"
+    assert cond["card"]["entities"] == ["input_select.hex_wall_fx", "input_select.hex_wall_palette",
+                                        "input_select.hex_wall_axis", "input_number.hex_wall_speed"]
+
+def test_no_empty_dicts_in_packages():
+    """HA package merge drops empty dicts (selector {color_rgb: {}} -> {})."""
+    import yaml
+    def walk(o, path):
+        if isinstance(o, dict):
+            assert o or path.endswith("variables"), f"empty mapping at {path}"
+            for k, v in o.items(): walk(v, f"{path}.{k}")
+        elif isinstance(o, list):
+            for i, v in enumerate(o): walk(v, f"{path}[{i}]")
+    for f in ("ha/hex_wall.generated.yaml", "ha/packages/hex_wall.yaml", "ha/packages/hex_wall_recorder.yaml"):
+        walk(yaml.safe_load(open(os.path.join(ROOT, f))), f)
 
 def test_no_axial_ids_user_facing():
     """Terry's naming rule: users only ever see 'Hex NN', never tile ids like c0 / r2-a."""
@@ -369,3 +391,24 @@ def test_no_axial_ids_user_facing():
     assert o["selector"]["select"]["options"][0] == "Hex 01" and o["selector"]["select"]["options"][-1] == "Hex 20"
     assert o["default"] == "Hex 01" and o["example"] == "Hex 01"
     assert "selectattr('nn', 'eq', origin" in h["script"]["hex_wall_ripple"]["variables"]["o"]
+
+def test_no_empty_selector_configs():
+    """HA rejects selectors whose config is an empty map ({color_rgb: {}}, {text: {}}); emit null."""
+    import yaml
+    bad = []
+    def walk(o, path):
+        if isinstance(o, dict):
+            if "selector" in o and isinstance(o["selector"], dict):
+                for typ, conf in o["selector"].items():
+                    if isinstance(conf, dict) and not conf:
+                        bad.append(f"{path}.selector.{typ}")
+            for k, v in o.items(): walk(v, f"{path}.{k}")
+        elif isinstance(o, list):
+            for i, v in enumerate(o): walk(v, f"{path}[{i}]")
+    for f in ("ha/hex_wall.generated.yaml", "ha/packages/hex_wall.yaml"):
+        walk(yaml.safe_load(open(os.path.join(ROOT, f))), f)
+    assert bad == []
+    import gen_ha
+    assert json.loads(gen_ha.fields_yaml({"c": gen_ha._rgb("x", [1, 2, 3]), "t": gen_ha._txt("y")})) == {
+        "c": {"description": "x", "example": "1, 2, 3", "default": [1, 2, 3], "selector": {"color_rgb": None}},
+        "t": {"description": "y", "example": "", "selector": {"text": None}}}

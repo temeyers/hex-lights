@@ -18,6 +18,8 @@ INTERFACE = {
     # Hardware 85cf36d: per-tile runtime ceiling (0-100 %, restored) and 1200 mA budget switch
     "max_brightness_number": "number.{node}_max_brightness",
     "current_limit_switch": "switch.{node}_current_limit",
+    # PENDING Hardware: per-tile "Manual color" switch (replaces palette 'light color')
+    "manual_color_switch": "switch.{node}_manual_color",
     # Hardware-confirmed: text_sensor "Displayed color" '#RRGGBB' @1-2 Hz
     "displayed_color_sensor": "sensor.{node}_displayed_color",
     # light RGB readback = rgb_color attribute of the tile light (no separate sensor)
@@ -52,7 +54,7 @@ WALL_FX = {"solid": 0, "radial_wave": 1, "rainbow_sweep": 2, "pulse": 3,
 # our effects.json names -> firmware names
 FX_ALIASES = {"ripple": "radial_wave", "breathe": "pulse"}
 AXES = ["x", "y", "ring", "angle"]
-PALETTES = ["rainbow", "ocean", "sunset", "forest", "fire", "mono", "light color"]  # ids 0-6 (Hardware 7dfa536)
+PALETTES = ["rainbow", "ocean", "sunset", "forest", "fire", "mono"]  # ids 0-5 ("light color" replaced by per-tile manual colour switch)
 
 
 def _num(desc, lo, hi, step, default, unit=None):
@@ -76,9 +78,20 @@ def _txt(desc, example=""):
     return {"description": desc, "example": example, "selector": {"text": {}}}
 
 
+def _no_empty_dicts(o):
+    """HA's package merge (homeassistant.config._recursive_merge) silently DROPS empty
+    dicts, so `selector: {color_rgb: {}}` arrives as `selector: {}` and the script is
+    disabled. Emit null instead ({color_rgb: null}), which HA treats as 'no options'."""
+    if isinstance(o, dict):
+        return {k: (None if isinstance(v, dict) and not v else _no_empty_dicts(v)) for k, v in o.items()}
+    if isinstance(o, list):
+        return [_no_empty_dicts(v) for v in o]
+    return o
+
+
 def fields_yaml(fields):
     """HA script `fields:` as a one-line JSON (valid YAML) mapping."""
-    return json.dumps(fields, separators=(", ", ": "))
+    return json.dumps(_no_empty_dicts(fields), separators=(", ", ": "))
 
 
 def render(d, node, light_entity):
@@ -353,7 +366,33 @@ def wall_block(d, node, master):
               - action: switch.turn_off
                 target: {{entity_id: "{{{{ live }}}}"}}
 """
+    mc = [I["manual_color_switch"].format(node=n) for n in tn]
+    limit_scripts += f"""  hex_wall_manual_color_apply:
+    alias: Hex wall push manual colour to tiles
+    variables:
+      targets: {J(mc)}
+    sequence:
+      - variables:
+          live: "{{{{ targets | select('has_value') | list }}}}"
+      - if: "{{{{ live | length > 0 }}}}"
+        then:
+          - if: "{{{{ is_state('input_boolean.hex_wall_manual_color', 'on') }}}}"
+            then:
+              - action: switch.turn_on
+                target: {{entity_id: "{{{{ live }}}}"}}
+            else:
+              - action: switch.turn_off
+                target: {{entity_id: "{{{{ live }}}}"}}
+"""
     limit_autos = """
+  - id: hex_wall_manual_color_changed
+    alias: Hex wall - manual colour changed
+    mode: restart
+    triggers:
+      - trigger: state
+        entity_id: input_boolean.hex_wall_manual_color
+    actions:
+      - action: script.hex_wall_manual_color_apply
   - id: hex_wall_max_brightness_changed
     alias: Hex wall - max brightness changed
     mode: restart
@@ -488,6 +527,9 @@ input_boolean:
   hex_wall_current_limit:
     name: Hex wall current limit (1200 mA per tile)
     initial: false
+  hex_wall_manual_color:
+    name: Hex wall manual colour (tiles show the light colour; effects off)
+    initial: false
 """
 
 
@@ -509,10 +551,15 @@ def render_dashboard(d, node):
                                   {"entity": I["displayed_color_sensor"].format(node=n), "name": "Shown"}]})
     dash = {"title": "Hex Wall", "views": [{"title": "Wall", "path": "hex-wall", "cards": [
         {"type": "entities", "title": "Wall", "entities": [
-            "light.hex_wall", "input_select.hex_wall_fx", "input_select.hex_wall_palette",
-            "input_select.hex_wall_axis", "input_number.hex_wall_speed", "input_number.hex_wall_led_count",
+            "light.hex_wall", "input_boolean.hex_wall_manual_color", "input_number.hex_wall_led_count",
             "input_number.hex_wall_max_brightness", "input_boolean.hex_wall_current_limit",
             I["sync_mode_select"].format(master=m)]},
+        # effect controls are hidden while manual colour is on
+        {"type": "conditional",
+         "conditions": [{"condition": "state", "entity": "input_boolean.hex_wall_manual_color", "state_not": "on"}],
+         "card": {"type": "entities", "title": "Wall effect", "entities": [
+             "input_select.hex_wall_fx", "input_select.hex_wall_palette",
+             "input_select.hex_wall_axis", "input_number.hex_wall_speed"]}},
         {"type": "vertical-stack", "cards": rows},
         {"type": "entities", "title": "Light RGB readback (rgb_color)", "entities": [
             {"type": "attribute", "entity": I["light"].format(node=node(d, t)), "attribute": I["light_rgb_attribute"],

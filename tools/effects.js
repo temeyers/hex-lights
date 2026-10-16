@@ -23,7 +23,6 @@ export const PALETTES = {
   forest: [[10, 80, 10], [60, 180, 20], [180, 220, 40], [10, 80, 10]],
   fire: [[120, 0, 0], [255, 60, 0], [255, 180, 20], [120, 0, 0]],
   mono: null,
-  "light color": null,   // id 6: shades of the (master) light colour
 };
 
 // 0..1 coordinate along an axis: x | y | ring (ring/maxRing) | angle (angle/360)
@@ -35,8 +34,6 @@ const frac = (u) => u - Math.floor(u);
 export function pal(name, u, color = [255, 140, 40]) {
   u = frac(u);
   if (name === "mono") return [...color];
-  // Hardware PAL_LIGHT: light colour scaled 25..100 % along the palette coordinate
-  if (name === "light color") { const k = 0.625 + 0.375 * Math.cos(2 * Math.PI * u); return color.map((c) => Math.round(c * k)); }
   const st = PALETTES[name];
   if (!st) return hsv(u * 360);
   const f = u * (st.length - 1), i = Math.min(Math.floor(f), st.length - 2), w = f - i;

@@ -11,15 +11,32 @@
      "title": "Wall",
      "entities": [
       "light.hex_wall",
-      "input_select.hex_wall_fx",
-      "input_select.hex_wall_palette",
-      "input_select.hex_wall_axis",
-      "input_number.hex_wall_speed",
+      "input_boolean.hex_wall_manual_color",
       "input_number.hex_wall_led_count",
       "input_number.hex_wall_max_brightness",
       "input_boolean.hex_wall_current_limit",
       "select.hex_01_sync_mode"
      ]
+    },
+    {
+     "type": "conditional",
+     "conditions": [
+      {
+       "condition": "state",
+       "entity": "input_boolean.hex_wall_manual_color",
+       "state_not": "on"
+      }
+     ],
+     "card": {
+      "type": "entities",
+      "title": "Wall effect",
+      "entities": [
+       "input_select.hex_wall_fx",
+       "input_select.hex_wall_palette",
+       "input_select.hex_wall_axis",
+       "input_number.hex_wall_speed"
+      ]
+     }
     },
     {
      "type": "vertical-stack",
