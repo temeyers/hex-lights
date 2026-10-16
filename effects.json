@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "notes": "Pure functions of (params, tile, tMs). Tile fields come from out/layout.json: x, y in 0..1, ring, angle (deg from master, 0 = +x, counter-clockwise in screen math), index, q, r. hsv(h,1,1) is standard HSV->RGB with h in degrees. Output per tile is [r,g,b] 0..255. Reference implementation: tools/effects.js.",
+  "notes": "Pure functions of (params, tile, tMs). Tile fields come from out/layout.json: x, y in 0..1, ring, angle (deg from master, 0 = +x (right), increasing clockwise on screen since y points down), index, q, r. hsv(h,1,1) is standard HSV->RGB with h in degrees. Output per tile is [r,g,b] 0..255. Reference implementation: tools/effects.js.",
   "effects": [
     {"name": "solid", "label": "Solid color",
      "params": {"color": {"type": "color", "default": [255, 140, 40]}},
