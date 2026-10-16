@@ -69,7 +69,7 @@ def test_substitution_map():
     d = g.derive(lay()); t = {x["id"]: x for x in d["tiles"]}
     s = g.substitutions(d, t["r1-e"])
     assert s == {"tile_id": "r1-e", "tile_num": 2, "q": 1, "r": 0, "rotation": 0,
-                 "led_pin": "GPIO13", "sync_pin": "GPIO12", "num_leds": 60, "led_count": 44, "static_leader": 0, "leader_priority": 3}
+                 "led_pin": "GPIO13", "sync_pin": "GPIO12", "sync_mode_default": "wireless", "num_leds": 60, "led_count": 44, "static_leader": 0, "leader_priority": 3}
     assert g.substitutions(d, t["c0"])["leader_priority"] == 1
     assert g.substitutions(d, t["r1-e"], pin_leader=True)["static_leader"] == 1
     assert g.substitutions(d, t["r3-a"])["led_count"] == 42 and g.substitutions(d, t["r3-a"])["num_leds"] == 60
@@ -242,3 +242,25 @@ def test_sync_mode_ha():
     dash = yaml.safe_load(open(os.path.join(ROOT, "ha/hex_wall_dashboard.generated.yaml")))
     txt = json.dumps(dash)
     assert "select.hex_c0_sync_mode" in txt and "sensor.hex_r2_a_sync_pulse_jitter" in txt and "sensor.hex_c0_sync_pulse_offset" in txt
+
+@pytest.mark.parametrize("pin", ["GPIO22", "GPIO30", "GPIO37"])
+def test_flash_pins_rejected(pin):
+    L = lay(); L["led"]["pin"] = pin
+    with pytest.raises(g.LayoutError): g.validate(L)
+    L = lay(); L["sync"] = {"pin": pin}
+    with pytest.raises(g.LayoutError): g.validate(L)
+
+def test_gpio21_and_38_ok():
+    for pin in ("GPIO21", "GPIO38"):
+        L = lay(); L["sync"] = {"pin": pin}; assert g.validate(L) == []
+
+def test_print_hw_args(tmp_path):
+    L = lay()
+    assert g.hw_args(L) == "--sync-pin GPIO12 --sync-mode wireless"
+    L["sync"] = {"mode": "jumper", "pin": "GPIO11"}
+    (tmp_path / "layout.json").write_text(json.dumps(L))
+    r = subprocess.run([sys.executable, os.path.join(ROOT, "tools/gen_tiles.py"), "--root", str(tmp_path), "--print-hw-args"],
+                       capture_output=True, text=True)
+    assert r.returncode == 0 and r.stdout.strip() == "--sync-pin GPIO11 --sync-mode jumper"
+    assert not (tmp_path / "out").exists()   # prints only, writes nothing
+    d = g.derive(L); assert g.substitutions(d, d["tiles"][0])["sync_mode_default"] == "jumper"

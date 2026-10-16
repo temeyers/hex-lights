@@ -15,14 +15,14 @@ Work in progress.
             "ledCount": 44, "pin": "GPIO13", "priority": 1}]}  (name/mac/rot/ledCount/pin/priority optional)
 ```
 - `id` is a slug (`[a-z0-9-]`) or a MAC. `q`,`r` are axial coords, `s=-q-r`, and `rot` is 0-5.
-- Validation: version 1, 1-64 tiles, unique ids and coords, exactly one master that is a tile id. Pins must be `GPIO<n>` and must not be GPIO0/3/45/46 (strapping), 19/20 (USB) or 48 (onboard RGB). Islands the master can't reach through neighbours give a warning.
+- Validation: version 1, 1-64 tiles, unique ids and coords, exactly one master that is a tile id. Pins must be `GPIO<n>` and must not be GPIO0/3/45/46 (strapping), 19/20 (USB), 22-37 (flash/PSRAM or not broken out) or 48 (onboard RGB). Islands the master can't reach through neighbours give a warning.
 - `out/layout.json` adds these fields to each tile: `s ring x y angle index isMaster leds neighbors`. `out/neighbors.json` is `{id:[ids]}`.
 - **`esphome/tiles.csv` can be generated from layout.json**: `--emit-csv [PATH]`, default `out/tiles.csv`. A test checks that it matches Hardware's CSV.
 
 ## Run (workflow)
 1. Edit `layout.json` (canonical).
 2. `python3 tools/gen_tiles.py --emit-csv esphome/tiles.csv` writes the CSV plus `out/layout.json`, `out/neighbors.json` and `ha/hex_wall.generated.yaml`.
-3. `python3 esphome/tools/gen_tiles.py` is Hardware's generator. It writes `esphome/tiles/tile_NN.yaml`, the only tile YAML set.
+3. `python3 esphome/tools/gen_tiles.py $(python3 tools/gen_tiles.py --print-hw-args)` runs Hardware's generator with the wall-wide `--sync-pin`/`--sync-mode` from layout.json `sync`. It writes `esphome/tiles/tile_NN.yaml`, the only tile YAML set.
 4. `cp secrets.example.yaml esphome/tiles/secrets.yaml`, fill it in (it's gitignored), then `esphome config esphome/tiles/tile_01.yaml`.
 
 Other flags: `--check` (exit 1 if stale), `--secrets-template`, `--tile-yaml` (opt-in: also writes `esphome/generated/<id>.yaml` straight from layout.json with the full map below), `--pin-leader` (with `--tile-yaml`: static_leader = the master's tile_num). Tests: `python -m pytest tests && node tests/effects.test.mjs`.
@@ -68,5 +68,5 @@ Hardware's newer firmware signature is `set_wall_fx(effect, palette, speed, scal
 - Automation `hex_wall_sync_jumper_lost` alerts when any tile is `jumper-lost` for 15 s while the mode is `Jumper wire`. It notifies `notifyService` (default `notify.notify`), which you can override with `"ha": {"notifyService": "notify.mobile_app_x"}`. After an alert it waits 10 minutes before alerting again.
 - Dashboard: `ha/hex_wall_dashboard.generated.yaml` is a Lovelace dashboard in YAML mode. It has the wall controls, the sync mode select and a sync glance card for each tile.
 - **Canonical layout key** (Front End's editor writes it, d55afb4): top-level `"sync": {"mode": "wireless"|"jumper", "pin": "GPIO<n>"}`. It's left out when it's the default (wireless, GPIO12). The pin is read from `sync.pin`, then the legacy `led.syncPin`, then GPIO12. It's validated like the LED pin and must not equal the LED pin or any tile's pin.
-- **sync_pin reaches the firmware only through `--tile-yaml`.** Hardware's tiles.csv generator has no sync_pin input, so its tiles use the template default GPIO12.
-- **sync.mode:** the firmware "Sync mode" select is a template select whose state comes from hexsync (it has no `initial_option`), so HA can't set its starting value. Running `script.hex_wall_sync_mode_apply_layout` once sets `select.hex_c0_sync_mode` to the layout's mode.
+- **sync_pin / sync_mode_default reach the firmware** through Hardware's generator flags (`--print-hw-args` prints them) or through `--tile-yaml`.
+- **sync.mode:** the firmware sets the mode from `sync_mode_default` on first boot and restores the saved mode from flash after that. `script.hex_wall_sync_mode_apply_layout` is only needed to change the mode later to match layout.json.

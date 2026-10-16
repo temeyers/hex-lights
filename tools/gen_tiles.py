@@ -15,7 +15,8 @@ SECRETS_SHARED = ["wifi_ssid", "wifi_password", "fallback_ap_password", "ota_pas
 TILE_DIR = "esphome/generated"
 DEFAULT_PACKAGE = "../templates/tile-common.yaml"
 BAD_PINS = {0: "strapping", 3: "strapping", 45: "strapping", 46: "strapping",
-            19: "USB", 20: "USB", 48: "onboard RGB LED"}
+            19: "USB", 20: "USB", 48: "onboard RGB LED",
+            **{n: "flash/PSRAM or not broken out" for n in range(22, 38)}}
 DEFAULT_SYNC_PIN = "GPIO12"   # template sync_pin; jumper-wire mode only
 SYNC_MODES = ("wireless", "jumper")
 
@@ -23,6 +24,11 @@ SYNC_MODES = ("wireless", "jumper")
 def sync_pin_of(lay):
     """Canonical sync.pin, then legacy led.syncPin, then GPIO12."""
     return (lay.get("sync") or {}).get("pin") or (lay.get("led") or {}).get("syncPin") or DEFAULT_SYNC_PIN
+
+
+def hw_args(lay):
+    """Arguments for Hardware's esphome/tools/gen_tiles.py from layout.json sync."""
+    return f"--sync-pin {sync_pin_of(lay)} --sync-mode {sync_mode_of(lay)}"
 
 
 def sync_mode_of(lay):
@@ -226,6 +232,7 @@ def substitutions(lay, t, pin_leader=False):
         # num_leds = compile-time strip length (max); led_count = runtime default
         # for the per-tile number entity (PROPOSED, Hardware to confirm).
         "sync_pin": sync_pin_of(lay),
+        "sync_mode_default": sync_mode_of(lay),
         "num_leds": max(t["leds"], lay["led"].get("maxCount", t["leds"])),
         "led_count": t["leds"],
         # "0" keeps hexsync automatic failover; --pin-leader pins the master.
@@ -308,6 +315,8 @@ def main(argv=None):
                     help="emit static_leader = master tile_num (default 0 = automatic failover)")
     ap.add_argument("--csv-order", action="store_true",
                     help="with --emit-csv: add the optional order column (Hardware's generator reads it)")
+    ap.add_argument("--print-hw-args", action="store_true",
+                    help="print the --sync-pin/--sync-mode args for Hardware's generator and exit")
     a = ap.parse_args(argv)
     path = a.layout or next(p for p in (os.path.join(a.root, "layout.json"), os.path.join(a.root, "layout.yaml"))
                             if os.path.exists(p) or p.endswith(".yaml"))
@@ -318,6 +327,8 @@ def main(argv=None):
         print(f"error: {e}", file=sys.stderr); return 2
     for w in warns:
         print(f"warning: {w}", file=sys.stderr)
+    if a.print_hw_args:
+        print(hw_args(lay)); return 0
     files = build_outputs(lay, a.tile_yaml, a.pin_leader)
     if a.secrets_template:
         files["secrets.example.yaml"] = secrets_template(lay)
