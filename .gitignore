@@ -8,3 +8,8 @@ __pycache__/
 .pytest_cache/
 esphome/generated/
 pip.log
+secrets.h
+.env.*
+*.pem
+*.key
+venv*/
