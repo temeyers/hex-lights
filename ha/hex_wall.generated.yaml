@@ -214,6 +214,12 @@ script:
                       transition: "{{ dt / 2 }}"
                       brightness: "{{ 255 if range(1000) | random < dens * 1000 else 1 }}"
             - delay: {seconds: "{{ dt }}"}
+  hex_wall_sync_mode_apply_layout:
+    alias: Hex wall set sync mode from layout.json (Wireless (ESP-NOW))
+    sequence:
+      - action: select.select_option
+        target: {entity_id: select.hex_c0_sync_mode}
+        data: {option: "Wireless (ESP-NOW)"}
   hex_wall_fx_apply:
     alias: Hex wall apply synced effect
     mode: restart

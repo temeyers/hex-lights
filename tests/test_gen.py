@@ -202,7 +202,25 @@ def test_sync_pin_validation():
     L = lay(); L["tiles"][2]["pin"] = "GPIO12"
     with pytest.raises(g.LayoutError, match="sync pin"): g.validate(L)
     L = lay(); L["led"]["syncPin"] = "GPIO48"
-    with pytest.raises(g.LayoutError, match="syncPin"): g.validate(L)
+    with pytest.raises(g.LayoutError, match="sync.pin"): g.validate(L)
+
+def test_sync_key_canonical():
+    import gen_ha
+    L = lay(); L["led"]["syncPin"] = "GPIO11"; L["sync"] = {"mode": "jumper", "pin": "GPIO10"}
+    assert g.validate(L) == [] and g.sync_pin_of(L) == "GPIO10"
+    d = g.derive(L); assert g.substitutions(d, d["tiles"][0])["sync_pin"] == "GPIO10"
+    del L["sync"]["pin"]; assert g.sync_pin_of(L) == "GPIO11"       # legacy fallback
+    del L["led"]["syncPin"]; assert g.sync_pin_of(L) == "GPIO12"    # default
+    out = gen_ha.render(g.derive(L), g.node, g.light_entity)
+    assert 'option: "Jumper wire"' in out.split("hex_wall_sync_mode_apply_layout:")[1].split("hex_wall_fx_apply")[0]
+    L["sync"] = {}
+    out = gen_ha.render(g.derive(L), g.node, g.light_entity)
+    assert 'option: "Wireless (ESP-NOW)"' in out.split("hex_wall_sync_mode_apply_layout:")[1].split("hex_wall_fx_apply")[0]
+    for bad, msg in [({"mode": "wire"}, "sync.mode"), ({"pin": "GPIO13"}, "collides"), ({"pin": "GPIO19"}, "sync.pin")]:
+        L = lay(); L["sync"] = bad
+        with pytest.raises(g.LayoutError, match=msg): g.validate(L)
+    L = lay(); L["sync"] = {"pin": "GPIO5"}; L["tiles"][1]["pin"] = "GPIO5"
+    with pytest.raises(g.LayoutError, match="sync pin"): g.validate(L)
 
 def test_sync_mode_ha():
     import yaml, gen_ha

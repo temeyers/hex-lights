@@ -17,6 +17,16 @@ DEFAULT_PACKAGE = "../templates/tile-common.yaml"
 BAD_PINS = {0: "strapping", 3: "strapping", 45: "strapping", 46: "strapping",
             19: "USB", 20: "USB", 48: "onboard RGB LED"}
 DEFAULT_SYNC_PIN = "GPIO12"   # template sync_pin; jumper-wire mode only
+SYNC_MODES = ("wireless", "jumper")
+
+
+def sync_pin_of(lay):
+    """Canonical sync.pin, then legacy led.syncPin, then GPIO12."""
+    return (lay.get("sync") or {}).get("pin") or (lay.get("led") or {}).get("syncPin") or DEFAULT_SYNC_PIN
+
+
+def sync_mode_of(lay):
+    return (lay.get("sync") or {}).get("mode", "wireless")
 PIN = re.compile(r"^GPIO(\d+)$")
 DEFAULT_PREFIX = "hex"
 
@@ -76,10 +86,15 @@ def validate(lay):
         raise LayoutError("led.count must be a positive int")
     check_pin(led["pin"], "led.pin")
     # Jumper-wire sync line (Hardware's template sync_pin, default GPIO12).
-    sync_pin = led.get("syncPin", DEFAULT_SYNC_PIN)
-    check_pin(sync_pin, "led.syncPin")
+    sync = lay.get("sync") or {}
+    if not isinstance(sync, dict):
+        raise LayoutError("sync must be an object")
+    if sync.get("mode", "wireless") not in SYNC_MODES:
+        raise LayoutError("sync.mode must be wireless|jumper")
+    sync_pin = sync_pin_of(lay)
+    check_pin(sync_pin, "sync.pin")
     if sync_pin == led["pin"]:
-        raise LayoutError(f"led.syncPin {sync_pin} collides with led.pin")
+        raise LayoutError(f"sync.pin {sync_pin} collides with led.pin")
     if "maxCount" in led and (not isinstance(led["maxCount"], int) or led["maxCount"] < led["count"]):
         raise LayoutError("led.maxCount must be an int >= led.count")
     if "budgetMa" in led and (not isinstance(led["budgetMa"], int) or led["budgetMa"] < 1):
@@ -210,7 +225,7 @@ def substitutions(lay, t, pin_leader=False):
         "led_pin": t.get("pin", led["pin"]),
         # num_leds = compile-time strip length (max); led_count = runtime default
         # for the per-tile number entity (PROPOSED, Hardware to confirm).
-        "sync_pin": lay["led"].get("syncPin", DEFAULT_SYNC_PIN),
+        "sync_pin": sync_pin_of(lay),
         "num_leds": max(t["leds"], lay["led"].get("maxCount", t["leds"])),
         "led_count": t["leds"],
         # "0" keeps hexsync automatic failover; --pin-leader pins the master.

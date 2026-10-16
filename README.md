@@ -63,7 +63,10 @@ Hardware's newer firmware signature is `set_wall_fx(effect, palette, speed, scal
 `--emit-csv` writes `id,q,r,rot` (it matches the committed file). Add `--csv-order` to also write `order` (empty = Hardware's default of row − 1). Hardware's generator reads it.
 
 ### Sync mode (Hardware d3aeb8b)
-- `select.hex_c0_sync_mode` (master only) has the options `Wireless (ESP-NOW)` (default) and `Jumper wire` (GPIO12, `led.syncPin`). The generator rejects a sync pin equal to the LED pin (GPIO13) or to any tile's pin.
+- `select.hex_c0_sync_mode` (master only) has the options `Wireless (ESP-NOW)` (default) and `Jumper wire` (GPIO12, `sync.pin`). The generator rejects a sync pin equal to the LED pin (GPIO13) or to any tile's pin.
 - Per tile: `sensor.hex_<id>_sync_source` (`espnow` | `jumper` | `jumper-lost`), `sensor.hex_<id>_sync_pulse_jitter` (µs), `sensor.hex_<id>_sync_pulse_offset` (ms).
 - Automation `hex_wall_sync_jumper_lost` alerts when any tile is `jumper-lost` for 15 s while the mode is `Jumper wire`. It notifies `notifyService` (default `notify.notify`), which you can override with `"ha": {"notifyService": "notify.mobile_app_x"}`. After an alert it waits 10 minutes before alerting again.
 - Dashboard: `ha/hex_wall_dashboard.generated.yaml` is a Lovelace dashboard in YAML mode. It has the wall controls, the sync mode select and a sync glance card for each tile.
+- **Canonical layout key** (Front End's editor writes it, d55afb4): top-level `"sync": {"mode": "wireless"|"jumper", "pin": "GPIO<n>"}`. It's left out when it's the default (wireless, GPIO12). The pin is read from `sync.pin`, then the legacy `led.syncPin`, then GPIO12. It's validated like the LED pin and must not equal the LED pin or any tile's pin.
+- **sync_pin reaches the firmware only through `--tile-yaml`.** Hardware's tiles.csv generator has no sync_pin input, so its tiles use the template default GPIO12.
+- **sync.mode:** the firmware "Sync mode" select is a template select whose state comes from hexsync (it has no `initial_option`), so HA can't set its starting value. Running `script.hex_wall_sync_mode_apply_layout` once sets `select.hex_c0_sync_mode` to the layout's mode.

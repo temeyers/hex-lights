@@ -264,6 +264,7 @@ def wall_block(d, node, master):
                 if "ledCount" in t}
     eff = I["light_effect"]
     tn = [node(d, t) for t in d["tiles"]]
+    want_mode = I["sync_mode_jumper"] if (d.get("sync") or {}).get("mode") == "jumper" else I["sync_mode_wireless"]
     src = [I["sync_source_sensor"].format(node=n) for n in tn]
     mode_sel = I["sync_mode_select"].format(master=mnode)
     sync_auto = f"""
@@ -289,7 +290,15 @@ def wall_block(d, node, master):
             jumper-wire sync pulse (falling back to the ESP-NOW clock). Check the GPIO12 wire.
       - delay: {{minutes: 10}}
 """
-    return f"""
+    sync_script = f"""
+  hex_wall_sync_mode_apply_layout:
+    alias: Hex wall set sync mode from layout.json ({want_mode})
+    sequence:
+      - action: select.select_option
+        target: {{entity_id: {mode_sel}}}
+        data: {{option: {J(want_mode)}}}
+"""
+    return f"""{sync_script}
   hex_wall_fx_apply:
     alias: Hex wall apply synced effect
     mode: restart
