@@ -122,11 +122,17 @@ const OUT = __dirname + '/screenshots/'; const URL = 'http://localhost:8411/web/
     // led.count limit
     await p.click('#tabLayout'); await p.fill('#lCount', '61'); ok((await p.textContent('#errList')).includes('LEDs per tile must be 1-60'), 'led.count > 60 flagged'); await p.fill('#lCount', '44');
     // wall effect snippet + firmware reference
-    await p.click('#tabFx'); await p.selectOption('#fxSel', 'solid'); await p.fill('#fxParams input[type=color]', '#ff0000');
+    await p.click('#tabFx'); await p.selectOption('#fxSel', 'solid'); await p.fill('#fxParams input[type=color]', '#ff0000'); await p.fill('#bri', '100');
     await p.click('#tabHw'); await p.fill('#hwDelay', '25000');
     const fy = await p.inputValue('#hwFx');
     ok(fy.includes('action: esphome.hex_c0_set_wall_fx') && fy.includes('effect: 0') && fy.includes('hue: 0') && fy.includes('saturation: 255') && fy.includes('value: 255') && fy.includes('start_delay_ms: 10000') && !(await p.isDisabled('#hwCopyFx')), 'wall fx YAML solid red, delay capped');
-    await p.click('#tabFx'); await p.selectOption('#fxSel', 'chase'); await p.click('#tabHw');
+    await p.click('#tabFx'); await p.$eval('#bri', e => { e.value = 50; e.dispatchEvent(new Event('input')); }); await p.fill('#fxParams input[type=color]', '#804020');
+    ok(await p.evaluate(() => HexApp.fwParams().P.value) === 64, 'value = round(colourV 128 * 50%) = 64');
+    await p.selectOption('#fxSel', 'rainbow_sweep'); ok(await p.evaluate(() => HexApp.fwParams().P.value) === 128, 'colourless value = round(255 * 50%) = 128');
+    await p.$eval('#fxParams select[data-k=axis]', e => { e.value = 'ring'; e.dispatchEvent(new Event('change', { bubbles: true })); }); await p.click('#tabHw');
+    const sm = await p.textContent('#hwFxMsg'); ok(sm.includes('select.hex_c0_wall_wipe_axis to ring') && !/x\/y only/i.test(sm) && (await p.inputValue('#hwFx')).includes('value: 128'), 'sweep axis note (ring), no x/y-only warning, YAML value 128 ' + sm);
+    await p.click('#tabFx'); await p.$eval('#bri', e => { e.value = 100; e.dispatchEvent(new Event('input')); });
+    await p.selectOption('#fxSel', 'chase'); await p.click('#tabHw');
     let P = await p.evaluate(() => HexApp.fwParams().P); ok(P.effect === 4 && P.speed === 3000 && P.scale === 300 && P.palette === 0, 'chase -> id 4, speed 3000, scale 300 ' + JSON.stringify(P));
     await p.click('#tabFx'); await p.selectOption('#fxSel', 'breathe'); P = await p.evaluate(() => HexApp.fwParams().P); ok(P.effect === 3 && P.speed === 250, 'breathe -> pulse 3, speed 250');
     await p.selectOption('#fxSel', 'wipe'); await p.click('#tabHw'); ok((await p.textContent('#hwFxMsg')).includes('select.hex_c0_wall_wipe_axis'), 'wipe axis note'); await p.click('#tabFx');

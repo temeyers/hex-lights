@@ -298,7 +298,7 @@
   $('fxParams').addEventListener('change', function (e) { var k = e.target.getAttribute('data-k'); if (k) fx.params[k] = pval(e.target); });
   bind('fxSel', 'change', function () { fx.name = this.value; buildFx(); $('fxFwMsg').textContent = FX.defs[fx.name].firmwareOnly ? 'Firmware-only effect: previewed with the firmware reference.' : ''; });
   function lbl() { $('briV').textContent = $('bri').value + '%'; $('spdV').textContent = ($('spd').value / 100).toFixed(1) + '×'; }
-  bind('bri', 'input', function () { lbl(); if (fx.colors) render(); }); bind('spd', 'input', lbl);
+  bind('bri', 'input', function () { lbl(); if (fx.colors) render(); if (cur === 'hw') hwFxSync(); }); bind('spd', 'input', lbl);
   function tick(now) {
     if (!fx.play) return; var dt = now - (fx.last || now); fx.last = now; fx.tAcc += dt * $('spd').value / 100;
     try { var D = derived(), t = fx.tAcc;
@@ -363,10 +363,10 @@
     var sp = n === 'breathe' ? 1 / (p.periodS || 4) : (p.speed != null ? p.speed : 1), sc = 100, notes = [];
     if (n === 'chase') sc = (p.tail || 3) * 100; else if (n === 'rainbow_flow') sc = (p.scale || 1) * 100;
     if (n === 'ripple' && p.origin && p.origin !== st.master) notes.push('firmware radial_wave always starts at q,r = 0,0, not the chosen origin');
-    if (n === 'wipe' || n === 'rainbow_sweep') notes.push('axis is not a service field: set select.' + nodeName() + '_wall_wipe_axis to ' + (p.axis || 'x') + (n === 'rainbow_sweep' ? ' (assumed shared with rainbow_sweep; firmware sweep supports x/y only)' : ''));
-    var hsv = p.color ? rgbToHsv255(p.color) : [0, 255, 255], pi = FW_PAL.indexOf(p.palette);
+    if (n === 'wipe' || n === 'rainbow_sweep') notes.push('axis is not a service field: set select.' + nodeName() + '_wall_wipe_axis to ' + (p.axis || 'x') + ' (shared by wipe and rainbow_sweep; x, y, ring, angle)');
+    var hsv = p.color ? rgbToHsv255(p.color) : [0, 255, 255], bri = clamp(($('bri').value | 0) / 100, 0, 1), pi = FW_PAL.indexOf(p.palette);
     var P = { effect: id, palette: pi < 0 ? (p.color ? 5 : 0) : pi, speed: clamp(Math.round(sp * 1000), 0, 10000), scale: clamp(Math.round(sc), 0, 65535),
-      hue: hsv[0], saturation: hsv[1], value: hsv[2], start_delay_ms: clamp(parseInt($('hwDelay').value, 10) || 0, 0, 10000) };
+      hue: hsv[0], saturation: hsv[1], value: clamp(Math.round(hsv[2] * bri), 0, 255), start_delay_ms: clamp(parseInt($('hwDelay').value, 10) || 0, 0, 10000) };
     if (sp * 1000 > 10000) notes.push('speed capped at 10000 mc/s');
     return { P: P, note: notes.join('; ') };
   }
@@ -374,7 +374,7 @@
     var r = fwParams(), nn = nodeName();
     $('hwCopyFx').disabled = !!r.error; $('hwFx').disabled = !!r.error;
     if (r.error) { $('hwFx').value = ''; $('hwFxMsg').textContent = r.error; return r; }
-    var P = r.P; $('hwFxMsg').textContent = 'Effect ' + fx.name + ' → firmware id ' + P.effect + '. Wipe axis is select.' + nn + '_wall_wipe_axis (not a service field).' + (r.note ? ' Note: ' + r.note + '.' : '');
+    var P = r.P; $('hwFxMsg').textContent = 'Effect ' + fx.name + ' → firmware id ' + P.effect + '. Axis (wipe and rainbow_sweep) is select.' + nn + '_wall_wipe_axis, not a service field. value includes the preview brightness (' + $('bri').value + '%).' + (r.note ? ' Note: ' + r.note + '.' : '');
     $('hwFx').value = 'action: esphome.' + nn + '_set_wall_fx\ndata:\n  effect: ' + P.effect + '\n  palette: ' + P.palette + '\n  speed: ' + P.speed + '\n  scale: ' + P.scale + '\n  hue: ' + P.hue + '\n  saturation: ' + P.saturation + '\n  value: ' + P.value + '\n  start_delay_ms: ' + P.start_delay_ms;
     return r;
   }
