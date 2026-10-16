@@ -20,6 +20,7 @@ substitutions:
   # Full output by default: 100% on the slider = full LED drive. Runtime ceiling = HA number "Max brightness".
   # WARNING: full white ~= 44 x 60 mA ~= 2.6 A per tile (~53 A wall). Feed the strip directly (not via the
   # S3 Super Mini 5V pin); keep 3 A per-tile fuses and the 60 A PSU. See README / DESIGN.md.
+  boot_brightness: "30%"    # light brightness applied on every boot (on_boot -100)
   led_gamma: "2.8"          # ESPHome default; gamma never lowers 255 but dims mid levels (value 180 -> ~38 %)
   max_scale: "1.0"          # first-boot value for hexsync's current model (Max brightness overrides at boot)
   tile_budget_ma: "1200"    # hexsync effect current budget per tile (ESTIMATED model); OFF unless "Current limit" switch is on
@@ -29,12 +30,36 @@ esphome:
   friendly_name: Hex ${hex_nn}
   min_version: 2025.9.0
   on_boot:
-    - priority: -100   # after restored numbers/switches have applied
+    # Restore (numbers/switches) fires BEFORE the light is set up: touching the light there crashed 85cf36d
+    # (update_state -> schedule_show -> null LightState). Apply brightness/limit here, after every setup().
+    - priority: -100
       then:
         - lambda: |-
+            float pct = id(max_brightness).state;
+            if (std::isnan(pct)) pct = 100.0f;
+            float k = std::max(0.0f, std::min(1.0f, pct / 100.0f));
+            id(hex_sync).set_max_scale(k);
+            id(hex_sync).set_budget_enabled(id(current_limit).state);
+            auto *out = static_cast<light::AddressableLight *>(id(tile_leds).get_output());
+            if (out != nullptr) {
+              out->set_correction(k, k, k);
+              if (id(tile_leds).current_values.is_on()) out->update_state(id(tile_leds));
+            }
+            id(bright_ready) = true;
             ESP_LOGI("hexsync", "brightness: max_brightness=%.0f%% (max_scale %.2f), current_limit=%s (budget %d mA), effect value=%d/255, gamma=%s, transition 0s",
-                     id(max_brightness).state, id(hex_sync).max_scale(), id(hex_sync).budget_enabled() ? "ON" : "off",
+                     pct, id(hex_sync).max_scale(), id(hex_sync).budget_enabled() ? "ON" : "off",
                      id(hex_sync).budget_ma(), id(hex_sync).effect_value(), "${led_gamma}");
+        # Power-on brightness: 30% every boot (light + hexsync are set up by now; LightCall is safe here).
+        # Keeps the restored colour/effect; Max brightness stays a separate ceiling (default 100%).
+        - light.turn_on:
+            id: tile_leds
+            brightness: ${boot_brightness}
+
+globals:
+  - id: bright_ready         # true once on_boot(-100) ran; restore-time callbacks must not touch the light
+    type: bool
+    restore_value: false
+    initial_value: "false"
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -149,7 +174,7 @@ light:
     default_transition_length: 0s
     gamma_correct: ${led_gamma}
     # No compile-time cap: the "Max brightness" number sets the correction (ceiling) at runtime.
-    restore_mode: RESTORE_DEFAULT_OFF
+    restore_mode: RESTORE_AND_ON   # colour + effect restored, always comes up on (brightness forced to 30% in on_boot)
     effects:
       - addressable_lambda:
           name: HexSync
@@ -230,11 +255,14 @@ number:
     restore_value: true
     on_value:
       - lambda: |-
-          float k = x / 100.0f;
-          auto *out = static_cast<light::AddressableLight *>(id(tile_leds).get_output());
-          out->set_correction(k, k, k);
-          out->update_state(id(tile_leds));   // re-render a static color now (effects pick it up next frame)
+          if (std::isnan(x)) return;
+          if (!id(bright_ready)) return;   // fired by restore during setup: on_boot(-100) applies it safely
+          float k = std::max(0.0f, std::min(1.0f, x / 100.0f));
           id(hex_sync).set_max_scale(k);
+          auto *out = static_cast<light::AddressableLight *>(id(tile_leds).get_output());
+          if (out == nullptr) return;
+          out->set_correction(k, k, k);
+          if (id(tile_leds).current_values.is_on()) out->update_state(id(tile_leds));  // re-render a static colour
   - platform: template
     name: LED count
     id: led_count_number
@@ -309,10 +337,11 @@ switch:
     icon: mdi:current-dc
     optimistic: true
     restore_mode: RESTORE_DEFAULT_OFF
+    # Only sets a bool in hexsync (no light access); on_boot(-100) re-applies the restored state too.
     turn_on_action:
-      - lambda: 'id(hex_sync).set_budget_enabled(true);'
+      - lambda: 'if (id(bright_ready)) id(hex_sync).set_budget_enabled(true);'
     turn_off_action:
-      - lambda: 'id(hex_sync).set_budget_enabled(false);'
+      - lambda: 'if (id(bright_ready)) id(hex_sync).set_budget_enabled(false);'
 
 select:
   - platform: template

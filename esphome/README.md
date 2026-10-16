@@ -112,3 +112,7 @@ Every LED has its own position on the tile ring: angle `2*pi*i/n + rotation`, wh
 - The Current limit switch defaults to off, so no budget scaling is applied.
 - The boot log prints `brightness: max_brightness=…, current_limit=…, effect value=…, gamma=…`.
 - Gamma 2.8 never lowers full output (255 stays 255), but it dims mid levels. Set `led_gamma: "1.0"` for a linear, brighter look.
+
+## Boot behaviour
+- The light restores with `RESTORE_AND_ON`, so its colour and effect come back and it always turns on. `on_boot` (priority -100) then sets the brightness to **30 %** (`boot_brightness`) on every boot.
+- Max brightness (default 100 %) and Current limit are applied in that same `on_boot`. Their restore-time callbacks never touch the light. 85cf36d crashed there: `update_state` → `schedule_show` wrote through a null `LightState` before the light was set up (StoreProhibited at 0xA8).
