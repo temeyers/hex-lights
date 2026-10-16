@@ -69,7 +69,7 @@ def test_substitution_map():
     d = g.derive(lay()); t = {x["id"]: x for x in d["tiles"]}
     s = g.substitutions(d, t["r1-e"])
     assert s == {"tile_id": "r1-e", "tile_num": 2, "q": 1, "r": 0, "rotation": 0,
-                 "led_pin": "GPIO4", "num_leds": 60, "led_count": 44, "static_leader": 0, "leader_priority": 3}
+                 "led_pin": "GPIO13", "num_leds": 60, "led_count": 44, "static_leader": 0, "leader_priority": 3}
     assert g.substitutions(d, t["c0"])["leader_priority"] == 1
     assert g.substitutions(d, t["r1-e"], pin_leader=True)["static_leader"] == 1
     assert g.substitutions(d, t["r3-a"])["led_count"] == 42 and g.substitutions(d, t["r3-a"])["num_leds"] == 60

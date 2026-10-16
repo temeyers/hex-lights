@@ -6,7 +6,7 @@
     "sizeMm": 100
   },
   "led": {
-    "pin": "GPIO4",
+    "pin": "GPIO13",
     "type": "WS2812",
     "order": "GRB",
     "count": 44,
