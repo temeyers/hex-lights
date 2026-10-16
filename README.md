@@ -87,7 +87,8 @@ This adds the wall helpers: Manual color, effect, palette, speed, wipe axis and 
 **Dashboard cards** (manual install, or use HACS above).
 1. Install **Mushroom** and **card-mod** from HACS.
 2. Copy `ha/cards/hex-layout-card.js` to `/config/www/hex-layout-card/`.
-3. Add it as a dashboard resource: `/local/hex-layout-card/hex-layout-card.js?v=5`, type **JavaScript module**.
+3. Add it as a dashboard resource: `/local/hex-layout-card/hex-layout-card.js?v=6`, type **JavaScript module**.
+   The layout card draws flat-top hexes by default (flat side down, like the tiles). Set `orientation: pointy` on the card for pointy-top. Saved `q`/`r` coordinates keep the same neighbours in both orientations.
 4. Paste the cards from `ha/cards/quins_room_hex_cards.yaml` into a view, using the raw configuration editor.
 
 There's also a ready-made full dashboard: `ha/hex_wall_dashboard.generated.yaml`.

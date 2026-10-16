@@ -1,11 +1,11 @@
 /* hex-layout-card v1 - honeycomb layout for Hex lights. No build step. */
-const HLC_VERSION = "2";
+const HLC_VERSION = "6";
 const SQ3 = Math.sqrt(3);
 
 class HexLayoutCard extends HTMLElement {
   static getStubConfig() { return { layout_id: "hex_layout_quin", layout: { tiles: {}, groups: [] } }; }
   setConfig(config) {
-    this._config = Object.assign({ layout_id: "hex_layout_quin", pattern: "^light\\.hex_.*_light$", size: 34, orientation: "pointy" }, config || {});
+    this._config = Object.assign({ layout_id: "hex_layout_quin", pattern: "^light\\.hex_.*_light$", size: 34, orientation: "flat" }, config || {});
     const l = this._config.layout || {};
     this._layout = { tiles: Object.assign({}, l.tiles || {}), groups: (l.groups || []).map(g => ({ name: g.name, entities: [...(g.entities || [])] })) };
     this._edit = this._edit || false; this._sel = new Set(); this._dirty = false;
@@ -42,7 +42,8 @@ class HexLayoutCard extends HTMLElement {
     const b = a.brightness == null ? 255 : a.brightness;
     return { fill: `rgb(${rgb.join(",")})`, on: true, b, op: 0.35 + 0.65 * (b / 255) };
   }
-  // axial (q,r) -> pixel
+  // axial (q,r) -> pixel. orientation: "flat" (default, flat side down like the physical tiles) | "pointy".
+  // Neighbours/adjacency are the same 6 axial offsets in both, so a saved layout keeps its topology.
   _px(q, r) {
     const s = this._config.size;
     return this._config.orientation === "flat"
