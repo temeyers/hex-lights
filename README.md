@@ -53,6 +53,19 @@ You need Home Assistant with the **ESPHome Device Builder** add-on, or the `esph
 4. **Flash the other tiles** the same way: `hex-02.yaml`, `hex-03.yaml`, and so on up to `hex-20.yaml`.
    > **Every tile must run the same firmware build** (sync packet v3). If you change anything, re-flash all of them.
 
+## Install the card with HACS
+The **Hex layout card** can be installed through HACS as a custom **Dashboard** repository.
+
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=temeyers&repository=hex-lights&category=plugin)
+
+Or by hand:
+1. In Home Assistant, open **HACS**, then **⋮ (top right)**, then **Custom repositories**.
+2. Repository: `https://github.com/temeyers/hex-lights`. Type: **Dashboard**. Click **Add**.
+3. Search for **Hex Lights Layout Card**, then **Download**, then reload the browser.
+4. HACS adds the resource for you (`/hacsfiles/hex-lights/hex-lights.js`). Use the card as `type: custom:hex-layout-card` (see `ha/cards/quins_room_hex_cards.yaml`).
+
+If you install the card through HACS, skip the manual copy steps under *Dashboard cards* below, and don't add the `/local/...` resource as well.
+
 ## Add to Home Assistant
 Each tile shows up on its own. Home Assistant auto-discovers ESPHome devices on your network. You can also add them by hand:
 
@@ -71,7 +84,7 @@ Enter `hex-01.local` (or the tile's IP address) and the `api_key` from your secr
 
 This adds the wall helpers: Manual color, effect, palette, speed, wipe axis and max brightness.
 
-**Dashboard cards.**
+**Dashboard cards** (manual install, or use HACS above).
 1. Install **Mushroom** and **card-mod** from HACS.
 2. Copy `ha/cards/hex-layout-card.js` to `/config/www/hex-layout-card/`.
 3. Add it as a dashboard resource: `/local/hex-layout-card/hex-layout-card.js?v=3`, type **JavaScript module**.
@@ -93,6 +106,8 @@ There's also a ready-made full dashboard: `ha/hex_wall_dashboard.generated.yaml`
 
 ## For developers
 Generators, the layout format, the sync protocol and the entity reference are in [docs/REFERENCE.md](docs/REFERENCE.md) and [DESIGN.md](DESIGN.md).
+
+`dist/hex-lights.js` is the HACS copy of `ha/cards/hex-layout-card.js`. Keep the two files identical.
 
 To run the tests:
 ```bash
