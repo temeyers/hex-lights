@@ -104,8 +104,11 @@ wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
   power_save_mode: none     # ESP-NOW latency suffers badly with modem sleep
+  reboot_timeout: 0s       # don't reboot while sitting in fallback AP (default 15 min would drop the AP)
   ap:
-    password: !secret fallback_ap_password
+    ssid: hex-${tile_id}
+    ap_timeout: 30s        # fallback AP comes up 30 s after STA fails (default 1 min)
+    password: !secret fallback_ap_password   # must be 8+ chars or the AP won't start
 
 captive_portal:
 
