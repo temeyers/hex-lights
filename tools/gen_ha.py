@@ -6,12 +6,15 @@ import json
 EFFECTS = ["solid", "breathe", "rainbow_sweep", "ripple", "spiral", "sparkle"]
 
 # ---- Firmware interface: ALL names in one spot (PROPOSED to Hardware, 2026-10-16).
-# Override any key with layout.json "ha": {...}. {node} = hex_<id with _>.
+# Override any key with layout.json "ha": {...}. {node} = hex_NN (tiles.csv row, 01 = master), {master} = master node.
 INTERFACE = {
     "light": "light.{node}_light",                 # template: light name "Light"
     "led_count_number": "number.{node}_led_count",  # per-tile runtime LED count (proposed)
     "fx_action": "esphome.{master}_set_wall_fx",    # proposed v2 action on any tile
     "legacy_action": "esphome.{master}_set_wall_effect",  # existing action
+    "layout_bulk_action": "esphome.{master}_set_layout_bulk",
+    "hex_layout_action": "esphome.{master}_set_hex_layout",  # (hex_num, q, r, rotation, order)
+    "sync_leader_binary": "binary_sensor.{node}_sync_leader",
     "light_effect": "HexSync",
     # master-only firmware entities (Hardware df1ad9b); the service above stays the primary path
     "wall_speed_number": "number.{master}_wall_speed",      # 0..10000 milli-cycles/s
@@ -399,10 +402,11 @@ def render_dashboard(d, node):
     rows = []
     for t in d["tiles"]:
         n = node(d, t)
-        rows.append({"type": "glance", "title": t.get("name") or str(t["id"]), "show_name": True,
+        rows.append({"type": "glance", "title": f"Hex {n[4:]} ({t.get('name') or t['id']})", "show_name": True,
                      "entities": [{"entity": I["sync_source_sensor"].format(node=n), "name": "Source"},
                                   {"entity": I["sync_jitter_sensor"].format(node=n), "name": "Jitter"},
-                                  {"entity": I["sync_offset_sensor"].format(node=n), "name": "Offset"}]})
+                                  {"entity": I["sync_offset_sensor"].format(node=n), "name": "Offset"},
+                                  {"entity": I["sync_leader_binary"].format(node=n), "name": "Leader"}]})
     dash = {"title": "Hex Wall", "views": [{"title": "Wall", "path": "hex-wall", "cards": [
         {"type": "entities", "title": "Wall", "entities": [
             "light.hex_wall", "input_select.hex_wall_fx", "input_select.hex_wall_palette",

@@ -205,9 +205,14 @@ def rot_deg(t):
     return t["rotationDeg"] if "rotationDeg" in t else t.get("rot", 0) * 60
 
 
+def hex_nn(t):
+    """2-digit 1-based tiles.csv row (= layout order): c0 -> "01"."""
+    return f"{t['index'] + 1:02d}"
+
+
 def device_name(lay, t):
-    """Hardware's template sets esphome name: hex-${tile_id}."""
-    return f"hex-{norm_id(str(t['id']))}"
+    """Hardware's template sets esphome name: hex-${hex_nn} (9b55813)."""
+    return f"hex-{hex_nn(t)}"
 
 
 def node(lay, t):
@@ -224,10 +229,12 @@ def substitutions(lay, t, pin_leader=False):
     led = lay["led"]
     master = next(x for x in lay["tiles"] if x["isMaster"])
     subs = {
-        "tile_id": norm_id(str(t["id"])),
+        "hex_nn": hex_nn(t),
         "tile_num": t["index"] + 1,          # 1..N in layout order (hexsync id)
         "q": t["q"], "r": t["r"],
         "rotation": rot_deg(t),          # firmware stores degrees; layout rot is 0-5
+        "order": t.get("order", t["index"]),
+        "wall_controls_internal": "false" if t["index"] == 0 else "true",
         "led_pin": t.get("pin", led["pin"]),
         # num_leds = compile-time strip length (max); led_count = runtime default
         # for the per-tile number entity (PROPOSED, Hardware to confirm).

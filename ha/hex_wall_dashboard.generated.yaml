@@ -16,7 +16,7 @@
       "input_select.hex_wall_axis",
       "input_number.hex_wall_speed",
       "input_number.hex_wall_led_count",
-      "select.hex_c0_sync_mode"
+      "select.hex_01_sync_mode"
      ]
     },
     {
@@ -24,381 +24,461 @@
      "cards": [
       {
        "type": "glance",
-       "title": "Center",
+       "title": "Hex 01 (Center)",
        "show_name": true,
        "entities": [
         {
-         "entity": "sensor.hex_c0_sync_source",
+         "entity": "sensor.hex_01_sync_source",
          "name": "Source"
         },
         {
-         "entity": "sensor.hex_c0_sync_pulse_jitter",
+         "entity": "sensor.hex_01_sync_pulse_jitter",
          "name": "Jitter"
         },
         {
-         "entity": "sensor.hex_c0_sync_pulse_offset",
+         "entity": "sensor.hex_01_sync_pulse_offset",
          "name": "Offset"
+        },
+        {
+         "entity": "binary_sensor.hex_01_sync_leader",
+         "name": "Leader"
         }
        ]
       },
       {
        "type": "glance",
-       "title": "Ring1 E",
+       "title": "Hex 02 (Ring1 E)",
        "show_name": true,
        "entities": [
         {
-         "entity": "sensor.hex_r1_e_sync_source",
+         "entity": "sensor.hex_02_sync_source",
          "name": "Source"
         },
         {
-         "entity": "sensor.hex_r1_e_sync_pulse_jitter",
+         "entity": "sensor.hex_02_sync_pulse_jitter",
          "name": "Jitter"
         },
         {
-         "entity": "sensor.hex_r1_e_sync_pulse_offset",
+         "entity": "sensor.hex_02_sync_pulse_offset",
          "name": "Offset"
+        },
+        {
+         "entity": "binary_sensor.hex_02_sync_leader",
+         "name": "Leader"
         }
        ]
       },
       {
        "type": "glance",
-       "title": "Ring1 NE",
+       "title": "Hex 03 (Ring1 NE)",
        "show_name": true,
        "entities": [
         {
-         "entity": "sensor.hex_r1_ne_sync_source",
+         "entity": "sensor.hex_03_sync_source",
          "name": "Source"
         },
         {
-         "entity": "sensor.hex_r1_ne_sync_pulse_jitter",
+         "entity": "sensor.hex_03_sync_pulse_jitter",
          "name": "Jitter"
         },
         {
-         "entity": "sensor.hex_r1_ne_sync_pulse_offset",
+         "entity": "sensor.hex_03_sync_pulse_offset",
          "name": "Offset"
+        },
+        {
+         "entity": "binary_sensor.hex_03_sync_leader",
+         "name": "Leader"
         }
        ]
       },
       {
        "type": "glance",
-       "title": "Ring1 NW",
+       "title": "Hex 04 (Ring1 NW)",
        "show_name": true,
        "entities": [
         {
-         "entity": "sensor.hex_r1_nw_sync_source",
+         "entity": "sensor.hex_04_sync_source",
          "name": "Source"
         },
         {
-         "entity": "sensor.hex_r1_nw_sync_pulse_jitter",
+         "entity": "sensor.hex_04_sync_pulse_jitter",
          "name": "Jitter"
         },
         {
-         "entity": "sensor.hex_r1_nw_sync_pulse_offset",
+         "entity": "sensor.hex_04_sync_pulse_offset",
          "name": "Offset"
+        },
+        {
+         "entity": "binary_sensor.hex_04_sync_leader",
+         "name": "Leader"
         }
        ]
       },
       {
        "type": "glance",
-       "title": "Ring1 W",
+       "title": "Hex 05 (Ring1 W)",
        "show_name": true,
        "entities": [
         {
-         "entity": "sensor.hex_r1_w_sync_source",
+         "entity": "sensor.hex_05_sync_source",
          "name": "Source"
         },
         {
-         "entity": "sensor.hex_r1_w_sync_pulse_jitter",
+         "entity": "sensor.hex_05_sync_pulse_jitter",
          "name": "Jitter"
         },
         {
-         "entity": "sensor.hex_r1_w_sync_pulse_offset",
+         "entity": "sensor.hex_05_sync_pulse_offset",
          "name": "Offset"
+        },
+        {
+         "entity": "binary_sensor.hex_05_sync_leader",
+         "name": "Leader"
         }
        ]
       },
       {
        "type": "glance",
-       "title": "Ring1 SW",
+       "title": "Hex 06 (Ring1 SW)",
        "show_name": true,
        "entities": [
         {
-         "entity": "sensor.hex_r1_sw_sync_source",
+         "entity": "sensor.hex_06_sync_source",
          "name": "Source"
         },
         {
-         "entity": "sensor.hex_r1_sw_sync_pulse_jitter",
+         "entity": "sensor.hex_06_sync_pulse_jitter",
          "name": "Jitter"
         },
         {
-         "entity": "sensor.hex_r1_sw_sync_pulse_offset",
+         "entity": "sensor.hex_06_sync_pulse_offset",
          "name": "Offset"
+        },
+        {
+         "entity": "binary_sensor.hex_06_sync_leader",
+         "name": "Leader"
         }
        ]
       },
       {
        "type": "glance",
-       "title": "Ring1 SE",
+       "title": "Hex 07 (Ring1 SE)",
        "show_name": true,
        "entities": [
         {
-         "entity": "sensor.hex_r1_se_sync_source",
+         "entity": "sensor.hex_07_sync_source",
          "name": "Source"
         },
         {
-         "entity": "sensor.hex_r1_se_sync_pulse_jitter",
+         "entity": "sensor.hex_07_sync_pulse_jitter",
          "name": "Jitter"
         },
         {
-         "entity": "sensor.hex_r1_se_sync_pulse_offset",
+         "entity": "sensor.hex_07_sync_pulse_offset",
          "name": "Offset"
+        },
+        {
+         "entity": "binary_sensor.hex_07_sync_leader",
+         "name": "Leader"
         }
        ]
       },
       {
        "type": "glance",
-       "title": "Ring2 A",
+       "title": "Hex 08 (Ring2 A)",
        "show_name": true,
        "entities": [
         {
-         "entity": "sensor.hex_r2_a_sync_source",
+         "entity": "sensor.hex_08_sync_source",
          "name": "Source"
         },
         {
-         "entity": "sensor.hex_r2_a_sync_pulse_jitter",
+         "entity": "sensor.hex_08_sync_pulse_jitter",
          "name": "Jitter"
         },
         {
-         "entity": "sensor.hex_r2_a_sync_pulse_offset",
+         "entity": "sensor.hex_08_sync_pulse_offset",
          "name": "Offset"
+        },
+        {
+         "entity": "binary_sensor.hex_08_sync_leader",
+         "name": "Leader"
         }
        ]
       },
       {
        "type": "glance",
-       "title": "Ring2 B",
+       "title": "Hex 09 (Ring2 B)",
        "show_name": true,
        "entities": [
         {
-         "entity": "sensor.hex_r2_b_sync_source",
+         "entity": "sensor.hex_09_sync_source",
          "name": "Source"
         },
         {
-         "entity": "sensor.hex_r2_b_sync_pulse_jitter",
+         "entity": "sensor.hex_09_sync_pulse_jitter",
          "name": "Jitter"
         },
         {
-         "entity": "sensor.hex_r2_b_sync_pulse_offset",
+         "entity": "sensor.hex_09_sync_pulse_offset",
          "name": "Offset"
+        },
+        {
+         "entity": "binary_sensor.hex_09_sync_leader",
+         "name": "Leader"
         }
        ]
       },
       {
        "type": "glance",
-       "title": "Ring2 C",
+       "title": "Hex 10 (Ring2 C)",
        "show_name": true,
        "entities": [
         {
-         "entity": "sensor.hex_r2_c_sync_source",
+         "entity": "sensor.hex_10_sync_source",
          "name": "Source"
         },
         {
-         "entity": "sensor.hex_r2_c_sync_pulse_jitter",
+         "entity": "sensor.hex_10_sync_pulse_jitter",
          "name": "Jitter"
         },
         {
-         "entity": "sensor.hex_r2_c_sync_pulse_offset",
+         "entity": "sensor.hex_10_sync_pulse_offset",
          "name": "Offset"
+        },
+        {
+         "entity": "binary_sensor.hex_10_sync_leader",
+         "name": "Leader"
         }
        ]
       },
       {
        "type": "glance",
-       "title": "Ring2 D",
+       "title": "Hex 11 (Ring2 D)",
        "show_name": true,
        "entities": [
         {
-         "entity": "sensor.hex_r2_d_sync_source",
+         "entity": "sensor.hex_11_sync_source",
          "name": "Source"
         },
         {
-         "entity": "sensor.hex_r2_d_sync_pulse_jitter",
+         "entity": "sensor.hex_11_sync_pulse_jitter",
          "name": "Jitter"
         },
         {
-         "entity": "sensor.hex_r2_d_sync_pulse_offset",
+         "entity": "sensor.hex_11_sync_pulse_offset",
          "name": "Offset"
+        },
+        {
+         "entity": "binary_sensor.hex_11_sync_leader",
+         "name": "Leader"
         }
        ]
       },
       {
        "type": "glance",
-       "title": "Ring2 E",
+       "title": "Hex 12 (Ring2 E)",
        "show_name": true,
        "entities": [
         {
-         "entity": "sensor.hex_r2_e_sync_source",
+         "entity": "sensor.hex_12_sync_source",
          "name": "Source"
         },
         {
-         "entity": "sensor.hex_r2_e_sync_pulse_jitter",
+         "entity": "sensor.hex_12_sync_pulse_jitter",
          "name": "Jitter"
         },
         {
-         "entity": "sensor.hex_r2_e_sync_pulse_offset",
+         "entity": "sensor.hex_12_sync_pulse_offset",
          "name": "Offset"
+        },
+        {
+         "entity": "binary_sensor.hex_12_sync_leader",
+         "name": "Leader"
         }
        ]
       },
       {
        "type": "glance",
-       "title": "Ring2 F",
+       "title": "Hex 13 (Ring2 F)",
        "show_name": true,
        "entities": [
         {
-         "entity": "sensor.hex_r2_f_sync_source",
+         "entity": "sensor.hex_13_sync_source",
          "name": "Source"
         },
         {
-         "entity": "sensor.hex_r2_f_sync_pulse_jitter",
+         "entity": "sensor.hex_13_sync_pulse_jitter",
          "name": "Jitter"
         },
         {
-         "entity": "sensor.hex_r2_f_sync_pulse_offset",
+         "entity": "sensor.hex_13_sync_pulse_offset",
          "name": "Offset"
+        },
+        {
+         "entity": "binary_sensor.hex_13_sync_leader",
+         "name": "Leader"
         }
        ]
       },
       {
        "type": "glance",
-       "title": "Ring2 G",
+       "title": "Hex 14 (Ring2 G)",
        "show_name": true,
        "entities": [
         {
-         "entity": "sensor.hex_r2_g_sync_source",
+         "entity": "sensor.hex_14_sync_source",
          "name": "Source"
         },
         {
-         "entity": "sensor.hex_r2_g_sync_pulse_jitter",
+         "entity": "sensor.hex_14_sync_pulse_jitter",
          "name": "Jitter"
         },
         {
-         "entity": "sensor.hex_r2_g_sync_pulse_offset",
+         "entity": "sensor.hex_14_sync_pulse_offset",
          "name": "Offset"
+        },
+        {
+         "entity": "binary_sensor.hex_14_sync_leader",
+         "name": "Leader"
         }
        ]
       },
       {
        "type": "glance",
-       "title": "Ring2 H",
+       "title": "Hex 15 (Ring2 H)",
        "show_name": true,
        "entities": [
         {
-         "entity": "sensor.hex_r2_h_sync_source",
+         "entity": "sensor.hex_15_sync_source",
          "name": "Source"
         },
         {
-         "entity": "sensor.hex_r2_h_sync_pulse_jitter",
+         "entity": "sensor.hex_15_sync_pulse_jitter",
          "name": "Jitter"
         },
         {
-         "entity": "sensor.hex_r2_h_sync_pulse_offset",
+         "entity": "sensor.hex_15_sync_pulse_offset",
          "name": "Offset"
+        },
+        {
+         "entity": "binary_sensor.hex_15_sync_leader",
+         "name": "Leader"
         }
        ]
       },
       {
        "type": "glance",
-       "title": "Ring2 I",
+       "title": "Hex 16 (Ring2 I)",
        "show_name": true,
        "entities": [
         {
-         "entity": "sensor.hex_r2_i_sync_source",
+         "entity": "sensor.hex_16_sync_source",
          "name": "Source"
         },
         {
-         "entity": "sensor.hex_r2_i_sync_pulse_jitter",
+         "entity": "sensor.hex_16_sync_pulse_jitter",
          "name": "Jitter"
         },
         {
-         "entity": "sensor.hex_r2_i_sync_pulse_offset",
+         "entity": "sensor.hex_16_sync_pulse_offset",
          "name": "Offset"
+        },
+        {
+         "entity": "binary_sensor.hex_16_sync_leader",
+         "name": "Leader"
         }
        ]
       },
       {
        "type": "glance",
-       "title": "Ring2 J",
+       "title": "Hex 17 (Ring2 J)",
        "show_name": true,
        "entities": [
         {
-         "entity": "sensor.hex_r2_j_sync_source",
+         "entity": "sensor.hex_17_sync_source",
          "name": "Source"
         },
         {
-         "entity": "sensor.hex_r2_j_sync_pulse_jitter",
+         "entity": "sensor.hex_17_sync_pulse_jitter",
          "name": "Jitter"
         },
         {
-         "entity": "sensor.hex_r2_j_sync_pulse_offset",
+         "entity": "sensor.hex_17_sync_pulse_offset",
          "name": "Offset"
+        },
+        {
+         "entity": "binary_sensor.hex_17_sync_leader",
+         "name": "Leader"
         }
        ]
       },
       {
        "type": "glance",
-       "title": "Ring2 K",
+       "title": "Hex 18 (Ring2 K)",
        "show_name": true,
        "entities": [
         {
-         "entity": "sensor.hex_r2_k_sync_source",
+         "entity": "sensor.hex_18_sync_source",
          "name": "Source"
         },
         {
-         "entity": "sensor.hex_r2_k_sync_pulse_jitter",
+         "entity": "sensor.hex_18_sync_pulse_jitter",
          "name": "Jitter"
         },
         {
-         "entity": "sensor.hex_r2_k_sync_pulse_offset",
+         "entity": "sensor.hex_18_sync_pulse_offset",
          "name": "Offset"
+        },
+        {
+         "entity": "binary_sensor.hex_18_sync_leader",
+         "name": "Leader"
         }
        ]
       },
       {
        "type": "glance",
-       "title": "Ring2 L",
+       "title": "Hex 19 (Ring2 L)",
        "show_name": true,
        "entities": [
         {
-         "entity": "sensor.hex_r2_l_sync_source",
+         "entity": "sensor.hex_19_sync_source",
          "name": "Source"
         },
         {
-         "entity": "sensor.hex_r2_l_sync_pulse_jitter",
+         "entity": "sensor.hex_19_sync_pulse_jitter",
          "name": "Jitter"
         },
         {
-         "entity": "sensor.hex_r2_l_sync_pulse_offset",
+         "entity": "sensor.hex_19_sync_pulse_offset",
          "name": "Offset"
+        },
+        {
+         "entity": "binary_sensor.hex_19_sync_leader",
+         "name": "Leader"
         }
        ]
       },
       {
        "type": "glance",
-       "title": "Ring3 A",
+       "title": "Hex 20 (Ring3 A)",
        "show_name": true,
        "entities": [
         {
-         "entity": "sensor.hex_r3_a_sync_source",
+         "entity": "sensor.hex_20_sync_source",
          "name": "Source"
         },
         {
-         "entity": "sensor.hex_r3_a_sync_pulse_jitter",
+         "entity": "sensor.hex_20_sync_pulse_jitter",
          "name": "Jitter"
         },
         {
-         "entity": "sensor.hex_r3_a_sync_pulse_offset",
+         "entity": "sensor.hex_20_sync_pulse_offset",
          "name": "Offset"
+        },
+        {
+         "entity": "binary_sensor.hex_20_sync_leader",
+         "name": "Leader"
         }
        ]
       }

@@ -46,14 +46,14 @@ Leader: hexsync picks the **lowest** `leader_priority` (1-250). Hardware's gener
 device_name and friendly_name are not emitted: the template derives them from the row number (`hex-${hex_nn}`, `Hex ${hex_nn}`, e.g. hex-01 / Hex 01). The axial id stays internal.
 
 ## Effects / Home Assistant
-`effects.json` is the catalogue, and `tools/effects.js` has `frame(effect, params, tiles, tMs)`. HA: install `ha/packages/hex_wall.yaml` and `ha/hex_wall.generated.yaml` in HA `packages/`. Tile lights are `light.hex_<id>_light`, and the group is `light.hex_wall`.
+`effects.json` is the catalogue, and `tools/effects.js` has `frame(effect, params, tiles, tMs)`. HA: install `ha/packages/hex_wall.yaml` and `ha/hex_wall.generated.yaml` in HA `packages/`. Tile lights are `light.hex_NN_light`, and the group is `light.hex_wall`.
 - Synced (ESP-NOW HexSync) path: `script.hex_wall_synced` calls `esphome.hex_<master>_set_wall_effect`, then `light.turn_on effect: HexSync` on the group. It maps solid->0 solid, ripple->1 radial wave, rainbow_sweep->2 rainbow sweep, breathe->3 pulse. It's used when `input_boolean.hex_wall_use_sync` is on.
 - Spiral and sparkle (or anything when sync is off) fall back to the per-tile HA scripts. Those use the effects.js formulas, sampled every `step` s. Ripple uses per-tile delays by hex distance, and sparkle uses HA `random`.
 
 ## Whole-wall effects + runtime LED count (v2, PROPOSED interface, not yet verified on hardware)
 - New effects: `chase` (tile to tile in index/order), `wipe` (axis x|y|ring|angle), `rainbow_flow`. Palettes: rainbow, ocean, sunset, forest, fire, mono. Every effect takes `speed`, and most take `palette`. Formulas are in `effects.json`, and `tools/effects.js` has `frame()` (`{id:[r,g,b]}`) plus `frameLeds()` (`{id:[[r,g,b] x leds]}`, where `leds` is the tile's `leds`, default 44).
 - HexSync ids (Hardware df1ad9b): 0 solid, 1 radial_wave (our ripple), 2 rainbow_sweep, 3 pulse (our breathe), 4 chase, 5 wipe, 6 rainbow_flow, 7 random_ripple, 8 twinkle, 9 color_cycle, 10 snake (7-10 firmware-only, not in effects.js). Axis is sent via `select.hex_01_wall_wipe_axis`; speed is capped at 10000, start delay at 10 s.
-- HA (generated): `input_select.hex_wall_fx`, `input_select.hex_wall_palette`, `input_number.hex_wall_speed` (cycles/s; sent as milli-cycles), `input_number.hex_wall_led_count` (default `led.count`). These call `esphome.hex_<master>_set_wall_fx` and set the per-tile `number.hex_<id>_led_count`. Every firmware name is in `INTERFACE` in `tools/gen_ha.py`, and `layout.json` `"ha": {...}` can override any of them.
+- HA (generated): `input_select.hex_wall_fx`, `input_select.hex_wall_palette`, `input_number.hex_wall_speed` (cycles/s; sent as milli-cycles), `input_number.hex_wall_led_count` (default `led.count`). These call `esphome.hex_<master>_set_wall_fx` and set the per-tile `number.hex_NN_led_count`. Every firmware name is in `INTERFACE` in `tools/gen_ha.py`, and `layout.json` `"ha": {...}` can override any of them.
 - Generator (`--tile-yaml` only): `num_leds` = compile-time max (`led.maxCount`, 60), `rotation` = rot × 60 degrees (also in the emitted CSV), and `led_count` = runtime default. tiles.csv is unchanged.
 
 ### set_wall_fx axis argument (`wallFxAxisArg`)
@@ -64,9 +64,12 @@ Hardware's newer firmware signature is `set_wall_fx(effect, palette, speed, scal
 
 ### Sync mode (Hardware d3aeb8b)
 - `select.hex_01_sync_mode` (master only) has the options `Wireless (ESP-NOW)` (default) and `Jumper wire` (GPIO12, `sync.pin`). The generator rejects a sync pin equal to the LED pin (GPIO13) or to any tile's pin.
-- Per tile: `sensor.hex_<id>_sync_source` (`espnow` | `jumper` | `jumper-lost`), `sensor.hex_<id>_sync_pulse_jitter` (µs), `sensor.hex_<id>_sync_pulse_offset` (ms).
+- Per tile: `sensor.hex_NN_sync_source` (`espnow` | `jumper` | `jumper-lost`), `sensor.hex_NN_sync_pulse_jitter` (µs), `sensor.hex_NN_sync_pulse_offset` (ms).
 - Automation `hex_wall_sync_jumper_lost` alerts when any tile is `jumper-lost` for 15 s while the mode is `Jumper wire`. It notifies `notifyService` (default `notify.notify`), which you can override with `"ha": {"notifyService": "notify.mobile_app_x"}`. After an alert it waits 10 minutes before alerting again.
 - Dashboard: `ha/hex_wall_dashboard.generated.yaml` is a Lovelace dashboard in YAML mode. It has the wall controls, the sync mode select and a sync glance card for each tile.
 - **Canonical layout key** (Front End's editor writes it, d55afb4): top-level `"sync": {"mode": "wireless"|"jumper", "pin": "GPIO<n>"}`. It's left out when it's the default (wireless, GPIO12). The pin is read from `sync.pin`, then the legacy `led.syncPin`, then GPIO12. It's validated like the LED pin and must not equal the LED pin or any tile's pin.
 - **sync_pin / sync_mode_default reach the firmware** through Hardware's generator flags (`--print-hw-args` prints them) or through `--tile-yaml`.
 - **sync.mode:** the firmware sets the mode from `sync_mode_default` on first boot and restores the saved mode from flash after that. `script.hex_wall_sync_mode_apply_layout` is only needed to change the mode later to match layout.json.
+
+### Hex NN names (Hardware 9b55813)
+HA entities and services use `hex_NN`, where NN is the tile's 2-digit 1-based row in tiles.csv (= layout.json order): c0 = 01 … r3-a = 20. The master is `hex_01`. Keep it first in layout.json, because Hardware's template exposes the wall controls only on row 1. Services: `esphome.hex_01_set_wall_fx`, `_set_wall_effect`, `_set_layout_bulk`, `_set_hex_layout(hex_num, q, r, rotation, order)`. The leader binary sensor is `binary_sensor.hex_NN_sync_leader`. All of these names are in `INTERFACE` (tools/gen_ha.py).

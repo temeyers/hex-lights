@@ -68,15 +68,15 @@ def test_substitution_map():
     import yaml
     d = g.derive(lay()); t = {x["id"]: x for x in d["tiles"]}
     s = g.substitutions(d, t["r1-e"])
-    assert s == {"tile_id": "r1-e", "tile_num": 2, "q": 1, "r": 0, "rotation": 0,
-                 "led_pin": "GPIO13", "sync_pin": "GPIO12", "sync_mode_default": "wireless", "num_leds": 60, "led_count": 44, "static_leader": 0, "leader_priority": 3}
+    assert s == {"hex_nn": "02", "tile_num": 2, "q": 1, "r": 0, "rotation": 0,
+                 "order": 1, "wall_controls_internal": "true", "led_pin": "GPIO13", "sync_pin": "GPIO12", "sync_mode_default": "wireless", "num_leds": 60, "led_count": 44, "static_leader": 0, "leader_priority": 3}
     assert g.substitutions(d, t["c0"])["leader_priority"] == 1
     assert g.substitutions(d, t["r1-e"], pin_leader=True)["static_leader"] == 1
     assert g.substitutions(d, t["r3-a"])["led_count"] == 42 and g.substitutions(d, t["r3-a"])["num_leds"] == 60
     L = lay(); L["led"].update(budgetMa=900, maxScale=0.4); L["tiles"][1]["priority"] = 7
     s = g.substitutions(g.derive(L), g.derive(L)["tiles"][1])
     assert (s["tile_budget_ma"], s["max_scale"], s["max_scale_pct"], s["leader_priority"]) == (900, 0.4, "40%", 7)
-    assert g.light_entity(d, t["r1-e"]) == "light.hex_r1_e_light"
+    assert g.light_entity(d, t["r1-e"]) == "light.hex_02_light"
 
 @pytest.mark.parametrize("pin", ["GPIO0", "GPIO3", "GPIO45", "GPIO46", "GPIO19", "GPIO20", "GPIO48", "D4"])
 def test_bad_pins(pin):
@@ -97,8 +97,8 @@ def test_ha_entities():
     import yaml
     h = yaml.safe_load(open(os.path.join(ROOT, "ha/hex_wall.generated.yaml")))
     ents = h["light"][0]["entities"]
-    assert len(ents) == 20 and "light.hex_c0_light" in ents and "light.hex_r2_a_light" in ents
-    assert "esphome.hex_c0_set_wall_effect" in open(os.path.join(ROOT, "ha/hex_wall.generated.yaml")).read()
+    assert len(ents) == 20 and "light.hex_01_light" in ents and "light.hex_08_light" in ents
+    assert "esphome.hex_01_set_wall_effect" in open(os.path.join(ROOT, "ha/hex_wall.generated.yaml")).read()
 
 def test_master_not_first_warns():
     L = lay(); L["master"] = "r1-e"
@@ -119,7 +119,7 @@ def test_ha_wall_interface():
     assert h["input_number"]["hex_wall_led_count"]["initial"] == 44
     assert h["input_number"]["hex_wall_led_count"]["max"] == 60
     txt = open(os.path.join(ROOT, "ha/hex_wall.generated.yaml")).read()
-    assert "number.hex_c0_led_count" in txt and "esphome.hex_c0_set_wall_fx" in txt
+    assert "number.hex_01_led_count" in txt and "esphome.hex_01_set_wall_fx" in txt
 
 def test_ha_yaml_no_duplicate_keys():
     import yaml
@@ -161,7 +161,7 @@ def test_hexsync_interface_matches_hardware():
     assert h["input_select"]["hex_wall_axis"]["options"] == ["x", "y", "ring", "angle"]
     n = h["input_number"]["hex_wall_led_count"]; assert (n["min"], n["max"], n["initial"]) == (1, 60, 44)
     txt = open(os.path.join(ROOT, "ha/hex_wall.generated.yaml")).read()
-    assert "select.hex_c0_wall_wipe_axis" in txt and "10000] | min" in txt
+    assert "select.hex_01_wall_wipe_axis" in txt and "10000] | min" in txt
     cat = json.load(open(os.path.join(ROOT, "effects.json")))
     fo = {e["name"] for e in cat["effects"] if e.get("firmwareOnly")}
     assert fo == {"random_ripple", "twinkle", "color_cycle", "snake"}
@@ -174,7 +174,7 @@ def test_wall_fx_axis_arg():
     import yaml, gen_ha
     L = lay(); d = g.derive(L)
     off = gen_ha.render(d, g.node, g.light_entity)
-    assert "select.hex_c0_wall_wipe_axis" in off.split("hex_wall_led_count_apply")[0].split("hex_wall_fx_apply")[1]
+    assert "select.hex_01_wall_wipe_axis" in off.split("hex_wall_led_count_apply")[0].split("hex_wall_fx_apply")[1]
     assert "axis: " not in off.split("hex_wall_fx_apply:")[1].split("hex_wall_led_count_apply")[0]
     L["ha"] = {"wallFxAxisArg": True}; d = g.derive(L)
     on = gen_ha.render(d, g.node, g.light_entity)
@@ -227,9 +227,9 @@ def test_sync_mode_ha():
     h = yaml.safe_load(open(os.path.join(ROOT, "ha/hex_wall.generated.yaml")))
     a = next(x for x in h["automation"] if x["id"] == "hex_wall_sync_jumper_lost")
     ents = a["triggers"][0]["entity_id"]
-    assert len(ents) == 20 and "sensor.hex_r1_e_sync_source" in ents
+    assert len(ents) == 20 and "sensor.hex_02_sync_source" in ents
     assert a["triggers"][0]["to"] == "jumper-lost"
-    assert a["conditions"][0] == {"condition": "state", "entity_id": "select.hex_c0_sync_mode", "state": "Jumper wire"}
+    assert a["conditions"][0] == {"condition": "state", "entity_id": "select.hex_01_sync_mode", "state": "Jumper wire"}
     assert a["actions"][0]["action"] == "notify.notify"
     L = lay(); L["ha"] = {"notifyService": "notify.mobile_app_terry"}
     assert "action: notify.mobile_app_terry" in gen_ha.render(g.derive(L), g.node, g.light_entity)
@@ -241,7 +241,7 @@ def test_sync_mode_ha():
     assert '"jumper-lost"' in cpp
     dash = yaml.safe_load(open(os.path.join(ROOT, "ha/hex_wall_dashboard.generated.yaml")))
     txt = json.dumps(dash)
-    assert "select.hex_c0_sync_mode" in txt and "sensor.hex_r2_a_sync_pulse_jitter" in txt and "sensor.hex_c0_sync_pulse_offset" in txt
+    assert "select.hex_01_sync_mode" in txt and "sensor.hex_08_sync_pulse_jitter" in txt and "sensor.hex_01_sync_pulse_offset" in txt
 
 @pytest.mark.parametrize("pin", ["GPIO22", "GPIO30", "GPIO37"])
 def test_flash_pins_rejected(pin):
@@ -264,3 +264,22 @@ def test_print_hw_args(tmp_path):
     assert r.returncode == 0 and r.stdout.strip() == "--sync-pin GPIO11 --sync-mode jumper"
     assert not (tmp_path / "out").exists()   # prints only, writes nothing
     d = g.derive(L); assert g.substitutions(d, d["tiles"][0])["sync_mode_default"] == "jumper"
+
+def test_hex_nn_names():
+    import yaml, gen_ha
+    d = g.derive(lay()); t = {x["id"]: x for x in d["tiles"]}
+    assert (g.node(d, t["c0"]), g.node(d, t["r1-e"]), g.node(d, t["r3-a"])) == ("hex_01", "hex_02", "hex_20")
+    assert g.device_name(d, t["r3-a"]) == "hex-20" and g.light_entity(d, t["r2-a"]) == "light.hex_08_light"
+    assert g.substitutions(d, t["c0"])["wall_controls_internal"] == "false"
+    txt = open(os.path.join(ROOT, "ha/hex_wall.generated.yaml")).read()
+    assert "hex_c0" not in txt and "esphome.hex_01_set_wall_fx" in txt and "light.hex_20_light" in txt
+    dash = open(os.path.join(ROOT, "ha/hex_wall_dashboard.generated.yaml")).read()
+    assert "binary_sensor.hex_05_sync_leader" in dash and "select.hex_01_sync_mode" in dash
+    I = gen_ha.INTERFACE
+    assert I["hex_layout_action"] == "esphome.{master}_set_hex_layout" and I["layout_bulk_action"].endswith("_set_layout_bulk")
+    tpl = open(os.path.join(ROOT, "esphome/templates/tile-common.yaml")).read()
+    if "hex_nn" in tpl:   # Hardware 9b55813 names
+        for k in ("name: hex-${hex_nn}", "- action: set_hex_layout", "hex_num: int", "- action: set_layout_bulk",
+                  "- action: set_wall_fx", "name: Sync leader", "name: Wall wipe axis", "name: Sync mode"):
+            assert k in tpl, k
+        assert "Sync leader (this tile)" not in tpl
