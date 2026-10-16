@@ -25,6 +25,10 @@ export const PALETTES = {
   mono: null,
 };
 
+// 0..1 coordinate along an axis: x | y | ring (ring/maxRing) | angle (angle/360)
+export const axisU = (tile, axis, maxRing) =>
+  axis === "ring" ? tile.ring / maxRing : axis === "angle" ? tile.angle / 360 : tile[axis];
+
 const frac = (u) => u - Math.floor(u);
 
 export function pal(name, u, color = [255, 140, 40]) {
@@ -71,7 +75,7 @@ export function frame(effect, params, tiles, tMs) {
     switch (effect) {
       case "solid": rgb = [...p.color]; break;
       case "breathe": rgb = scale(p.color, 0.5 - 0.5 * Math.cos((2 * Math.PI * tMs) / (p.periodS * 1000))); break;
-      case "rainbow_sweep": rgb = pal(p.palette, tile[p.axis] + t * p.speed, p.color); break;
+      case "rainbow_sweep": rgb = pal(p.palette, axisU(tile, p.axis, maxRing) + t * p.speed, p.color); break;
       case "ripple": {
         const d = hexDistance(tile, origin), ph = (t * p.speed) % (maxD + 2);
         rgb = scale(pal(p.palette, d / Math.max(1, maxD), p.color), Math.max(0, 1 - Math.abs(ph - d))); break;
@@ -79,11 +83,12 @@ export function frame(effect, params, tiles, tMs) {
       case "spiral": rgb = pal(p.palette, (tile.angle + tile.ring * 30) / 360 + t * p.speed, p.color); break;
       case "sparkle": rgb = hash01(tile.index, Math.floor(tMs / 100)) < p.density ? [...p.color] : [0, 0, 0]; break;
       case "chase": {
-        const head = (t * p.speed) % N, d = (((head - tile.index) % N) + N) % N;
+        const o = Number.isInteger(tile.order) ? tile.order : tile.index;
+        const head = (t * p.speed) % N, d = (((head - o) % N) + N) % N;
         rgb = scale(pal(p.palette, tile.index / N, p.color), Math.max(0, 1 - d / p.tail)); break;
       }
       case "wipe": {
-        const u = p.axis === "ring" ? tile.ring / maxRing : p.axis === "angle" ? tile.angle / 360 : tile[p.axis];
+        const u = axisU(tile, p.axis, maxRing);
         const ph = (t * p.speed) % 2, on = ph < 1 ? u <= ph : u > ph - 1;
         rgb = on ? pal(p.palette, u === 1 ? 0.999 : u, p.color) : [0, 0, 0]; break;
       }

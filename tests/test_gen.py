@@ -131,3 +131,22 @@ def test_ha_yaml_no_duplicate_keys():
     U.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, m)
     for f in ("ha/hex_wall.generated.yaml", "ha/packages/hex_wall.yaml"):
         yaml.load(open(os.path.join(ROOT, f)), U)
+
+def test_rotation_deg_and_order():
+    L = lay(); L["tiles"][1].update(rot=2, rotationDeg=45, order=7); L["tiles"][2]["rot"] = 1
+    assert g.validate(L) == []
+    d = g.derive(L); t = d["tiles"]
+    assert (g.substitutions(d, t[1])["rotation"], g.substitutions(d, t[2])["rotation"]) == (45, 60)
+    assert (t[1]["order"], t[1]["rotationDeg"], t[3]["order"], t[3]["rotationDeg"]) == (7, 45, 3, 0)
+    rows = g.tiles_csv(L).splitlines()
+    assert rows[0] == "id,q,r,rot" and rows[2].endswith(",45") and rows[3].endswith(",60")
+
+@pytest.mark.parametrize("field,val", [("rotationDeg", 360), ("rotationDeg", -1), ("rotationDeg", 1.5),
+                                       ("rotationDeg", True), ("order", 255), ("order", -1), ("order", "3")])
+def test_rotation_order_validation(field, val):
+    L = lay(); L["tiles"][0][field] = val
+    with pytest.raises(g.LayoutError, match=field): g.validate(L)
+
+def test_ha_rainbow_axes():
+    txt = open(os.path.join(ROOT, "ha/hex_wall.generated.yaml")).read()
+    assert "ringU" in txt and "angleU" in txt

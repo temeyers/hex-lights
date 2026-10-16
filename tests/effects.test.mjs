@@ -55,3 +55,21 @@ assert.equal(L[tiles[0].id].length, tiles[0].leds || 44);
 assert.equal(frameLeds("solid", {}, [{ ...tiles[0], leds: undefined }], 0)[tiles[0].id].length, 44);
 assert.deepEqual(L[tiles[0].id][7], frame("rainbow_flow", {}, tiles, 0)[tiles[0].id]);
 console.log("wall effects: all tests passed");
+// --- order-driven chase + rainbow_sweep axes ---
+{
+  const T = tiles.map((t, i) => ({ ...t, order: tiles.length - 1 - i }));
+  const f = frame("chase", { palette: "mono", color: [100, 100, 100], tail: 1, speed: 1 }, T, 0);
+  assert.deepEqual(f[T[T.length - 1].id], [100, 100, 100]);  // order 0 = last tile in list
+  assert.deepEqual(f[T[0].id], [0, 0, 0]);
+  const g = frame("chase", { palette: "mono", color: [100, 100, 100], tail: 1, speed: 1 }, tiles, 0);
+  assert.deepEqual(g[tiles[0].id], [100, 100, 100]);           // no order -> index
+  for (const axis of ["x", "y", "ring", "angle"]) {
+    const a = frame("rainbow_sweep", { axis }, tiles, 1234);
+    assert.deepEqual(a, frame("rainbow_sweep", { axis }, tiles, 1234));
+    for (const c of Object.values(a)) c.forEach((v) => assert.ok(Number.isInteger(v) && v >= 0 && v <= 255, `${axis} ${c}`));
+  }
+  const ringF = frame("rainbow_sweep", { axis: "ring", speed: 1 }, tiles, 0);
+  assert.deepEqual(ringF.c0, [255, 0, 0]);                       // ring 0 -> hue 0
+  assert.deepEqual(ringF["r1-e"], ringF["r1-w"]);                // same ring -> same colour
+  console.log("order/axis: all tests passed");
+}

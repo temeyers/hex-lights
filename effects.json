@@ -55,7 +55,9 @@
      "type": "enum",
      "options": [
       "x",
-      "y"
+      "y",
+      "ring",
+      "angle"
      ],
      "default": "x"
     },
@@ -72,7 +74,7 @@
      "default": "rainbow"
     }
    },
-   "formula": "h = (tile[axis]*360 + t/1000*speed*360) mod 360; rgb = pal(palette, h/360)",
+   "formula": "u = x | y | ring/maxRing | angle/360; h = (u*360 + t/1000*speed*360) mod 360; rgb = pal(palette, h/360)",
    "hexsyncId": 2
   },
   {
@@ -202,7 +204,7 @@
      ]
     }
    },
-   "formula": "N = tiles; head = (t/1000*speed) mod N; d = (head - index) mod N; k = max(0, 1 - d/tail); rgb = round(pal(palette, index/N)*k)"
+   "formula": "N = tiles; o = tile.order if set else index; head = (t/1000*speed) mod N; d = (head - o) mod N; k = max(0, 1 - d/tail); rgb = round(pal(palette, index/N)*k)"
   },
   {
    "name": "wipe",

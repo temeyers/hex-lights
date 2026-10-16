@@ -25,7 +25,9 @@ def render(d, node, light_entity):
     master = next(t for t in tiles if t["isMaster"])
     action = f"esphome.{node(d, master)}_set_wall_effect"
     data = [{"e": light_entity(d, t), "id": str(t["id"]), "x": t["x"], "y": t["y"], "q": t["q"],
-             "r": t["r"], "ring": t["ring"], "angle": t["angle"], "i": t["index"]} for t in tiles]
+             "r": t["r"], "ring": t["ring"], "angle": t["angle"], "i": t["index"],
+             "ringU": round(t["ring"] / max(1, max(x["ring"] for x in tiles)), 4),
+             "angleU": round(t["angle"] / 360, 4)} for t in tiles]
     tj = json.dumps(data, separators=(",", ":"))
     J = json.dumps
     loop = "{{ is_state('input_select.hex_wall_effect', '%s') }}"
@@ -38,7 +40,7 @@ def render(d, node, light_entity):
     fields:
       speed: {{description: see effects.json, example: 0.25}}
       step: {{description: seconds per update, example: 1}}
-{'      axis: {description: x or y, example: x}' if name == 'rainbow_sweep' else ''}
+{'      axis: {description: x, y, ring or angle, example: x}' if name == 'rainbow_sweep' else ''}
     variables:
       tiles: {tj}
       sp: "{{{{ speed | default({0.25 if name == 'rainbow_sweep' else 0.2}) | float }}}}"
@@ -144,7 +146,7 @@ script:
               target: {{entity_id: light.hex_wall}}
               data: {{brightness: 1, transition: "{{{{ half }}}}"}}
             - delay: {{seconds: "{{{{ half }}}}"}}
-{hue_loop('rainbow_sweep', "repeat.item[ax] * 360 + t * sp * 360")}
+{hue_loop('rainbow_sweep', "repeat.item[{'ring': 'ringU', 'angle': 'angleU'}.get(ax, ax)] * 360 + t * sp * 360")}
 {hue_loop('spiral', "repeat.item.angle + repeat.item.ring * 30 + t * sp * 360")}
 
   hex_wall_ripple:

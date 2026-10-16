@@ -100,6 +100,12 @@ def validate(lay):
         rot = t.get("rot", 0)
         if not isinstance(rot, int) or not 0 <= rot <= 5:
             raise LayoutError(f"tile {i}: rot must be 0-5")
+        if "rotationDeg" in t and (not isinstance(t["rotationDeg"], int) or isinstance(t["rotationDeg"], bool)
+                                   or not 0 <= t["rotationDeg"] <= 359):
+            raise LayoutError(f"tile {i}: rotationDeg must be an int 0-359")
+        if "order" in t and (not isinstance(t["order"], int) or isinstance(t["order"], bool)
+                             or not 0 <= t["order"] <= 254):
+            raise LayoutError(f"tile {i}: order must be an int 0-254")
         if "ledCount" in t and (not isinstance(t["ledCount"], int) or t["ledCount"] < 1):
             raise LayoutError(f"tile {i}: ledCount must be a positive int")
         if "pin" in t:
@@ -153,7 +159,8 @@ def derive(lay):
         d.update(
             s=-q - r, ring=hex_distance((q, r), mc),
             x=round(nrm(px, min(xs), max(xs)), 4), y=round(nrm(py, min(ys), max(ys)), 4),
-            angle=round(ang, 2), index=idx, isMaster=(i == lay["master"]),
+            angle=round(ang, 2), index=idx, order=t.get("order", idx),
+            rotationDeg=rot_deg(t), isMaster=(i == lay["master"]),
             leds=t.get("ledCount", lay["led"]["count"]),
             neighbors=[coords[(q + dq, r + dr)] for dq, dr in DIRS if (q + dq, r + dr) in coords],
         )
@@ -162,6 +169,11 @@ def derive(lay):
     res["led"] = {"type": "WS2812", "order": "GRB", **lay["led"]}
     res["tiles"] = out
     return res
+
+
+def rot_deg(t):
+    """Firmware rotation in degrees: tile.rotationDeg, else rot (0-5) * 60."""
+    return t["rotationDeg"] if "rotationDeg" in t else t.get("rot", 0) * 60
 
 
 def device_name(lay, t):
@@ -186,7 +198,7 @@ def substitutions(lay, t, pin_leader=False):
         "tile_id": norm_id(str(t["id"])),
         "tile_num": t["index"] + 1,          # 1..N in layout order (hexsync id)
         "q": t["q"], "r": t["r"],
-        "rotation": t["rot"] * 60,          # firmware stores degrees; layout rot is 0-5
+        "rotation": rot_deg(t),          # firmware stores degrees; layout rot is 0-5
         "led_pin": t.get("pin", led["pin"]),
         # num_leds = compile-time strip length (max); led_count = runtime default
         # for the per-tile number entity (PROPOSED, Hardware to confirm).
@@ -234,7 +246,7 @@ def secrets_template(lay):
 
 def tiles_csv(lay):
     """Hardware's esphome/tiles.csv format (id,q,r,rot), rows in tile_num order; rot in degrees (rot*60) for the firmware."""
-    rows = ["id,q,r,rot"] + [f"{t['id']},{t['q']},{t['r']},{t.get('rot', 0) * 60}" for t in lay["tiles"]]
+    rows = ["id,q,r,rot"] + [f"{t['id']},{t['q']},{t['r']},{rot_deg(t)}" for t in lay["tiles"]]
     return "\n".join(rows) + "\n"
 
 
