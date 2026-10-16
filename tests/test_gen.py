@@ -72,7 +72,7 @@ def test_substitution_map():
                  "led_pin": "GPIO4", "num_leds": 60, "led_count": 44, "static_leader": 0, "leader_priority": 3}
     assert g.substitutions(d, t["c0"])["leader_priority"] == 1
     assert g.substitutions(d, t["r1-e"], pin_leader=True)["static_leader"] == 1
-    assert g.substitutions(d, t["r3-a"])["num_leds"] == 42
+    assert g.substitutions(d, t["r3-a"])["led_count"] == 42 and g.substitutions(d, t["r3-a"])["num_leds"] == 60
     L = lay(); L["led"].update(budgetMa=900, maxScale=0.4); L["tiles"][1]["priority"] = 7
     s = g.substitutions(g.derive(L), g.derive(L)["tiles"][1])
     assert (s["tile_budget_ma"], s["max_scale"], s["max_scale_pct"], s["leader_priority"]) == (900, 0.4, "40%", 7)
