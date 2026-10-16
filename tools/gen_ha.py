@@ -18,6 +18,9 @@ INTERFACE = {
     "wall_effect_select": "select.{master}_wall_effect",
     "wall_palette_select": "select.{master}_wall_palette",
     "wall_axis_select": "select.{master}_wall_wipe_axis",  # x|y|ring|angle
+    # true once Hardware's firmware with set_wall_fx(..., axis) is flashed (axis then REQUIRED):
+    # pass axis (0 x, 1 y, 2 ring, 3 angle) on the service call and skip the select.
+    "wallFxAxisArg": False,
 }
 LED_COUNT_RANGE = (1, 60)          # firmware number range
 MAX_START_DELAY_MS = 10000         # firmware cap
@@ -232,6 +235,20 @@ def wall_block(d, node, master):
     mnode = node(d, master)
     fx_action = I["fx_action"].format(master=mnode)
     axis_sel = I["wall_axis_select"].format(master=mnode)
+    if I["wallFxAxisArg"]:
+        amap = "{" + ", ".join(f"'{a}': {i}" for i, a in enumerate(AXES)) + "}"
+        axis_arg = ("\n          axis: \"{{ " + amap
+                    + ".get(states('input_select.hex_wall_axis'), 0) }}\"")
+        axis_select = ""
+    else:
+        axis_arg = ""
+        axis_select = f"""
+      - if: "{{{{ has_value('{axis_sel}') }}}}"
+        then:
+          - action: select.select_option
+            continue_on_error: true
+            target: {{entity_id: {axis_sel}}}
+            data: {{option: "{{{{ states('input_select.hex_wall_axis') }}}}"}}"""
     numbers = [I["led_count_number"].format(node=node(d, t)) for t in d["tiles"]]
     per_tile = {I["led_count_number"].format(node=node(d, t)): t["leds"] for t in d["tiles"]
                 if "ledCount" in t}
@@ -260,13 +277,7 @@ def wall_block(d, node, master):
           hue: 18
           saturation: 215
           value: 255
-          start_delay_ms: {min(300, MAX_START_DELAY_MS)}
-      - if: "{{{{ has_value('{axis_sel}') }}}}"
-        then:
-          - action: select.select_option
-            continue_on_error: true
-            target: {{entity_id: {axis_sel}}}
-            data: {{option: "{{{{ states('input_select.hex_wall_axis') }}}}"}}
+          start_delay_ms: {min(300, MAX_START_DELAY_MS)}{axis_arg}{axis_select}
       - action: light.turn_on
         target: {{entity_id: light.hex_wall}}
         data: {{effect: {eff}}}

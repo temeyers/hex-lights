@@ -244,9 +244,14 @@ def secrets_template(lay):
     return "\n".join(lines) + "\n"
 
 
-def tiles_csv(lay):
-    """Hardware's esphome/tiles.csv format (id,q,r,rot), rows in tile_num order; rot in degrees (rot*60) for the firmware."""
-    rows = ["id,q,r,rot"] + [f"{t['id']},{t['q']},{t['r']},{rot_deg(t)}" for t in lay["tiles"]]
+def tiles_csv(lay, with_order=False):
+    """Hardware's esphome/tiles.csv format (id,q,r,rot[,order]), rows in tile_num order;
+    rot in degrees for the firmware. order only with --csv-order (empty = row - 1)."""
+    if with_order:
+        rows = ["id,q,r,rot,order"] + [f"{t['id']},{t['q']},{t['r']},{rot_deg(t)},{t.get('order', '')}"
+                                        for t in lay["tiles"]]
+    else:
+        rows = ["id,q,r,rot"] + [f"{t['id']},{t['q']},{t['r']},{rot_deg(t)}" for t in lay["tiles"]]
     return "\n".join(rows) + "\n"
 
 
@@ -276,6 +281,8 @@ def main(argv=None):
                     help=f"also write {TILE_DIR}/<id>.yaml (default: Hardware's esphome/tiles/ is the tile set)")
     ap.add_argument("--pin-leader", action="store_true",
                     help="emit static_leader = master tile_num (default 0 = automatic failover)")
+    ap.add_argument("--csv-order", action="store_true",
+                    help="with --emit-csv: add the optional order column (Hardware's generator reads it)")
     a = ap.parse_args(argv)
     path = a.layout or next(p for p in (os.path.join(a.root, "layout.json"), os.path.join(a.root, "layout.yaml"))
                             if os.path.exists(p) or p.endswith(".yaml"))
@@ -290,7 +297,7 @@ def main(argv=None):
     if a.secrets_template:
         files["secrets.example.yaml"] = secrets_template(lay)
     if a.emit_csv:
-        files[a.emit_csv] = tiles_csv(lay)
+        files[a.emit_csv] = tiles_csv(lay, a.csv_order)
     stale = []
     for rel, text in sorted(files.items()):
         p = os.path.join(a.root, rel)

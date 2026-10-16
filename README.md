@@ -55,3 +55,9 @@ device_name and friendly_name are not emitted: the template derives them (`hex-$
 - HexSync ids (Hardware df1ad9b): 0 solid, 1 radial_wave (our ripple), 2 rainbow_sweep, 3 pulse (our breathe), 4 chase, 5 wipe, 6 rainbow_flow, 7 random_ripple, 8 twinkle, 9 color_cycle, 10 snake (7-10 firmware-only, not in effects.js). Axis is sent via `select.hex_c0_wall_wipe_axis`; speed is capped at 10000, start delay at 10 s.
 - HA (generated): `input_select.hex_wall_fx`, `input_select.hex_wall_palette`, `input_number.hex_wall_speed` (cycles/s; sent as milli-cycles), `input_number.hex_wall_led_count` (default `led.count`). These call `esphome.hex_<master>_set_wall_fx` and set the per-tile `number.hex_<id>_led_count`. Every firmware name is in `INTERFACE` in `tools/gen_ha.py`, and `layout.json` `"ha": {...}` can override any of them.
 - Generator (`--tile-yaml` only): `num_leds` = compile-time max (`led.maxCount`, 60), `rotation` = rot × 60 degrees (also in the emitted CSV), and `led_count` = runtime default. tiles.csv is unchanged.
+
+### set_wall_fx axis argument (`wallFxAxisArg`)
+Hardware's newer firmware signature is `set_wall_fx(effect, palette, speed, scale, hue, saturation, value, start_delay_ms, axis)`, with axis 0 x, 1 y, 2 ring, 3 angle. Once it's flashed, **axis is required**. Set `"ha": {"wallFxAxisArg": true}` in layout.json and regenerate. HA then passes `axis` from `input_select.hex_wall_axis` on every call and skips `select.hex_c0_wall_wipe_axis`. With the default (`false`), no axis argument is sent and the select is set instead, which matches older firmware.
+
+### tiles.csv order column
+`--emit-csv` writes `id,q,r,rot` (it matches the committed file). Add `--csv-order` to also write `order` (empty = Hardware's default of row − 1). Hardware's generator reads it.

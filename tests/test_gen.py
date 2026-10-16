@@ -169,3 +169,27 @@ def test_hexsync_interface_matches_hardware():
     if "set_wall_fx" in tpl:   # Hardware's template present: names must line up
         for k in ("effect", "palette", "speed", "scale", "hue", "saturation", "value", "start_delay_ms"):
             assert f"{k}: int" in tpl
+
+def test_wall_fx_axis_arg():
+    import yaml, gen_ha
+    L = lay(); d = g.derive(L)
+    off = gen_ha.render(d, g.node, g.light_entity)
+    assert "select.hex_c0_wall_wipe_axis" in off.split("hex_wall_led_count_apply")[0].split("hex_wall_fx_apply")[1]
+    assert "axis: " not in off.split("hex_wall_fx_apply:")[1].split("hex_wall_led_count_apply")[0]
+    L["ha"] = {"wallFxAxisArg": True}; d = g.derive(L)
+    on = gen_ha.render(d, g.node, g.light_entity)
+    block = on.split("hex_wall_fx_apply:")[1].split("hex_wall_led_count_apply")[0]
+    assert "axis: \"{{ {'x': 0, 'y': 1, 'ring': 2, 'angle': 3}.get(states('input_select.hex_wall_axis'), 0) }}\"" in block
+    assert "select.select_option" not in block
+    yaml.safe_load(on)
+
+def test_csv_order_opt_in(tmp_path):
+    L = lay(); L["tiles"][2]["order"] = 9
+    assert g.tiles_csv(L).splitlines()[0] == "id,q,r,rot"
+    rows = g.tiles_csv(L, with_order=True).splitlines()
+    assert rows[0] == "id,q,r,rot,order" and rows[3].endswith(",9") and rows[1].endswith(",0,")
+    (tmp_path / "layout.json").write_text(json.dumps(L))
+    run = lambda *a: subprocess.run([sys.executable, os.path.join(ROOT, "tools/gen_tiles.py"), "--root", str(tmp_path), *a], capture_output=True, text=True)
+    assert run("--emit-csv", "c.csv").returncode == 0 and "order" not in (tmp_path / "c.csv").read_text()
+    assert run("--emit-csv", "c.csv", "--csv-order").returncode == 0
+    assert (tmp_path / "c.csv").read_text().startswith("id,q,r,rot,order")
