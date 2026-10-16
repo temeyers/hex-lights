@@ -69,7 +69,7 @@ def test_substitution_map():
     d = g.derive(lay()); t = {x["id"]: x for x in d["tiles"]}
     s = g.substitutions(d, t["r1-e"])
     assert s == {"tile_id": "r1-e", "tile_num": 2, "q": 1, "r": 0, "rotation": 0,
-                 "led_pin": "GPIO4", "num_leds": 44, "led_count": 44, "static_leader": 0, "leader_priority": 3}
+                 "led_pin": "GPIO4", "num_leds": 60, "led_count": 44, "static_leader": 0, "leader_priority": 3}
     assert g.substitutions(d, t["c0"])["leader_priority"] == 1
     assert g.substitutions(d, t["r1-e"], pin_leader=True)["static_leader"] == 1
     assert g.substitutions(d, t["r3-a"])["num_leds"] == 42
@@ -105,7 +105,9 @@ def test_master_not_first_warns():
     assert any("not the first tile" in w for w in g.validate(L))
 
 def test_led_max_count():
-    L = lay(); L["led"]["maxCount"] = 64; d = g.derive(L)
+    L = lay(); L["tiles"][2]["rot"] = 3; L["led"]["maxCount"] = 64; d = g.derive(L)
+    assert g.substitutions(d, d["tiles"][2])["rotation"] == 180
+    assert g.tiles_csv(L).splitlines()[3].endswith(",180")
     s = g.substitutions(d, d["tiles"][0]); assert (s["num_leds"], s["led_count"]) == (64, 44)
     L["led"]["maxCount"] = 10
     with pytest.raises(g.LayoutError, match="maxCount"): g.validate(L)
@@ -115,6 +117,7 @@ def test_ha_wall_interface():
     h = yaml.safe_load(open(os.path.join(ROOT, "ha/hex_wall.generated.yaml")))
     assert "chase" in h["input_select"]["hex_wall_fx"]["options"]
     assert h["input_number"]["hex_wall_led_count"]["initial"] == 44
+    assert h["input_number"]["hex_wall_led_count"]["max"] == 60
     txt = open(os.path.join(ROOT, "ha/hex_wall.generated.yaml")).read()
     assert "number.hex_c0_led_count" in txt and "esphome.hex_c0_set_wall_fx" in txt
 

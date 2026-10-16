@@ -285,7 +285,7 @@ input_number:
   hex_wall_led_count:
     name: Hex wall LEDs per tile
     min: 1
-    max: 120
+    max: {d["led"].get("maxCount", d["led"]["count"])}
     step: 1
     initial: {d["led"]["count"]}
     mode: box

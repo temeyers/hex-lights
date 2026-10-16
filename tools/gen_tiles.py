@@ -186,7 +186,7 @@ def substitutions(lay, t, pin_leader=False):
         "tile_id": norm_id(str(t["id"])),
         "tile_num": t["index"] + 1,          # 1..N in layout order (hexsync id)
         "q": t["q"], "r": t["r"],
-        "rotation": t["rot"],
+        "rotation": t["rot"] * 60,          # firmware stores degrees; layout rot is 0-5
         "led_pin": t.get("pin", led["pin"]),
         # num_leds = compile-time strip length (max); led_count = runtime default
         # for the per-tile number entity (PROPOSED, Hardware to confirm).
@@ -233,8 +233,8 @@ def secrets_template(lay):
 
 
 def tiles_csv(lay):
-    """Hardware's esphome/tiles.csv format (id,q,r,rot), rows in tile_num order."""
-    rows = ["id,q,r,rot"] + [f"{t['id']},{t['q']},{t['r']},{t.get('rot', 0)}" for t in lay["tiles"]]
+    """Hardware's esphome/tiles.csv format (id,q,r,rot), rows in tile_num order; rot in degrees (rot*60) for the firmware."""
+    rows = ["id,q,r,rot"] + [f"{t['id']},{t['q']},{t['r']},{t.get('rot', 0) * 60}" for t in lay["tiles"]]
     return "\n".join(rows) + "\n"
 
 

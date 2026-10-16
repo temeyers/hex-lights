@@ -275,7 +275,7 @@ input_number:
   hex_wall_led_count:
     name: Hex wall LEDs per tile
     min: 1
-    max: 120
+    max: 60
     step: 1
     initial: 44
     mode: box

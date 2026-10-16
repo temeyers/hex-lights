@@ -9,7 +9,8 @@
     "pin": "GPIO4",
     "type": "WS2812",
     "order": "GRB",
-    "count": 44
+    "count": 44,
+    "maxCount": 60
   },
   "master": "c0",
   "tiles": [
