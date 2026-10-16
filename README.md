@@ -87,18 +87,45 @@ This adds the wall helpers: Manual color, effect, palette, speed, wipe axis and 
 **Dashboard cards** (manual install, or use HACS above).
 1. Install **Mushroom** and **card-mod** from HACS.
 2. Copy `ha/cards/hex-layout-card.js` to `/config/www/hex-layout-card/`.
-3. Add it as a dashboard resource: `/local/hex-layout-card/hex-layout-card.js?v=3`, type **JavaScript module**.
+3. Add it as a dashboard resource: `/local/hex-layout-card/hex-layout-card.js?v=5`, type **JavaScript module**.
 4. Paste the cards from `ha/cards/quins_room_hex_cards.yaml` into a view, using the raw configuration editor.
 
 There's also a ready-made full dashboard: `ha/hex_wall_dashboard.generated.yaml`.
 
 ## Using it
-- Turn **Manual color** on and use the Hex 01 color button to pick a solid color for the whole wall.
-- Turn **Manual color** off to pick an effect and palette. The Hex 01 slider then controls brightness only.
-- To change the tile arrangement without re-flashing, use the layout editor (`web/`; see [web/README.md](web/README.md)) or the `esphome.hex_01_set_layout_bulk` action.
+One panel drives the whole wall or a single tile:
+- **Target** (`input_select.hex_wall_target`): `All` or `Hex NN`. Tap a hex in the layout card to target it; tap it
+  again (or the **All** chip) to go back to All. Hold a hex for its more-info dialog. **⏻ … on/off** switches the
+  current target (all on → off, otherwise on). Picking **All** also turns on any tile that was switched off on its own.
+- **Hex** light card (`light.hex_target`): brightness and colour for the target.
+- **Manual color** (`switch.hex_target_manual_color`) on: each tile shows its own solid colour. **White shade** slider
+  (2000–6500 K) and **Warm 2700K / Neutral 4000K / Cool 6500K** buttons appear (`script.hex_target_white`,
+  `number.hex_NN_white_temperature`). The LEDs are RGB-only, so colour temperature is emulated in the firmware.
+- **Manual color** off: Effect / Palette / Speed / Wipe axis are shown and applied to the target
+  (`script.hex_wall_fx_apply` calls `esphome.hex_NN_set_wall_fx` on every targeted tile).
+- HexSync is always on in the firmware (it's the only effect; "None" is switched straight back).
+- To change the tile arrangement without re-flashing, use the layout card's **Edit layout** (new tiles wait in the
+  *Tray*), the layout editor (`web/`; see [web/README.md](web/README.md)) or `esphome.hex_01_set_layout_bulk`.
+
+## Adding Hex 04 and up
+1. Flash the tile with the template (`tools/gen_tiles.py` writes `esphome/hex-NN.yaml`; same build as the others).
+2. **One-time step:** adopt it in Home Assistant (Settings → Devices → ESPHome → *Configure* on the discovered
+   `hex-NN`, or add `hex-NN.local` by hand) and make sure the device is called `Hex NN`, so its entities are
+   `light.hex_NN_light`, `switch.hex_NN_manual_color` and so on. If HA put an area prefix on them
+   (`light.quins_room_hex_NN_light`), rename the entity IDs back to `…hex_NN_…`.
+3. That's all. Everything else finds `*.hex_NN_*` entities by pattern at runtime:
+   - the Target dropdown is rebuilt (All + sorted `Hex NN`) on HA start, on every entity-registry change, after an
+     automation reload and once a minute (`automation.hex_wall_target_list_all_flashed_tiles`); the static seed is just `All`;
+   - All fan-out (light, manual colour, white shade, effects, max brightness, current limit, LED count) uses
+     templates over `light.hex_*_light`, `switch.hex_*_…` and `number.hex_*_…`, not fixed lists;
+   - the layout card lists every `light.hex_NN_light`; a new one sits in the Tray until you place it.
+   - Not dynamic (HA limitation): the `light.hex_wall` light group, the `sensor.hex_wall_displayed_color` group and
+     the sync-source triggers are generated for Hex 01–20. Nothing in the panel depends on them; tiles above 20 need
+     a re-run of `tools/gen_tiles.py`.
 
 ## Troubleshooting
-- **A tile isn't syncing.** Make sure every tile runs the same build. Re-flash any odd one out.
+- **A tile isn't syncing.** Make sure every tile runs the same build (device info shows `Project temeyers.hex-lights` and the version). Re-flash any odd one out. Tiles on different Wi-Fi APs may be on different channels and then can't hear each other over ESP-NOW (`sensor.hex_NN_peers_seen` = 0).
+- **Tiles reboot at full-brightness white.** All 44 LEDs at full white draw far more than any colour. If the supply can't keep up, the tile browns out and restarts at 30 %. Turn on **Current limit** or use a bigger supply.
 - **"Invalid api_key" when compiling.** ESPHome 2026.x rejects placeholder keys. Generate a real one with `openssl rand -base64 32`.
 - **A tile doesn't show up in HA.** Add it by hand with the button above, using `hex-NN.local` or its IP address. Check that it's on the same network or VLAN.
 - **Effect colors don't match the card.** Cards should use `sensor.hex_NN_displayed_color`, not the light's color.

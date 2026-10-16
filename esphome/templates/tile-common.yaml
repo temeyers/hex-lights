@@ -29,6 +29,9 @@ esphome:
   name: hex-${hex_nn}
   friendly_name: Hex ${hex_nn}
   min_version: 2025.9.0
+  project:
+    name: temeyers.hex-lights
+    version: "17304e3"   # firmware source commit (bump on every firmware change)
   on_boot:
     # Restore (numbers/switches) fires BEFORE the light is set up: touching the light there crashed 85cf36d
     # (update_state -> schedule_show -> null LightState). Apply brightness/limit here, after every setup().

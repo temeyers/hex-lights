@@ -96,7 +96,7 @@ class HexLayoutCard extends HTMLElement {
     let html = `<style>${HexLayoutCard.css}</style><ha-card>
       <div class="head"><span class="title">${this._config.title || "Hex layout"}</span>
       <button class="btn" id="edit">${this._edit ? "Done" : "Edit layout"}</button></div>
-      <div class="chips">${chip(this._tgtEnt() ? (this._tgt() === "All" ? "● All" : "All") : "All", "all", anyOn)}${this._tgtEnt() ? `<button class="chip pwr" id="pwr" title="On/off for the selected target">⏻ ${this._tgt()}</button>` : ""}${groups.map((g, i) => chip(g.name, i, gOn(g))).join("")}</div>
+      <div class="chips">${this._tgtEnt() ? `<button class="chip${this._tgt() === "All" ? " tgtchip" : ""}" data-g="all" title="Target: whole wall">All</button><button class="chip pwr${anyOn ? " on" : ""}" id="pwr" title="Turn the selected target on/off">⏻ ${this._tgt() === "All" ? "All" : this._tgt()} on/off</button>` : chip("All", "all", anyOn)}${groups.map((g, i) => chip(g.name, i, gOn(g))).join("")}</div>
       <div class="stage">${svg}</div>`;
     if (this._edit) {
       html += `<div class="edit">
@@ -134,13 +134,14 @@ class HexLayoutCard extends HTMLElement {
         const on = ents.some(e => this._hass.states[e] && this._hass.states[e].state === "on");
         this._hass.callService("light", on ? "turn_off" : "turn_on", { entity_id: ents });
       };
-      if (g === "all" && this._tgtEnt()) this._tap("chip-all", () => this._setTgt("All"), toggle); else toggle();
+      if (g === "all" && this._tgtEnt()) this._setTgt("All"); else toggle();
     });
     const pw = $("pwr");
     if (pw) pw.onclick = () => {
       const tg = this._tgt(), ents = !tg || tg === "All" ? this._lights() : this._lights().filter(e => this._hexName(e) === tg);
-      const on = ents.some(e => this._hass.states[e] && this._hass.states[e].state === "on");
-      this._hass.callService("light", on ? "turn_off" : "turn_on", { entity_id: ents });
+      // all on -> off; any off (mixed or all off) -> on, so a stray off tile is brought back, never the reverse
+      const allOn = ents.length && ents.every(e => this._hass.states[e] && this._hass.states[e].state === "on");
+      this._hass.callService("light", allOn ? "turn_off" : "turn_on", { entity_id: ents });
     };
     this.shadowRoot.querySelectorAll(".tile").forEach(t => {
       const e = t.dataset.e; let timer, long = false, down = null, moved = false;
@@ -155,7 +156,9 @@ class HexLayoutCard extends HTMLElement {
         if (this._edit) { this._drag = null; if (moved) this._place(e, ev); else { this._sel.has(e) ? this._sel.delete(e) : this._sel.add(e); } this._render(); }
         else if (!long && !moved) {
           const n = this._hexName(e), toggle = () => this._hass.callService("light", "toggle", { entity_id: e });
-          if (this._tgtEnt() && n) this._tap(e, () => this._setTgt(this._tgt() === n ? "All" : n), toggle);
+          // tap = select target (tap again = back to All). No double-tap toggle: two quick taps to deselect
+          // were read as a double tap and switched the tile off. On/off = the power button or more-info (hold).
+          if (this._tgtEnt() && n) this._setTgt(this._tgt() === n ? "All" : n);
           else toggle();
         }
         down = null;
@@ -225,7 +228,7 @@ ha-card{display:block;background:rgba(255,255,255,0.08);backdrop-filter:blur(14p
 .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}.title{font-weight:500;font-size:16px}
 .btn,.chip{background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.22);color:#fff;border-radius:14px;padding:5px 12px;font:inherit;font-size:13px;cursor:pointer}
 .btn[disabled]{opacity:.4;cursor:default}
-.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}.chip.on{background:rgba(255,200,90,0.35);border-color:rgba(255,210,120,0.7)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}.chip.on{background:rgba(255,200,90,0.35);border-color:rgba(255,210,120,0.7)}.chip.tgtchip{border:2px solid #fff;font-weight:600}
 .stage{width:100%;height:260px;touch-action:none}svg{width:100%;height:100%;user-select:none}
 .cell{fill:rgba(255,255,255,0.03);stroke:rgba(255,255,255,0.18);stroke-dasharray:3 3}
 .hex{stroke:rgba(255,255,255,0.45);stroke-width:1.5}.tile{cursor:pointer}.tile.sel .hex{stroke:#4fc3f7;stroke-width:3.5}.tile.tgt .hex{stroke:#fff;stroke-width:4;stroke-dasharray:none}

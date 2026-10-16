@@ -329,7 +329,7 @@ def target_block(tn, mnode):
         return (T + "{% set e = 'select.hex_' ~ t[4:] ~ '_" + kind + "' if t[:4] == 'Hex ' else '' %}"
                 "{{ e if e and has_value(e) else 'select." + mnode + "_" + kind + "' }}")
     sel = ("  hex_wall_target:\n    name: Hex target\n    icon: mdi:hexagon-multiple-outline\n"
-           "    options: " + J(["All"] + ["Hex " + n[4:] for n in tn]) + "\n")
+           "    options: [\"All\"]   # seed only; hex_wall_target_options adds 'Hex NN' for every light.hex_NN_light\n")
     autos = f"""  - id: hex_wall_target_options
     alias: Hex wall - target list = All + flashed tiles
     mode: single
@@ -338,6 +338,8 @@ def target_block(tn, mnode):
         event: start
       - trigger: event
         event_type: entity_registry_updated
+      - trigger: event
+        event_type: automation_reloaded
       - trigger: time_pattern
         minutes: "/1"
     variables:
@@ -392,6 +394,21 @@ def target_block(tn, mnode):
       - delay: {{milliseconds: 800}}
       - action: input_boolean.turn_off
         target: {{entity_id: input_boolean.hex_wall_syncing}}
+      # 'All' means every tile: if the wall is on but some tiles are off (e.g. one was switched off on its own),
+      # bring those up with the colour/brightness of the first lit tile so the whole wall answers the panel.
+      - if: "{{{{ trigger.to_state.state == 'All' }}}}"
+        then:
+          - variables:
+              lights: "{{{{ {dyn('light', 'light')} }}}}"
+              lit: "{{{{ lights | select('is_state', 'on') | list }}}}"
+              dark: "{{{{ lights | reject('is_state', 'on') | list }}}}"
+          - if: "{{{{ lit | length > 0 and dark | length > 0 }}}}"
+            then:
+              - action: light.turn_on
+                target: {{entity_id: "{{{{ dark }}}}"}}
+                data:
+                  brightness: "{{{{ state_attr(lit[0], 'brightness') | int(76) }}}}"
+                  rgb_color: "{{{{ state_attr(lit[0], 'rgb_color') or [255, 255, 255] }}}}"
 """
     tmpl = f"""
 template:

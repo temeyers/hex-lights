@@ -316,7 +316,7 @@ input_select:
   hex_wall_target:
     name: Hex target
     icon: mdi:hexagon-multiple-outline
-    options: ["All", "Hex 01", "Hex 02", "Hex 03", "Hex 04", "Hex 05", "Hex 06", "Hex 07", "Hex 08", "Hex 09", "Hex 10", "Hex 11", "Hex 12", "Hex 13", "Hex 14", "Hex 15", "Hex 16", "Hex 17", "Hex 18", "Hex 19", "Hex 20"]
+    options: ["All"]   # seed only; hex_wall_target_options adds 'Hex NN' for every light.hex_NN_light
   hex_wall_fx:
     name: Hex wall synced effect
     options: ["off", "solid", "radial_wave", "rainbow_sweep", "pulse", "chase", "wipe", "rainbow_flow", "random_ripple", "twinkle", "color_cycle", "snake"]
@@ -361,6 +361,8 @@ automation:
         event: start
       - trigger: event
         event_type: entity_registry_updated
+      - trigger: event
+        event_type: automation_reloaded
       - trigger: time_pattern
         minutes: "/1"
     variables:
@@ -415,6 +417,21 @@ automation:
       - delay: {milliseconds: 800}
       - action: input_boolean.turn_off
         target: {entity_id: input_boolean.hex_wall_syncing}
+      # 'All' means every tile: if the wall is on but some tiles are off (e.g. one was switched off on its own),
+      # bring those up with the colour/brightness of the first lit tile so the whole wall answers the panel.
+      - if: "{{ trigger.to_state.state == 'All' }}"
+        then:
+          - variables:
+              lights: "{{ (states.light | map(attribute='entity_id') | select('match', '^light[.]hex_[0-9]+_light$') | sort | select('has_value') | list) }}"
+              lit: "{{ lights | select('is_state', 'on') | list }}"
+              dark: "{{ lights | reject('is_state', 'on') | list }}"
+          - if: "{{ lit | length > 0 and dark | length > 0 }}"
+            then:
+              - action: light.turn_on
+                target: {entity_id: "{{ dark }}"}
+                data:
+                  brightness: "{{ state_attr(lit[0], 'brightness') | int(76) }}"
+                  rgb_color: "{{ state_attr(lit[0], 'rgb_color') or [255, 255, 255] }}"
   - id: hex_wall_fx_changed
     alias: Hex wall - synced effect / palette / speed changed
     mode: restart

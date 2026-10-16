@@ -423,7 +423,7 @@ def test_target_panel():
     assert "hex_wall_control_all" not in h["input_boolean"]
     assert h["input_boolean"]["hex_wall_syncing"]["initial"] is False
     opts = h["input_select"]["hex_wall_target"]["options"]
-    assert opts[0] == "All" and opts[1] == "Hex 01" and all(o == "All" or o.startswith("Hex ") for o in opts)
+    assert opts == ["All"]  # no placeholder Hex NN; the options automation fills in the tiles that exist
     ids = {a["id"] for a in h["automation"]}
     assert {"hex_wall_target_options", "hex_wall_target_changed"} <= ids
     fx = [a for a in h["automation"] if a["id"] == "hex_wall_fx_changed"][0]
