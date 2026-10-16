@@ -420,7 +420,8 @@ int HexSync::palette_id(const std::string &n) {
 }
 
 void HexSync::set_wall_fx(int effect, int palette, int speed, int scale, int hue, int sat, int value,
-                          int start_delay_ms) {
+                          int start_delay_ms, int axis) {
+  if (axis >= 0) params_.axis = (uint8_t) (axis & 3);
   uint32_t now = effect_clock();
   params_.gen = (now > params_.gen) ? now : params_.gen + 1;
   params_.effect = (effect >= 0 && effect < FX_COUNT) ? effect : FX_SOLID;

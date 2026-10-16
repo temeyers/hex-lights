@@ -40,7 +40,7 @@ Effects (v2): 0 solid, 1 radial_wave, 2 rainbow_sweep, 3 pulse, 4 chase, 5 wipe,
 Preferred service:
 ```yaml
 action: esphome.hex_c0_set_wall_fx
-data: {effect: 5, palette: 2, speed: 300, scale: 100, hue: 18, saturation: 215, value: 255, start_delay_ms: 300}
+data: {effect: 5, palette: 2, speed: 300, scale: 100, hue: 18, saturation: 215, value: 255, start_delay_ms: 300, axis: 0}
 ```
 Or use the master's Wall effect / Wall palette / Wall speed / Wall wipe axis entities.
 Each tile's **LED count** number (1-60, default 44) changes the active LEDs without reflashing. Then turn the 20 lights on with effect **HexSync**.

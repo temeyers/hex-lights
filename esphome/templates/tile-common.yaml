@@ -69,8 +69,10 @@ api:
         saturation: int      # 0-255
         value: int           # 0-255
         start_delay_ms: int  # leader start_ms = clock + delay
+        axis: int            # 0 x, 1 y, 2 ring, 3 angle (REQUIRED: ESPHome API action args can't be optional)
       then:
-        - lambda: 'id(hex_sync).set_wall_fx(effect, palette, speed, scale, hue, saturation, value, start_delay_ms);'
+        - lambda: |-
+            id(hex_sync).set_wall_fx(effect, palette, speed, scale, hue, saturation, value, start_delay_ms, axis);
         - light.turn_on:
             id: tile_leds
             effect: HexSync

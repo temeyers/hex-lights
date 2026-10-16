@@ -5,6 +5,7 @@ substitutions:
   q: "-1"
   r: "2"
   rotation: "0"
+  order: "16"
   wall_controls_internal: "true"
 
 packages:

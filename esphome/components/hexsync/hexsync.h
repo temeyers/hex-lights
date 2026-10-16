@@ -131,7 +131,8 @@ class HexSync : public Component {
   void set_default_led_count(int v) { led_count_ = v; }
   int led_count() const { return led_count_; }
   // v2 wall effect. start_delay_ms > 0 lets every tile receive it before it starts.
-  void set_wall_fx(int effect, int palette, int speed, int scale, int hue, int sat, int value, int start_delay_ms);
+  void set_wall_fx(int effect, int palette, int speed, int scale, int hue, int sat, int value, int start_delay_ms,
+                   int axis = -1);  // axis -1 = keep current
   // Change one shared control, keep the rest (Wall speed / palette / effect / axis entities).
   void set_wall_speed(int v);
   void set_wall_palette(int v);

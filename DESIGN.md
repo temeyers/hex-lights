@@ -98,7 +98,7 @@ is set because modem sleep drops broadcasts.
 ### Runtime layout (no reflash) – interface for Back End / Front End
 q, r, rotation and chase order are **live values** inside hexsync, saved to flash
 (NVS, debounced 1 s). The compile-time substitutions (`q`, `r`, `rotation`,
-`order`, default order = tile_num − 1) are only first-boot defaults.
+`order`, default order = optional `order` column in tiles.csv, else tile_num − 1) are only first-boot defaults.
 
 **Tile identity:** `tile_id` = `tile_num` = 1-based row in `esphome/tiles.csv`
 (c0 = 1, r1-e = 2 … r3-a = 20). It's fixed at compile time; position is not.
@@ -154,8 +154,8 @@ position is one of the 6 axial offsets (+1,0) (+1,−1) (0,−1) (−1,0) (−1,
 There are no compile-time neighbor lists anywhere.
 
 ### Wall effects v2 (matches Back End `effects.json` / `tools/gen_ha.py`)
-Service on the master: `esphome.hex_c0_set_wall_fx(effect, palette, speed, scale, hue, saturation, value, start_delay_ms)`
-(speed milli-cycles/s, scale ×100, hue/sat/value 0–255, start_delay_ms 0–10000 → `start_ms = clock + delay`).
+Service on the master: `esphome.hex_c0_set_wall_fx(effect, palette, speed, scale, hue, saturation, value, start_delay_ms, axis)`
+(speed milli-cycles/s, scale ×100, hue/sat/value 0–255, start_delay_ms 0–10000 → `start_ms = clock + delay`, axis 0 x 1 y 2 ring 3 angle — **required**: ESPHome API action variables cannot be optional).
 Legacy `esphome.hex_c0_set_wall_effect` still works (keeps palette, starts now).
 
 | id | name | notes |
