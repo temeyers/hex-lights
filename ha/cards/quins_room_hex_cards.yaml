@@ -1,6 +1,7 @@
 # Quins Room (/quins-room, view 'quins') Hex Lights cards, exported from Home Assistant 2026-10-16.
 # Requires: Mushroom, card-mod (HACS), resource /local/hex-layout-card/hex-layout-card.js?v=3 (type module).
-# Effect/Palette/Speed/Wipe axis card is visible only while switch.hex_01_manual_color is 'off'.
+# switch.hex_01_manual_color off: brightness-only Hex 01 card + Effect/Palette/Speed/Wipe axis card.
+# switch.hex_01_manual_color on: Hex 01 card with brightness + color control.
 - type: heading
   heading: Hex Lights
   heading_style: title
@@ -17,6 +18,37 @@
         r: 0
         rot: 0
     groups: []
+- type: custom:mushroom-light-card
+  entity: light.hex_01_light
+  name: Hex 01
+  icon: mdi:hexagon-multiple
+  use_light_color: true
+  show_brightness_control: true
+  show_color_control: false
+  grid_options:
+    columns: 12
+  card_mod:
+    style:
+      .: '{% set d = states(''sensor.hex_01_displayed_color'') %}{% set l = state_attr(''light.hex_01_light'',''rgb_color'') or [255,214,160] %}{% if d is match(''^#[0-9A-Fa-f]{6}$'') %}{% set v = [d[1:3]|int(0,16),
+        d[3:5]|int(0,16), d[5:7]|int(0,16)] %}{% set mx = v|max %}{% if mx > 0 %}{% set c = v|map(''multiply'', 255/mx)|map(''round'')|map(''int'')|list %}{% else %}{% set c = l %}{% endif %}{% else %}{%
+        set c = l %}{% endif %}{% set rgb = c|join('', '') %}ha-card { --rgb-state-light: {{ rgb }}; }'
+      mushroom-light-brightness-control$:
+        .: '{% set d = states(''sensor.hex_01_displayed_color'') %}{% set l = state_attr(''light.hex_01_light'',''rgb_color'') or [255,214,160] %}{% if d is match(''^#[0-9A-Fa-f]{6}$'') %}{% set v = [d[1:3]|int(0,16),
+          d[3:5]|int(0,16), d[5:7]|int(0,16)] %}{% set mx = v|max %}{% if mx > 0 %}{% set c = v|map(''multiply'', 255/mx)|map(''round'')|map(''int'')|list %}{% else %}{% set c = l %}{% endif %}{% else %}{%
+          set c = l %}{% endif %}{% set rgb = c|join('', '') %}:host { --slider-color: rgb({{ rgb }}) !important; --slider-bg-color: rgba({{ rgb }}, 0.2) !important; }'
+        mushroom-slider$: '{% set d = states(''sensor.hex_01_displayed_color'') %}{% set l = state_attr(''light.hex_01_light'',''rgb_color'') or [255,214,160] %}{% if d is match(''^#[0-9A-Fa-f]{6}$'') %}{%
+          set v = [d[1:3]|int(0,16), d[3:5]|int(0,16), d[5:7]|int(0,16)] %}{% set mx = v|max %}{% if mx > 0 %}{% set c = v|map(''multiply'', 255/mx)|map(''round'')|map(''int'')|list %}{% else %}{% set c
+          = l %}{% endif %}{% else %}{% set c = l %}{% endif %}{% set rgb = c|join('', '') %}.slider { --main-color: rgb({{ rgb }}) !important; --bg-color: rgba({{ rgb }}, 0.2) !important; } .slider .slider-track-active
+          { background-color: rgb({{ rgb }}) !important; } .slider .slider-track-background { background-color: rgba({{ rgb }}, 0.2) !important; }'
+      mushroom-shape-icon$: '{% set d = states(''sensor.hex_01_displayed_color'') %}{% set l = state_attr(''light.hex_01_light'',''rgb_color'') or [255,214,160] %}{% if d is match(''^#[0-9A-Fa-f]{6}$'')
+        %}{% set v = [d[1:3]|int(0,16), d[3:5]|int(0,16), d[5:7]|int(0,16)] %}{% set mx = v|max %}{% if mx > 0 %}{% set c = v|map(''multiply'', 255/mx)|map(''round'')|map(''int'')|list %}{% else %}{% set
+        c = l %}{% endif %}{% else %}{% set c = l %}{% endif %}{% set rgb = c|join('', '') %}.shape { --icon-color: rgb({{ rgb }}) !important; --shape-color: rgba({{ rgb }}, 0.2) !important; background-color:
+        rgba({{ rgb }}, 0.2) !important; } .shape ha-state-icon, .shape ha-icon, .shape ::slotted(*) { color: rgb({{ rgb }}) !important; }'
+  show_color_temp_control: false
+  visibility:
+  - condition: state
+    entity: switch.hex_01_manual_color
+    state: 'off'
 - type: custom:mushroom-light-card
   entity: light.hex_01_light
   name: Hex 01
@@ -44,6 +76,10 @@
         %}{% set v = [d[1:3]|int(0,16), d[3:5]|int(0,16), d[5:7]|int(0,16)] %}{% set mx = v|max %}{% if mx > 0 %}{% set c = v|map(''multiply'', 255/mx)|map(''round'')|map(''int'')|list %}{% else %}{% set
         c = l %}{% endif %}{% else %}{% set c = l %}{% endif %}{% set rgb = c|join('', '') %}.shape { --icon-color: rgb({{ rgb }}) !important; --shape-color: rgba({{ rgb }}, 0.2) !important; background-color:
         rgba({{ rgb }}, 0.2) !important; } .shape ha-state-icon, .shape ha-icon, .shape ::slotted(*) { color: rgb({{ rgb }}) !important; }'
+  visibility:
+  - condition: state
+    entity: switch.hex_01_manual_color
+    state: 'on'
 - type: custom:mushroom-template-card
   primary: Displayed color
   secondary: '{{ states("sensor.hex_01_displayed_color") }}'
