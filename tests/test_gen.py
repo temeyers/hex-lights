@@ -155,7 +155,8 @@ def test_ha_rainbow_axes():
 def test_hexsync_interface_matches_hardware():
     import json, yaml
     import gen_ha
-    assert gen_ha.WALL_FX["ripple"] == 1 and gen_ha.WALL_FX["breathe"] == 3
+    assert gen_ha.WALL_FX["radial_wave"] == 1 and gen_ha.WALL_FX["pulse"] == 3 and "ripple" not in gen_ha.WALL_FX
+    assert gen_ha.FX_ALIASES == {"ripple": "radial_wave", "breathe": "pulse"}
     assert [gen_ha.WALL_FX[n] for n in ("random_ripple", "twinkle", "color_cycle", "snake")] == [7, 8, 9, 10]
     h = yaml.safe_load(open(os.path.join(ROOT, "ha/hex_wall.generated.yaml")))
     assert set(gen_ha.WALL_FX) <= set(h["input_select"]["hex_wall_fx"]["options"])

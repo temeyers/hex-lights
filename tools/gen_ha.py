@@ -45,11 +45,40 @@ INTERFACE = {
 LED_COUNT_RANGE = (1, 60)          # firmware number range
 MAX_START_DELAY_MS = 10000         # firmware cap
 # our name -> HexSync id (firmware names: 1 radial_wave, 3 pulse; 7-10 firmware-only)
-WALL_FX = {"solid": 0, "ripple": 1, "rainbow_sweep": 2, "breathe": 3,
+# Firmware effect names exactly as hexsync FX_NAMES (input_select.hex_wall_fx options).
+WALL_FX = {"solid": 0, "radial_wave": 1, "rainbow_sweep": 2, "pulse": 3,
            "chase": 4, "wipe": 5, "rainbow_flow": 6, "random_ripple": 7,
            "twinkle": 8, "color_cycle": 9, "snake": 10}
+# our effects.json names -> firmware names
+FX_ALIASES = {"ripple": "radial_wave", "breathe": "pulse"}
 AXES = ["x", "y", "ring", "angle"]
 PALETTES = ["rainbow", "ocean", "sunset", "forest", "fire", "mono", "light color"]  # ids 0-6 (Hardware 7dfa536)
+
+
+def _num(desc, lo, hi, step, default, unit=None):
+    sel = {"number": {"min": lo, "max": hi, "step": step, "mode": "box"}}
+    if unit:
+        sel["number"]["unit_of_measurement"] = unit
+    return {"description": desc, "example": str(default), "default": default, "selector": sel}
+
+
+def _rgb(desc, default):
+    return {"description": desc, "example": ", ".join(map(str, default)), "default": list(default),
+            "selector": {"color_rgb": {}}}
+
+
+def _sel(desc, options, default):
+    return {"description": desc, "example": default, "default": default,
+            "selector": {"select": {"options": list(options)}}}
+
+
+def _txt(desc, example=""):
+    return {"description": desc, "example": example, "selector": {"text": {}}}
+
+
+def fields_yaml(fields):
+    """HA script `fields:` as a one-line JSON (valid YAML) mapping."""
+    return json.dumps(fields, separators=(", ", ": "))
 
 
 def render(d, node, light_entity):
@@ -70,10 +99,7 @@ def render(d, node, light_entity):
   hex_wall_{name}:
     alias: Hex wall {name.replace('_', ' ')}
     mode: restart
-    fields:
-      speed: {{description: see effects.json, example: 0.25}}
-      step: {{description: seconds per update, example: 1}}
-{'      axis: {description: x, y, ring or angle, example: x}' if name == 'rainbow_sweep' else ''}
+    fields: {fields_yaml(dict(speed=_num("cycles/s (see effects.json)", 0, 5, 0.01, 0.25 if name == 'rainbow_sweep' else 0.2, "cycles/s"), step=_num("seconds per update", 0.2, 10, 0.1, 1, "s"), **({"axis": _sel("sweep axis", AXES, "x")} if name == 'rainbow_sweep' else {})))}
     variables:
       tiles: {tj}
       sp: "{{{{ speed | default({0.25 if name == 'rainbow_sweep' else 0.2}) | float }}}}"
@@ -111,13 +137,7 @@ script:
   hex_wall_synced:
     alias: Hex wall synced effect (HexSync, ESP-NOW)
     mode: restart
-    fields:
-      effect: {{description: "effects.json name: solid, ripple, rainbow_sweep, breathe"}}
-      hue: {{description: 0-255, example: 18}}
-      saturation: {{description: 0-255, example: 215}}
-      value: {{description: 0-255, example: 255}}
-      speed: {{description: milli-cycles per second, example: 500}}
-      scale: {{description: tiles per cycle x100, example: 300}}
+    fields: {fields_yaml(dict(effect=_sel("HA effect name (mapped to HexSync id)", ["solid", "ripple", "rainbow_sweep", "breathe"], "solid"), hue=_num("0-255", 0, 255, 1, 18), saturation=_num("0-255", 0, 255, 1, 215), value=_num("0-255", 0, 255, 1, 255), speed=_num("milli-cycles per second", 0, 10000, 10, 500), scale=_num("tiles per cycle x100", 1, 2000, 1, 300)))}
     variables:
       codes: {{solid: 0, ripple: 1, rainbow_sweep: 2, breathe: 3}}
     sequence:
@@ -138,7 +158,7 @@ script:
     alias: Hex wall tile pulse (internal)
     mode: parallel
     max: 128
-    fields: {{entity: {{}}, delay_ms: {{}}, color: {{}}, up_s: {{}}, down_s: {{}}}}
+    fields: {fields_yaml(dict(entity={"description": "tile light", "example": "light.hex_01_light", "selector": {"entity": {"domain": "light"}}}, delay_ms=_num("delay before the pulse", 0, 60000, 1, 0, "ms"), color=_rgb("pulse colour", [40, 120, 255]), up_s=_num("fade-in", 0, 10, 0.05, 0.5, "s"), down_s=_num("fade-out", 0, 10, 0.05, 0.5, "s")))}
     sequence:
       - delay: {{milliseconds: "{{{{ delay_ms | int }}}}"}}
       - action: light.turn_on
@@ -152,7 +172,7 @@ script:
   hex_wall_solid:
     alias: Hex wall solid color
     mode: restart
-    fields: {{color: {{example: [255, 140, 40]}}}}
+    fields: {fields_yaml(dict(color=_rgb("wall colour", [255, 140, 40])))}
     sequence:
       - {stop_others('solid')}
       - action: light.turn_on
@@ -162,7 +182,7 @@ script:
   hex_wall_breathe:
     alias: Hex wall breathe
     mode: restart
-    fields: {{color: {{example: [255, 140, 40]}}, periodS: {{example: 4}}}}
+    fields: {fields_yaml(dict(color=_rgb("breathe colour", [255, 140, 40]), periodS=_num("breath period", 0.5, 30, 0.5, 4, "s")))}
     variables:
       c: "{{{{ color | default([255,140,40]) }}}}"
       half: "{{{{ (periodS | default(4) | float) / 2 }}}}"
@@ -185,7 +205,7 @@ script:
   hex_wall_ripple:
     alias: Hex wall ripple
     mode: restart
-    fields: {{color: {{example: [40, 120, 255]}}, speed: {{example: 2}}, origin: {{description: tile id, default master}}}}
+    fields: {fields_yaml(dict(color=_rgb("ripple colour", [40, 120, 255]), speed=_num("rings per second", 0.1, 10, 0.1, 2, "rings/s"), origin=_sel("ripple origin tile id (default: master)", [str(t["id"]) for t in tiles], str(master["id"]))))}
     variables:
       tiles: {tj}
       c: "{{{{ color | default([40,120,255]) }}}}"
@@ -223,7 +243,7 @@ script:
   hex_wall_sparkle:
     alias: Hex wall sparkle
     mode: restart
-    fields: {{color: {{example: [255, 255, 255]}}, density: {{example: 0.15}}, step: {{example: 0.5}}}}
+    fields: {fields_yaml(dict(color=_rgb("sparkle colour", [255, 255, 255]), density=_num("fraction of tiles lit per step", 0, 1, 0.01, 0.15), step=_num("seconds per update", 0.1, 10, 0.1, 0.5, "s")))}
     variables:
       tiles: {tj}
       c: "{{{{ color | default([255,255,255]) }}}}"

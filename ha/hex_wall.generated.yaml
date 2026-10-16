@@ -31,13 +31,7 @@ script:
   hex_wall_synced:
     alias: Hex wall synced effect (HexSync, ESP-NOW)
     mode: restart
-    fields:
-      effect: {description: "effects.json name: solid, ripple, rainbow_sweep, breathe"}
-      hue: {description: 0-255, example: 18}
-      saturation: {description: 0-255, example: 215}
-      value: {description: 0-255, example: 255}
-      speed: {description: milli-cycles per second, example: 500}
-      scale: {description: tiles per cycle x100, example: 300}
+    fields: {"effect": {"description": "HA effect name (mapped to HexSync id)", "example": "solid", "default": "solid", "selector": {"select": {"options": ["solid", "ripple", "rainbow_sweep", "breathe"]}}}, "hue": {"description": "0-255", "example": "18", "default": 18, "selector": {"number": {"min": 0, "max": 255, "step": 1, "mode": "box"}}}, "saturation": {"description": "0-255", "example": "215", "default": 215, "selector": {"number": {"min": 0, "max": 255, "step": 1, "mode": "box"}}}, "value": {"description": "0-255", "example": "255", "default": 255, "selector": {"number": {"min": 0, "max": 255, "step": 1, "mode": "box"}}}, "speed": {"description": "milli-cycles per second", "example": "500", "default": 500, "selector": {"number": {"min": 0, "max": 10000, "step": 10, "mode": "box"}}}, "scale": {"description": "tiles per cycle x100", "example": "300", "default": 300, "selector": {"number": {"min": 1, "max": 2000, "step": 1, "mode": "box"}}}}
     variables:
       codes: {solid: 0, ripple: 1, rainbow_sweep: 2, breathe: 3}
     sequence:
@@ -57,7 +51,7 @@ script:
     alias: Hex wall tile pulse (internal)
     mode: parallel
     max: 128
-    fields: {entity: {}, delay_ms: {}, color: {}, up_s: {}, down_s: {}}
+    fields: {"entity": {"description": "tile light", "example": "light.hex_01_light", "selector": {"entity": {"domain": "light"}}}, "delay_ms": {"description": "delay before the pulse", "example": "0", "default": 0, "selector": {"number": {"min": 0, "max": 60000, "step": 1, "mode": "box", "unit_of_measurement": "ms"}}}, "color": {"description": "pulse colour", "example": "40, 120, 255", "default": [40, 120, 255], "selector": {"color_rgb": {}}}, "up_s": {"description": "fade-in", "example": "0.5", "default": 0.5, "selector": {"number": {"min": 0, "max": 10, "step": 0.05, "mode": "box", "unit_of_measurement": "s"}}}, "down_s": {"description": "fade-out", "example": "0.5", "default": 0.5, "selector": {"number": {"min": 0, "max": 10, "step": 0.05, "mode": "box", "unit_of_measurement": "s"}}}}
     sequence:
       - delay: {milliseconds: "{{ delay_ms | int }}"}
       - action: light.turn_on
@@ -70,7 +64,7 @@ script:
   hex_wall_solid:
     alias: Hex wall solid color
     mode: restart
-    fields: {color: {example: [255, 140, 40]}}
+    fields: {"color": {"description": "wall colour", "example": "255, 140, 40", "default": [255, 140, 40], "selector": {"color_rgb": {}}}}
     sequence:
       - {"action": "script.turn_off", "target": {"entity_id": ["script.hex_wall_breathe", "script.hex_wall_rainbow_sweep", "script.hex_wall_ripple", "script.hex_wall_spiral", "script.hex_wall_sparkle"]}}
       - action: light.turn_on
@@ -79,7 +73,7 @@ script:
   hex_wall_breathe:
     alias: Hex wall breathe
     mode: restart
-    fields: {color: {example: [255, 140, 40]}, periodS: {example: 4}}
+    fields: {"color": {"description": "breathe colour", "example": "255, 140, 40", "default": [255, 140, 40], "selector": {"color_rgb": {}}}, "periodS": {"description": "breath period", "example": "4", "default": 4, "selector": {"number": {"min": 0.5, "max": 30, "step": 0.5, "mode": "box", "unit_of_measurement": "s"}}}}
     variables:
       c: "{{ color | default([255,140,40]) }}"
       half: "{{ (periodS | default(4) | float) / 2 }}"
@@ -99,10 +93,7 @@ script:
   hex_wall_rainbow_sweep:
     alias: Hex wall rainbow sweep
     mode: restart
-    fields:
-      speed: {description: see effects.json, example: 0.25}
-      step: {description: seconds per update, example: 1}
-      axis: {description: x, y, ring or angle, example: x}
+    fields: {"speed": {"description": "cycles/s (see effects.json)", "example": "0.25", "default": 0.25, "selector": {"number": {"min": 0, "max": 5, "step": 0.01, "mode": "box", "unit_of_measurement": "cycles/s"}}}, "step": {"description": "seconds per update", "example": "1", "default": 1, "selector": {"number": {"min": 0.2, "max": 10, "step": 0.1, "mode": "box", "unit_of_measurement": "s"}}}, "axis": {"description": "sweep axis", "example": "x", "default": "x", "selector": {"select": {"options": ["x", "y", "ring", "angle"]}}}}
     variables:
       tiles: [{"e":"light.hex_01_light","id":"c0","x":0.4444,"y":0.5,"q":0,"r":0,"ring":0,"angle":0.0,"i":0,"ringU":0.0,"angleU":0.0},{"e":"light.hex_02_light","id":"r1-e","x":0.6667,"y":0.5,"q":1,"r":0,"ring":1,"angle":0.0,"i":1,"ringU":0.3333,"angleU":0.0},{"e":"light.hex_03_light","id":"r1-ne","x":0.5556,"y":0.25,"q":1,"r":-1,"ring":1,"angle":300.0,"i":2,"ringU":0.3333,"angleU":0.8333},{"e":"light.hex_04_light","id":"r1-nw","x":0.3333,"y":0.25,"q":0,"r":-1,"ring":1,"angle":240.0,"i":3,"ringU":0.3333,"angleU":0.6667},{"e":"light.hex_05_light","id":"r1-w","x":0.2222,"y":0.5,"q":-1,"r":0,"ring":1,"angle":180.0,"i":4,"ringU":0.3333,"angleU":0.5},{"e":"light.hex_06_light","id":"r1-sw","x":0.3333,"y":0.75,"q":-1,"r":1,"ring":1,"angle":120.0,"i":5,"ringU":0.3333,"angleU":0.3333},{"e":"light.hex_07_light","id":"r1-se","x":0.5556,"y":0.75,"q":0,"r":1,"ring":1,"angle":60.0,"i":6,"ringU":0.3333,"angleU":0.1667},{"e":"light.hex_08_light","id":"r2-a","x":0.8889,"y":0.5,"q":2,"r":0,"ring":2,"angle":0.0,"i":7,"ringU":0.6667,"angleU":0.0},{"e":"light.hex_09_light","id":"r2-b","x":0.7778,"y":0.25,"q":2,"r":-1,"ring":2,"angle":330.0,"i":8,"ringU":0.6667,"angleU":0.9167},{"e":"light.hex_10_light","id":"r2-c","x":0.6667,"y":0.0,"q":2,"r":-2,"ring":2,"angle":300.0,"i":9,"ringU":0.6667,"angleU":0.8333},{"e":"light.hex_11_light","id":"r2-d","x":0.4444,"y":0.0,"q":1,"r":-2,"ring":2,"angle":270.0,"i":10,"ringU":0.6667,"angleU":0.75},{"e":"light.hex_12_light","id":"r2-e","x":0.2222,"y":0.0,"q":0,"r":-2,"ring":2,"angle":240.0,"i":11,"ringU":0.6667,"angleU":0.6667},{"e":"light.hex_13_light","id":"r2-f","x":0.1111,"y":0.25,"q":-1,"r":-1,"ring":2,"angle":210.0,"i":12,"ringU":0.6667,"angleU":0.5833},{"e":"light.hex_14_light","id":"r2-g","x":0.0,"y":0.5,"q":-2,"r":0,"ring":2,"angle":180.0,"i":13,"ringU":0.6667,"angleU":0.5},{"e":"light.hex_15_light","id":"r2-h","x":0.1111,"y":0.75,"q":-2,"r":1,"ring":2,"angle":150.0,"i":14,"ringU":0.6667,"angleU":0.4167},{"e":"light.hex_16_light","id":"r2-i","x":0.2222,"y":1.0,"q":-2,"r":2,"ring":2,"angle":120.0,"i":15,"ringU":0.6667,"angleU":0.3333},{"e":"light.hex_17_light","id":"r2-j","x":0.4444,"y":1.0,"q":-1,"r":2,"ring":2,"angle":90.0,"i":16,"ringU":0.6667,"angleU":0.25},{"e":"light.hex_18_light","id":"r2-k","x":0.6667,"y":1.0,"q":0,"r":2,"ring":2,"angle":60.0,"i":17,"ringU":0.6667,"angleU":0.1667},{"e":"light.hex_19_light","id":"r2-l","x":0.7778,"y":0.75,"q":1,"r":1,"ring":2,"angle":30.0,"i":18,"ringU":0.6667,"angleU":0.0833},{"e":"light.hex_20_light","id":"r3-a","x":1.0,"y":0.25,"q":3,"r":-1,"ring":3,"angle":340.89,"i":19,"ringU":1.0,"angleU":0.9469}]
       sp: "{{ speed | default(0.25) | float }}"
@@ -128,9 +119,7 @@ script:
   hex_wall_spiral:
     alias: Hex wall spiral
     mode: restart
-    fields:
-      speed: {description: see effects.json, example: 0.25}
-      step: {description: seconds per update, example: 1}
+    fields: {"speed": {"description": "cycles/s (see effects.json)", "example": "0.2", "default": 0.2, "selector": {"number": {"min": 0, "max": 5, "step": 0.01, "mode": "box", "unit_of_measurement": "cycles/s"}}}, "step": {"description": "seconds per update", "example": "1", "default": 1, "selector": {"number": {"min": 0.2, "max": 10, "step": 0.1, "mode": "box", "unit_of_measurement": "s"}}}}
     variables:
       tiles: [{"e":"light.hex_01_light","id":"c0","x":0.4444,"y":0.5,"q":0,"r":0,"ring":0,"angle":0.0,"i":0,"ringU":0.0,"angleU":0.0},{"e":"light.hex_02_light","id":"r1-e","x":0.6667,"y":0.5,"q":1,"r":0,"ring":1,"angle":0.0,"i":1,"ringU":0.3333,"angleU":0.0},{"e":"light.hex_03_light","id":"r1-ne","x":0.5556,"y":0.25,"q":1,"r":-1,"ring":1,"angle":300.0,"i":2,"ringU":0.3333,"angleU":0.8333},{"e":"light.hex_04_light","id":"r1-nw","x":0.3333,"y":0.25,"q":0,"r":-1,"ring":1,"angle":240.0,"i":3,"ringU":0.3333,"angleU":0.6667},{"e":"light.hex_05_light","id":"r1-w","x":0.2222,"y":0.5,"q":-1,"r":0,"ring":1,"angle":180.0,"i":4,"ringU":0.3333,"angleU":0.5},{"e":"light.hex_06_light","id":"r1-sw","x":0.3333,"y":0.75,"q":-1,"r":1,"ring":1,"angle":120.0,"i":5,"ringU":0.3333,"angleU":0.3333},{"e":"light.hex_07_light","id":"r1-se","x":0.5556,"y":0.75,"q":0,"r":1,"ring":1,"angle":60.0,"i":6,"ringU":0.3333,"angleU":0.1667},{"e":"light.hex_08_light","id":"r2-a","x":0.8889,"y":0.5,"q":2,"r":0,"ring":2,"angle":0.0,"i":7,"ringU":0.6667,"angleU":0.0},{"e":"light.hex_09_light","id":"r2-b","x":0.7778,"y":0.25,"q":2,"r":-1,"ring":2,"angle":330.0,"i":8,"ringU":0.6667,"angleU":0.9167},{"e":"light.hex_10_light","id":"r2-c","x":0.6667,"y":0.0,"q":2,"r":-2,"ring":2,"angle":300.0,"i":9,"ringU":0.6667,"angleU":0.8333},{"e":"light.hex_11_light","id":"r2-d","x":0.4444,"y":0.0,"q":1,"r":-2,"ring":2,"angle":270.0,"i":10,"ringU":0.6667,"angleU":0.75},{"e":"light.hex_12_light","id":"r2-e","x":0.2222,"y":0.0,"q":0,"r":-2,"ring":2,"angle":240.0,"i":11,"ringU":0.6667,"angleU":0.6667},{"e":"light.hex_13_light","id":"r2-f","x":0.1111,"y":0.25,"q":-1,"r":-1,"ring":2,"angle":210.0,"i":12,"ringU":0.6667,"angleU":0.5833},{"e":"light.hex_14_light","id":"r2-g","x":0.0,"y":0.5,"q":-2,"r":0,"ring":2,"angle":180.0,"i":13,"ringU":0.6667,"angleU":0.5},{"e":"light.hex_15_light","id":"r2-h","x":0.1111,"y":0.75,"q":-2,"r":1,"ring":2,"angle":150.0,"i":14,"ringU":0.6667,"angleU":0.4167},{"e":"light.hex_16_light","id":"r2-i","x":0.2222,"y":1.0,"q":-2,"r":2,"ring":2,"angle":120.0,"i":15,"ringU":0.6667,"angleU":0.3333},{"e":"light.hex_17_light","id":"r2-j","x":0.4444,"y":1.0,"q":-1,"r":2,"ring":2,"angle":90.0,"i":16,"ringU":0.6667,"angleU":0.25},{"e":"light.hex_18_light","id":"r2-k","x":0.6667,"y":1.0,"q":0,"r":2,"ring":2,"angle":60.0,"i":17,"ringU":0.6667,"angleU":0.1667},{"e":"light.hex_19_light","id":"r2-l","x":0.7778,"y":0.75,"q":1,"r":1,"ring":2,"angle":30.0,"i":18,"ringU":0.6667,"angleU":0.0833},{"e":"light.hex_20_light","id":"r3-a","x":1.0,"y":0.25,"q":3,"r":-1,"ring":3,"angle":340.89,"i":19,"ringU":1.0,"angleU":0.9469}]
       sp: "{{ speed | default(0.2) | float }}"
@@ -156,7 +145,7 @@ script:
   hex_wall_ripple:
     alias: Hex wall ripple
     mode: restart
-    fields: {color: {example: [40, 120, 255]}, speed: {example: 2}, origin: {description: tile id, default master}}
+    fields: {"color": {"description": "ripple colour", "example": "40, 120, 255", "default": [40, 120, 255], "selector": {"color_rgb": {}}}, "speed": {"description": "rings per second", "example": "2", "default": 2, "selector": {"number": {"min": 0.1, "max": 10, "step": 0.1, "mode": "box", "unit_of_measurement": "rings/s"}}}, "origin": {"description": "ripple origin tile id (default: master)", "example": "c0", "default": "c0", "selector": {"select": {"options": ["c0", "r1-e", "r1-ne", "r1-nw", "r1-w", "r1-sw", "r1-se", "r2-a", "r2-b", "r2-c", "r2-d", "r2-e", "r2-f", "r2-g", "r2-h", "r2-i", "r2-j", "r2-k", "r2-l", "r3-a"]}}}}
     variables:
       tiles: [{"e":"light.hex_01_light","id":"c0","x":0.4444,"y":0.5,"q":0,"r":0,"ring":0,"angle":0.0,"i":0,"ringU":0.0,"angleU":0.0},{"e":"light.hex_02_light","id":"r1-e","x":0.6667,"y":0.5,"q":1,"r":0,"ring":1,"angle":0.0,"i":1,"ringU":0.3333,"angleU":0.0},{"e":"light.hex_03_light","id":"r1-ne","x":0.5556,"y":0.25,"q":1,"r":-1,"ring":1,"angle":300.0,"i":2,"ringU":0.3333,"angleU":0.8333},{"e":"light.hex_04_light","id":"r1-nw","x":0.3333,"y":0.25,"q":0,"r":-1,"ring":1,"angle":240.0,"i":3,"ringU":0.3333,"angleU":0.6667},{"e":"light.hex_05_light","id":"r1-w","x":0.2222,"y":0.5,"q":-1,"r":0,"ring":1,"angle":180.0,"i":4,"ringU":0.3333,"angleU":0.5},{"e":"light.hex_06_light","id":"r1-sw","x":0.3333,"y":0.75,"q":-1,"r":1,"ring":1,"angle":120.0,"i":5,"ringU":0.3333,"angleU":0.3333},{"e":"light.hex_07_light","id":"r1-se","x":0.5556,"y":0.75,"q":0,"r":1,"ring":1,"angle":60.0,"i":6,"ringU":0.3333,"angleU":0.1667},{"e":"light.hex_08_light","id":"r2-a","x":0.8889,"y":0.5,"q":2,"r":0,"ring":2,"angle":0.0,"i":7,"ringU":0.6667,"angleU":0.0},{"e":"light.hex_09_light","id":"r2-b","x":0.7778,"y":0.25,"q":2,"r":-1,"ring":2,"angle":330.0,"i":8,"ringU":0.6667,"angleU":0.9167},{"e":"light.hex_10_light","id":"r2-c","x":0.6667,"y":0.0,"q":2,"r":-2,"ring":2,"angle":300.0,"i":9,"ringU":0.6667,"angleU":0.8333},{"e":"light.hex_11_light","id":"r2-d","x":0.4444,"y":0.0,"q":1,"r":-2,"ring":2,"angle":270.0,"i":10,"ringU":0.6667,"angleU":0.75},{"e":"light.hex_12_light","id":"r2-e","x":0.2222,"y":0.0,"q":0,"r":-2,"ring":2,"angle":240.0,"i":11,"ringU":0.6667,"angleU":0.6667},{"e":"light.hex_13_light","id":"r2-f","x":0.1111,"y":0.25,"q":-1,"r":-1,"ring":2,"angle":210.0,"i":12,"ringU":0.6667,"angleU":0.5833},{"e":"light.hex_14_light","id":"r2-g","x":0.0,"y":0.5,"q":-2,"r":0,"ring":2,"angle":180.0,"i":13,"ringU":0.6667,"angleU":0.5},{"e":"light.hex_15_light","id":"r2-h","x":0.1111,"y":0.75,"q":-2,"r":1,"ring":2,"angle":150.0,"i":14,"ringU":0.6667,"angleU":0.4167},{"e":"light.hex_16_light","id":"r2-i","x":0.2222,"y":1.0,"q":-2,"r":2,"ring":2,"angle":120.0,"i":15,"ringU":0.6667,"angleU":0.3333},{"e":"light.hex_17_light","id":"r2-j","x":0.4444,"y":1.0,"q":-1,"r":2,"ring":2,"angle":90.0,"i":16,"ringU":0.6667,"angleU":0.25},{"e":"light.hex_18_light","id":"r2-k","x":0.6667,"y":1.0,"q":0,"r":2,"ring":2,"angle":60.0,"i":17,"ringU":0.6667,"angleU":0.1667},{"e":"light.hex_19_light","id":"r2-l","x":0.7778,"y":0.75,"q":1,"r":1,"ring":2,"angle":30.0,"i":18,"ringU":0.6667,"angleU":0.0833},{"e":"light.hex_20_light","id":"r3-a","x":1.0,"y":0.25,"q":3,"r":-1,"ring":3,"angle":340.89,"i":19,"ringU":1.0,"angleU":0.9469}]
       c: "{{ color | default([40,120,255]) }}"
@@ -193,7 +182,7 @@ script:
   hex_wall_sparkle:
     alias: Hex wall sparkle
     mode: restart
-    fields: {color: {example: [255, 255, 255]}, density: {example: 0.15}, step: {example: 0.5}}
+    fields: {"color": {"description": "sparkle colour", "example": "255, 255, 255", "default": [255, 255, 255], "selector": {"color_rgb": {}}}, "density": {"description": "fraction of tiles lit per step", "example": "0.15", "default": 0.15, "selector": {"number": {"min": 0, "max": 1, "step": 0.01, "mode": "box"}}}, "step": {"description": "seconds per update", "example": "0.5", "default": 0.5, "selector": {"number": {"min": 0.1, "max": 10, "step": 0.1, "mode": "box", "unit_of_measurement": "s"}}}}
     variables:
       tiles: [{"e":"light.hex_01_light","id":"c0","x":0.4444,"y":0.5,"q":0,"r":0,"ring":0,"angle":0.0,"i":0,"ringU":0.0,"angleU":0.0},{"e":"light.hex_02_light","id":"r1-e","x":0.6667,"y":0.5,"q":1,"r":0,"ring":1,"angle":0.0,"i":1,"ringU":0.3333,"angleU":0.0},{"e":"light.hex_03_light","id":"r1-ne","x":0.5556,"y":0.25,"q":1,"r":-1,"ring":1,"angle":300.0,"i":2,"ringU":0.3333,"angleU":0.8333},{"e":"light.hex_04_light","id":"r1-nw","x":0.3333,"y":0.25,"q":0,"r":-1,"ring":1,"angle":240.0,"i":3,"ringU":0.3333,"angleU":0.6667},{"e":"light.hex_05_light","id":"r1-w","x":0.2222,"y":0.5,"q":-1,"r":0,"ring":1,"angle":180.0,"i":4,"ringU":0.3333,"angleU":0.5},{"e":"light.hex_06_light","id":"r1-sw","x":0.3333,"y":0.75,"q":-1,"r":1,"ring":1,"angle":120.0,"i":5,"ringU":0.3333,"angleU":0.3333},{"e":"light.hex_07_light","id":"r1-se","x":0.5556,"y":0.75,"q":0,"r":1,"ring":1,"angle":60.0,"i":6,"ringU":0.3333,"angleU":0.1667},{"e":"light.hex_08_light","id":"r2-a","x":0.8889,"y":0.5,"q":2,"r":0,"ring":2,"angle":0.0,"i":7,"ringU":0.6667,"angleU":0.0},{"e":"light.hex_09_light","id":"r2-b","x":0.7778,"y":0.25,"q":2,"r":-1,"ring":2,"angle":330.0,"i":8,"ringU":0.6667,"angleU":0.9167},{"e":"light.hex_10_light","id":"r2-c","x":0.6667,"y":0.0,"q":2,"r":-2,"ring":2,"angle":300.0,"i":9,"ringU":0.6667,"angleU":0.8333},{"e":"light.hex_11_light","id":"r2-d","x":0.4444,"y":0.0,"q":1,"r":-2,"ring":2,"angle":270.0,"i":10,"ringU":0.6667,"angleU":0.75},{"e":"light.hex_12_light","id":"r2-e","x":0.2222,"y":0.0,"q":0,"r":-2,"ring":2,"angle":240.0,"i":11,"ringU":0.6667,"angleU":0.6667},{"e":"light.hex_13_light","id":"r2-f","x":0.1111,"y":0.25,"q":-1,"r":-1,"ring":2,"angle":210.0,"i":12,"ringU":0.6667,"angleU":0.5833},{"e":"light.hex_14_light","id":"r2-g","x":0.0,"y":0.5,"q":-2,"r":0,"ring":2,"angle":180.0,"i":13,"ringU":0.6667,"angleU":0.5},{"e":"light.hex_15_light","id":"r2-h","x":0.1111,"y":0.75,"q":-2,"r":1,"ring":2,"angle":150.0,"i":14,"ringU":0.6667,"angleU":0.4167},{"e":"light.hex_16_light","id":"r2-i","x":0.2222,"y":1.0,"q":-2,"r":2,"ring":2,"angle":120.0,"i":15,"ringU":0.6667,"angleU":0.3333},{"e":"light.hex_17_light","id":"r2-j","x":0.4444,"y":1.0,"q":-1,"r":2,"ring":2,"angle":90.0,"i":16,"ringU":0.6667,"angleU":0.25},{"e":"light.hex_18_light","id":"r2-k","x":0.6667,"y":1.0,"q":0,"r":2,"ring":2,"angle":60.0,"i":17,"ringU":0.6667,"angleU":0.1667},{"e":"light.hex_19_light","id":"r2-l","x":0.7778,"y":0.75,"q":1,"r":1,"ring":2,"angle":30.0,"i":18,"ringU":0.6667,"angleU":0.0833},{"e":"light.hex_20_light","id":"r3-a","x":1.0,"y":0.25,"q":3,"r":-1,"ring":3,"angle":340.89,"i":19,"ringU":1.0,"angleU":0.9469}]
       c: "{{ color | default([255,255,255]) }}"
@@ -253,7 +242,7 @@ script:
     alias: Hex wall apply synced effect
     mode: restart
     variables:
-      fx_ids: {"solid": 0, "ripple": 1, "rainbow_sweep": 2, "breathe": 3, "chase": 4, "wipe": 5, "rainbow_flow": 6, "random_ripple": 7, "twinkle": 8, "color_cycle": 9, "snake": 10}
+      fx_ids: {"solid": 0, "radial_wave": 1, "rainbow_sweep": 2, "pulse": 3, "chase": 4, "wipe": 5, "rainbow_flow": 6, "random_ripple": 7, "twinkle": 8, "color_cycle": 9, "snake": 10}
       pal_ids: {"rainbow": 0, "ocean": 1, "sunset": 2, "forest": 3, "fire": 4, "mono": 5, "light color": 6}
       fx: "{{ states('input_select.hex_wall_fx') }}"
     sequence:
@@ -299,7 +288,7 @@ script:
 input_select:
   hex_wall_fx:
     name: Hex wall synced effect
-    options: ["off", "solid", "ripple", "rainbow_sweep", "breathe", "chase", "wipe", "rainbow_flow", "random_ripple", "twinkle", "color_cycle", "snake"]
+    options: ["off", "solid", "radial_wave", "rainbow_sweep", "pulse", "chase", "wipe", "rainbow_flow", "random_ripple", "twinkle", "color_cycle", "snake"]
     initial: "off"
   hex_wall_palette:
     name: Hex wall palette
