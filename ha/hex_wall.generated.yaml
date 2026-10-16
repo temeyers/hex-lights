@@ -261,23 +261,30 @@ script:
       fx_ids: {"solid": 0, "radial_wave": 1, "rainbow_sweep": 2, "pulse": 3, "chase": 4, "wipe": 5, "rainbow_flow": 6, "random_ripple": 7, "twinkle": 8, "color_cycle": 9, "snake": 10}
       pal_ids: {"rainbow": 0, "ocean": 1, "sunset": 2, "forest": 3, "fire": 4, "mono": 5}
       fx: "{{ states('input_select.hex_wall_fx') }}"
+      tgt_nodes: "{% set t = states('input_select.hex_wall_target') %}{% if t[:4] == 'Hex ' %}{{ ['hex_' ~ t[4:]] }}{% else %}{% set ns = namespace(o=[]) %}{% for n in ['hex_01', 'hex_02', 'hex_03', 'hex_04', 'hex_05', 'hex_06', 'hex_07', 'hex_08', 'hex_09', 'hex_10', 'hex_11', 'hex_12', 'hex_13', 'hex_14', 'hex_15', 'hex_16', 'hex_17', 'hex_18', 'hex_19', 'hex_20'] %}{% if has_value('light.' ~ n ~ '_light') %}{% set ns.o = ns.o + [n] %}{% endif %}{% endfor %}{{ ns.o }}{% endif %}"
+      tgt_light: "{% set t = states('input_select.hex_wall_target') %}{{ 'light.hex_' ~ t[4:] ~ '_light' if t[:4] == 'Hex ' else 'light.hex_wall' }}"
     sequence:
       - if: "{{ fx == 'off' }}"
         then:
           - action: light.turn_off
-            target: {entity_id: light.hex_wall}
+            target: {entity_id: "{{ tgt_light }}"}
           - stop: "off"
-      - action: esphome.hex_01_set_wall_fx
-        continue_on_error: true
-        data:
-          effect: "{{ fx_ids[fx] }}"
-          palette: "{{ pal_ids[states('input_select.hex_wall_palette')] }}"
-          speed: "{{ [[(states('input_number.hex_wall_speed') | float(1) * 1000) | int, 0] | max, 10000] | min }}"
-          scale: 100
-          hue: 18
-          saturation: 215
-          value: 255
-          start_delay_ms: 300
+      # Target 'All': every flashed tile gets the same params + start time (followers also take them from the
+      # leader's hexsync beacons when ESP-NOW links); 'Hex NN': that tile only.
+      - repeat:
+          for_each: "{{ tgt_nodes }}"
+          sequence:
+            - action: "esphome.{{ repeat.item }}_set_wall_fx"
+              continue_on_error: true
+              data:
+                effect: "{{ fx_ids[fx] }}"
+                palette: "{{ pal_ids[states('input_select.hex_wall_palette')] }}"
+                speed: "{{ [[(states('input_number.hex_wall_speed') | float(1) * 1000) | int, 0] | max, 10000] | min }}"
+                scale: 100
+                hue: 18
+                saturation: 215
+                value: 255
+                start_delay_ms: 300
       - if: "{{ has_value('select.hex_01_wall_wipe_axis') }}"
         then:
           - action: select.select_option
@@ -285,7 +292,7 @@ script:
             target: {entity_id: select.hex_01_wall_wipe_axis}
             data: {option: "{{ states('input_select.hex_wall_axis') }}"}
       - action: light.turn_on
-        target: {entity_id: light.hex_wall}
+        target: {entity_id: "{{ tgt_light }}"}
         data: {effect: HexSync}
   hex_wall_led_count_apply:
     alias: Hex wall push LED count to tiles
@@ -302,6 +309,10 @@ script:
               data: {value: "{{ overrides.get(repeat.item, n) }}"}
 # ---- Whole-wall (HexSync v2) effects. Interface names: tools/gen_ha.py INTERFACE.
 input_select:
+  hex_wall_target:
+    name: Hex target
+    icon: mdi:hexagon-multiple-outline
+    options: ["All", "Hex 01", "Hex 02", "Hex 03", "Hex 04", "Hex 05", "Hex 06", "Hex 07", "Hex 08", "Hex 09", "Hex 10", "Hex 11", "Hex 12", "Hex 13", "Hex 14", "Hex 15", "Hex 16", "Hex 17", "Hex 18", "Hex 19", "Hex 20"]
   hex_wall_fx:
     name: Hex wall synced effect
     options: ["off", "solid", "radial_wave", "rainbow_sweep", "pulse", "chase", "wipe", "rainbow_flow", "random_ripple", "twinkle", "color_cycle", "snake"]
@@ -338,12 +349,76 @@ input_number:
     initial: 44
     mode: box
 automation:
+  - id: hex_wall_target_options
+    alias: Hex wall - target list = All + flashed tiles
+    mode: single
+    triggers:
+      - trigger: homeassistant
+        event: start
+      - trigger: time_pattern
+        minutes: "/5"
+    variables:
+      want: "{% set ns = namespace(o=['All']) %}{% for n in ['hex_01', 'hex_02', 'hex_03', 'hex_04', 'hex_05', 'hex_06', 'hex_07', 'hex_08', 'hex_09', 'hex_10', 'hex_11', 'hex_12', 'hex_13', 'hex_14', 'hex_15', 'hex_16', 'hex_17', 'hex_18', 'hex_19', 'hex_20'] %}{% if has_value('light.' ~ n ~ '_light') %}{% set ns.o = ns.o + ['Hex ' ~ n[4:]] %}{% endif %}{% endfor %}{{ ns.o }}"
+    conditions:
+      - "{{ state_attr('input_select.hex_wall_target', 'options') != want }}"
+    actions:
+      - variables:
+          cur: "{{ states('input_select.hex_wall_target') }}"
+      - action: input_select.set_options
+        target: {entity_id: input_select.hex_wall_target}
+        data: {options: "{{ want }}"}
+      - if: "{{ cur in want }}"
+        then:
+          - action: input_select.select_option
+            target: {entity_id: input_select.hex_wall_target}
+            data: {option: "{{ cur }}"}
+  - id: hex_wall_target_changed
+    alias: Hex wall - panel follows the selected target
+    mode: restart
+    triggers:
+      - trigger: state
+        entity_id: input_select.hex_wall_target
+    variables:
+      fx_sel: "{% set t = states('input_select.hex_wall_target') %}{% set e = 'select.hex_' ~ t[4:] ~ '_wall_effect' if t[:4] == 'Hex ' else '' %}{{ e if e and has_value(e) else 'select.hex_01_wall_effect' }}"
+      pal_sel: "{% set t = states('input_select.hex_wall_target') %}{% set e = 'select.hex_' ~ t[4:] ~ '_wall_palette' if t[:4] == 'Hex ' else '' %}{{ e if e and has_value(e) else 'select.hex_01_wall_palette' }}"
+      axis_sel: "{% set t = states('input_select.hex_wall_target') %}{% set e = 'select.hex_' ~ t[4:] ~ '_wall_wipe_axis' if t[:4] == 'Hex ' else '' %}{{ e if e and has_value(e) else 'select.hex_01_wall_wipe_axis' }}"
+      speed_num: "number.hex_01_wall_speed"
+    actions:
+      - action: input_boolean.turn_on
+        target: {entity_id: input_boolean.hex_wall_syncing}
+      - if: "{{ states(fx_sel) in state_attr('input_select.hex_wall_fx', 'options') }}"
+        then:
+          - action: input_select.select_option
+            target: {entity_id: input_select.hex_wall_fx}
+            data: {option: "{{ states(fx_sel) }}"}
+      - if: "{{ states(pal_sel) in state_attr('input_select.hex_wall_palette', 'options') }}"
+        then:
+          - action: input_select.select_option
+            target: {entity_id: input_select.hex_wall_palette}
+            data: {option: "{{ states(pal_sel) }}"}
+      - if: "{{ states(axis_sel) in state_attr('input_select.hex_wall_axis', 'options') }}"
+        then:
+          - action: input_select.select_option
+            target: {entity_id: input_select.hex_wall_axis}
+            data: {option: "{{ states(axis_sel) }}"}
+      - if: "{{ has_value(speed_num) }}"
+        then:
+          - action: input_number.set_value
+            target: {entity_id: input_number.hex_wall_speed}
+            data: {value: "{{ (states(speed_num) | float(1000) / 1000) | round(2) }}"}
+      - delay: {milliseconds: 800}
+      - action: input_boolean.turn_off
+        target: {entity_id: input_boolean.hex_wall_syncing}
   - id: hex_wall_fx_changed
     alias: Hex wall - synced effect / palette / speed changed
     mode: restart
     triggers:
       - trigger: state
         entity_id: [input_select.hex_wall_fx, input_select.hex_wall_palette, input_select.hex_wall_axis, input_number.hex_wall_speed]
+    conditions:
+      - condition: state
+        entity_id: input_boolean.hex_wall_syncing
+        state: "off"
     actions:
       - delay: {milliseconds: 300}
       - action: script.hex_wall_fx_apply
@@ -413,6 +488,39 @@ input_boolean:
   hex_wall_manual_color:
     name: Hex wall manual colour (tiles show the light colour; effects off)
     initial: false
-  hex_wall_control_all:
-    name: Control all
-    icon: mdi:hexagon-multiple
+  hex_wall_syncing:
+    name: Hex wall panel syncing (internal)
+    initial: false
+template:
+  - light:
+      - name: Hex target
+        unique_id: hex_target_light
+        icon: mdi:hexagon-multiple
+        state: "{% set t = states('input_select.hex_wall_target') %}{{ is_state('light.hex_' ~ t[4:] ~ '_light' if t[:4] == 'Hex ' else 'light.hex_wall', 'on') }}"
+        level: "{% set t = states('input_select.hex_wall_target') %}{{ state_attr('light.hex_' ~ t[4:] ~ '_light' if t[:4] == 'Hex ' else 'light.hex_wall', 'brightness') | int(0) }}"
+        rgb: "{% set t = states('input_select.hex_wall_target') %}{{ state_attr('light.hex_' ~ t[4:] ~ '_light' if t[:4] == 'Hex ' else 'light.hex_wall', 'rgb_color') or (255, 255, 255) }}"
+        turn_on:
+          - action: light.turn_on
+            target: {entity_id: "{% set t = states('input_select.hex_wall_target') %}{{ 'light.hex_' ~ t[4:] ~ '_light' if t[:4] == 'Hex ' else 'light.hex_wall' }}"}
+        turn_off:
+          - action: light.turn_off
+            target: {entity_id: "{% set t = states('input_select.hex_wall_target') %}{{ 'light.hex_' ~ t[4:] ~ '_light' if t[:4] == 'Hex ' else 'light.hex_wall' }}"}
+        set_level:
+          - action: light.turn_on
+            target: {entity_id: "{% set t = states('input_select.hex_wall_target') %}{{ 'light.hex_' ~ t[4:] ~ '_light' if t[:4] == 'Hex ' else 'light.hex_wall' }}"}
+            data: {brightness: "{{ brightness }}"}
+        set_rgb:
+          - action: light.turn_on
+            target: {entity_id: "{% set t = states('input_select.hex_wall_target') %}{{ 'light.hex_' ~ t[4:] ~ '_light' if t[:4] == 'Hex ' else 'light.hex_wall' }}"}
+            data: {rgb_color: ["{{ r }}", "{{ g }}", "{{ b }}"]}
+  - switch:
+      - name: Hex target manual color
+        unique_id: hex_target_manual_color
+        icon: mdi:palette
+        state: "{% set t = states('input_select.hex_wall_target') %}{{ is_state('switch.hex_' ~ t[4:] ~ '_manual_color' if t[:4] == 'Hex ' else 'switch.hex_01_manual_color', 'on') }}"
+        turn_on:
+          - action: switch.turn_on
+            target: {entity_id: "{% set t = states('input_select.hex_wall_target') %}{{ ['switch.hex_' ~ t[4:] ~ '_manual_color'] if t[:4] == 'Hex ' else states.switch | map(attribute='entity_id') | select('match', '^switch[.]hex_[0-9]+_manual_color$') | select('has_value') | list }}"}
+        turn_off:
+          - action: switch.turn_off
+            target: {entity_id: "{% set t = states('input_select.hex_wall_target') %}{{ ['switch.hex_' ~ t[4:] ~ '_manual_color'] if t[:4] == 'Hex ' else states.switch | map(attribute='entity_id') | select('match', '^switch[.]hex_[0-9]+_manual_color$') | select('has_value') | list }}"}

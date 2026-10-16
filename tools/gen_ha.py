@@ -283,6 +283,144 @@ script:
     return "\n".join(l.rstrip() for l in out.splitlines() if l.strip() != "") + "\n"
 
 
+def target_jinja(tn, mnode):
+    """Jinja for the panel target (input_select.hex_wall_target): tile nodes to write, and the light to drive."""
+    T = "{% set t = states('input_select.hex_wall_target') %}"
+    nodes = (T + "{% if t[:4] == 'Hex ' %}{{ ['hex_' ~ t[4:]] }}{% else %}"
+             "{% set ns = namespace(o=[]) %}{% for n in " + json.dumps(tn).replace('"', "'") + " %}"
+             "{% if has_value('light.' ~ n ~ '_light') %}{% set ns.o = ns.o + [n] %}{% endif %}{% endfor %}"
+             "{{ ns.o }}{% endif %}")
+    light = T + "{{ 'light.hex_' ~ t[4:] ~ '_light' if t[:4] == 'Hex ' else 'light.hex_wall' }}"
+    return nodes, light
+
+
+def target_block(tn, mnode):
+    """One control panel for the whole wall or one tile ('All' / 'Hex NN').
+
+    - input_select.hex_wall_target: 'All' + 'Hex NN' for every flashed tile (options refreshed at runtime, so
+      Hex 03..20 appear once they're online - no card edits).
+    - light.hex_target / switch.hex_target_manual_color: template proxies for the panel (brightness, colour,
+      manual colour) that read and write the selected target; All = light.hex_wall / every tile's switch.
+    - Effect/palette/speed/axis stay the wall helpers; hex_wall_fx_apply fans them out to the target.
+      On a target change the helpers are re-synced FROM the target with input_boolean.hex_wall_syncing on,
+      which hex_wall_fx_changed checks, so syncing never writes back to the tiles.
+    """
+    J = json.dumps
+    T = "{% set t = states('input_select.hex_wall_target') %}"
+    TL = T + "{{ 'light.hex_' ~ t[4:] ~ '_light' if t[:4] == 'Hex ' else 'light.hex_wall' }}"
+    master_sw = "switch." + mnode + "_manual_color"
+    TS = (T + "{{ 'switch.hex_' ~ t[4:] ~ '_manual_color' if t[:4] == 'Hex ' else '" + master_sw + "' }}")
+    ALL_SW = ("{{ states.switch | map(attribute='entity_id') | select('match', '^switch[.]hex_[0-9]+_manual_color$') "
+              "| select('has_value') | list }}")
+    TSW = T + "{{ ['switch.hex_' ~ t[4:] ~ '_manual_color'] if t[:4] == 'Hex ' else " + ALL_SW[3:-3] + " }}"
+    opts = ("{% set ns = namespace(o=['All']) %}{% for n in " + J(tn).replace('"', "'") + " %}"
+            "{% if has_value('light.' ~ n ~ '_light') %}{% set ns.o = ns.o + ['Hex ' ~ n[4:]] %}{% endif %}"
+            "{% endfor %}{{ ns.o }}")
+    # tile selects (only the master exposes wall selects; followers fall back to the master's)
+    def tsel(kind):
+        return (T + "{% set e = 'select.hex_' ~ t[4:] ~ '_" + kind + "' if t[:4] == 'Hex ' else '' %}"
+                "{{ e if e and has_value(e) else 'select." + mnode + "_" + kind + "' }}")
+    sel = ("  hex_wall_target:\n    name: Hex target\n    icon: mdi:hexagon-multiple-outline\n"
+           "    options: " + J(["All"] + ["Hex " + n[4:] for n in tn]) + "\n")
+    autos = f"""  - id: hex_wall_target_options
+    alias: Hex wall - target list = All + flashed tiles
+    mode: single
+    triggers:
+      - trigger: homeassistant
+        event: start
+      - trigger: time_pattern
+        minutes: "/5"
+    variables:
+      want: {J(opts)}
+    conditions:
+      - "{{{{ state_attr('input_select.hex_wall_target', 'options') != want }}}}"
+    actions:
+      - variables:
+          cur: "{{{{ states('input_select.hex_wall_target') }}}}"
+      - action: input_select.set_options
+        target: {{entity_id: input_select.hex_wall_target}}
+        data: {{options: "{{{{ want }}}}"}}
+      - if: "{{{{ cur in want }}}}"
+        then:
+          - action: input_select.select_option
+            target: {{entity_id: input_select.hex_wall_target}}
+            data: {{option: "{{{{ cur }}}}"}}
+  - id: hex_wall_target_changed
+    alias: Hex wall - panel follows the selected target
+    mode: restart
+    triggers:
+      - trigger: state
+        entity_id: input_select.hex_wall_target
+    variables:
+      fx_sel: {J(tsel("wall_effect"))}
+      pal_sel: {J(tsel("wall_palette"))}
+      axis_sel: {J(tsel("wall_wipe_axis"))}
+      speed_num: "number.{mnode}_wall_speed"
+    actions:
+      - action: input_boolean.turn_on
+        target: {{entity_id: input_boolean.hex_wall_syncing}}
+      - if: "{{{{ states(fx_sel) in state_attr('input_select.hex_wall_fx', 'options') }}}}"
+        then:
+          - action: input_select.select_option
+            target: {{entity_id: input_select.hex_wall_fx}}
+            data: {{option: "{{{{ states(fx_sel) }}}}"}}
+      - if: "{{{{ states(pal_sel) in state_attr('input_select.hex_wall_palette', 'options') }}}}"
+        then:
+          - action: input_select.select_option
+            target: {{entity_id: input_select.hex_wall_palette}}
+            data: {{option: "{{{{ states(pal_sel) }}}}"}}
+      - if: "{{{{ states(axis_sel) in state_attr('input_select.hex_wall_axis', 'options') }}}}"
+        then:
+          - action: input_select.select_option
+            target: {{entity_id: input_select.hex_wall_axis}}
+            data: {{option: "{{{{ states(axis_sel) }}}}"}}
+      - if: "{{{{ has_value(speed_num) }}}}"
+        then:
+          - action: input_number.set_value
+            target: {{entity_id: input_number.hex_wall_speed}}
+            data: {{value: "{{{{ (states(speed_num) | float(1000) / 1000) | round(2) }}}}"}}
+      - delay: {{milliseconds: 800}}
+      - action: input_boolean.turn_off
+        target: {{entity_id: input_boolean.hex_wall_syncing}}
+"""
+    tmpl = f"""
+template:
+  - light:
+      - name: Hex target
+        unique_id: hex_target_light
+        icon: mdi:hexagon-multiple
+        state: {J("{% set l = " + TL[len(T):].replace("{{ ", "").replace(" }}", "") + " %}" if False else T + "{{ is_state(" + TL[len(T) + 3:-3] + ", 'on') }}")}
+        level: {J(T + "{{ state_attr(" + TL[len(T) + 3:-3] + ", 'brightness') | int(0) }}")}
+        rgb: {J(T + "{{ state_attr(" + TL[len(T) + 3:-3] + ", 'rgb_color') or (255, 255, 255) }}")}
+        turn_on:
+          - action: light.turn_on
+            target: {{entity_id: {J(TL)}}}
+        turn_off:
+          - action: light.turn_off
+            target: {{entity_id: {J(TL)}}}
+        set_level:
+          - action: light.turn_on
+            target: {{entity_id: {J(TL)}}}
+            data: {{brightness: "{{{{ brightness }}}}"}}
+        set_rgb:
+          - action: light.turn_on
+            target: {{entity_id: {J(TL)}}}
+            data: {{rgb_color: ["{{{{ r }}}}", "{{{{ g }}}}", "{{{{ b }}}}"]}}
+  - switch:
+      - name: Hex target manual color
+        unique_id: hex_target_manual_color
+        icon: mdi:palette
+        state: {J(T + "{{ is_state(" + TS[len(T) + 3:-3] + ", 'on') }}")}
+        turn_on:
+          - action: switch.turn_on
+            target: {{entity_id: {J(TSW)}}}
+        turn_off:
+          - action: switch.turn_off
+            target: {{entity_id: {J(TSW)}}}
+"""
+    return sel, autos, tmpl
+
+
 def wall_block(d, node, master):
     I = {**INTERFACE, **(d.get("ha") or {})}
     J = json.dumps
@@ -308,6 +446,8 @@ def wall_block(d, node, master):
                 if "ledCount" in t}
     eff = I["light_effect"]
     tn = [node(d, t) for t in d["tiles"]]
+    TGT_NODES, TGT_LIGHT = target_jinja(tn, mnode)
+    TB_SELECT, TB_AUTOS, TB_TEMPLATE = target_block(tn, mnode)
     want_mode = I["sync_mode_jumper"] if (d.get("sync") or {}).get("mode") == "jumper" else I["sync_mode_wireless"]
     src = [I["sync_source_sensor"].format(node=n) for n in tn]
     mode_sel = I["sync_mode_select"].format(master=mnode)
@@ -428,25 +568,32 @@ def wall_block(d, node, master):
       fx_ids: {J(WALL_FX)}
       pal_ids: {J({p: i for i, p in enumerate(PALETTES)})}
       fx: "{{{{ states('input_select.hex_wall_fx') }}}}"
+      tgt_nodes: "{TGT_NODES}"
+      tgt_light: "{TGT_LIGHT}"
     sequence:
       - if: "{{{{ fx == 'off' }}}}"
         then:
           - action: light.turn_off
-            target: {{entity_id: light.hex_wall}}
+            target: {{entity_id: "{{{{ tgt_light }}}}"}}
           - stop: "off"
-      - action: {fx_action}
-        continue_on_error: true
-        data:
-          effect: "{{{{ fx_ids[fx] }}}}"
-          palette: "{{{{ pal_ids[states('input_select.hex_wall_palette')] }}}}"
-          speed: "{{{{ [[(states('input_number.hex_wall_speed') | float(1) * 1000) | int, 0] | max, 10000] | min }}}}"
-          scale: 100
-          hue: 18
-          saturation: 215
-          value: 255
-          start_delay_ms: {min(300, MAX_START_DELAY_MS)}{axis_arg}{axis_select}
+      # Target 'All': every flashed tile gets the same params + start time (followers also take them from the
+      # leader's hexsync beacons when ESP-NOW links); 'Hex NN': that tile only.
+      - repeat:
+          for_each: "{{{{ tgt_nodes }}}}"
+          sequence:
+            - action: "esphome.{{{{ repeat.item }}}}_set_wall_fx"
+              continue_on_error: true
+              data:
+                effect: "{{{{ fx_ids[fx] }}}}"
+                palette: "{{{{ pal_ids[states('input_select.hex_wall_palette')] }}}}"
+                speed: "{{{{ [[(states('input_number.hex_wall_speed') | float(1) * 1000) | int, 0] | max, 10000] | min }}}}"
+                scale: 100
+                hue: 18
+                saturation: 215
+                value: 255
+                start_delay_ms: {min(300, MAX_START_DELAY_MS)}{axis_arg.replace(chr(10) + "          ", chr(10) + "                ")}{axis_select}
       - action: light.turn_on
-        target: {{entity_id: light.hex_wall}}
+        target: {{entity_id: "{{{{ tgt_light }}}}"}}
         data: {{effect: {eff}}}
   hex_wall_led_count_apply:
     alias: Hex wall push LED count to tiles
@@ -463,7 +610,7 @@ def wall_block(d, node, master):
               data: {{value: "{{{{ overrides.get(repeat.item, n) }}}}"}}
 # ---- Whole-wall (HexSync v2) effects. Interface names: tools/gen_ha.py INTERFACE.
 input_select:
-  hex_wall_fx:
+{TB_SELECT}  hex_wall_fx:
     name: Hex wall synced effect
     options: {J(["off"] + list(WALL_FX))}
     initial: "off"
@@ -500,12 +647,16 @@ input_number:
     mode: box
 
 automation:
-  - id: hex_wall_fx_changed
+{TB_AUTOS}  - id: hex_wall_fx_changed
     alias: Hex wall - synced effect / palette / speed changed
     mode: restart
     triggers:
       - trigger: state
         entity_id: [input_select.hex_wall_fx, input_select.hex_wall_palette, input_select.hex_wall_axis, input_number.hex_wall_speed]
+    conditions:
+      - condition: state
+        entity_id: input_boolean.hex_wall_syncing
+        state: "off"
     actions:
       - delay: {{milliseconds: 300}}
       - action: script.hex_wall_fx_apply
@@ -531,10 +682,10 @@ input_boolean:
   hex_wall_manual_color:
     name: Hex wall manual colour (tiles show the light colour; effects off)
     initial: false
-  hex_wall_control_all:
-    name: Control all
-    icon: mdi:hexagon-multiple
-"""
+  hex_wall_syncing:
+    name: Hex wall panel syncing (internal)
+    initial: false
+""" + TB_TEMPLATE
 
 
 def render_dashboard(d, node):

@@ -120,7 +120,7 @@ def test_ha_wall_interface():
     assert h["input_number"]["hex_wall_led_count"]["initial"] == 44
     assert h["input_number"]["hex_wall_led_count"]["max"] == 60
     txt = open(os.path.join(ROOT, "ha/hex_wall.generated.yaml")).read()
-    assert "number.hex_01_led_count" in txt and "esphome.hex_01_set_wall_fx" in txt
+    assert "number.hex_01_led_count" in txt and "esphome.{{ repeat.item }}_set_wall_fx" in txt
 
 def test_ha_yaml_no_duplicate_keys():
     import yaml
@@ -274,7 +274,7 @@ def test_hex_nn_names():
     assert g.device_name(d, t["r3-a"]) == "hex-20" and g.light_entity(d, t["r2-a"]) == "light.hex_08_light"
     assert g.substitutions(d, t["c0"])["wall_controls_internal"] == "false"
     txt = open(os.path.join(ROOT, "ha/hex_wall.generated.yaml")).read()
-    assert "hex_c0" not in txt and "esphome.hex_01_set_wall_fx" in txt and "light.hex_20_light" in txt
+    assert "hex_c0" not in txt and "esphome.{{ repeat.item }}_set_wall_fx" in txt and "light.hex_20_light" in txt
     dash = open(os.path.join(ROOT, "ha/hex_wall_dashboard.generated.yaml")).read()
     assert "binary_sensor.hex_05_sync_leader" in dash and "select.hex_01_sync_mode" in dash
     I = gen_ha.INTERFACE
@@ -416,8 +416,19 @@ def test_no_empty_selector_configs():
         "t": {"description": "y", "example": "", "selector": {"text": None}}}
 
 
-def test_control_all_helper():
+def test_target_panel():
     import yaml
     h = yaml.safe_load(open(os.path.join(ROOT, "ha/hex_wall.generated.yaml")))
-    b = h["input_boolean"]["hex_wall_control_all"]
-    assert b["name"] == "Control all" and "initial" not in b   # UI toggle: keeps its state across restarts
+    assert "hex_wall_control_all" not in h["input_boolean"]
+    assert h["input_boolean"]["hex_wall_syncing"]["initial"] is False
+    opts = h["input_select"]["hex_wall_target"]["options"]
+    assert opts[0] == "All" and opts[1] == "Hex 01" and all(o == "All" or o.startswith("Hex ") for o in opts)
+    ids = {a["id"] for a in h["automation"]}
+    assert {"hex_wall_target_options", "hex_wall_target_changed"} <= ids
+    fx = [a for a in h["automation"] if a["id"] == "hex_wall_fx_changed"][0]
+    assert fx["conditions"][0]["entity_id"] == "input_boolean.hex_wall_syncing"   # no write-back while syncing
+    seq = json.dumps(h["script"]["hex_wall_fx_apply"])
+    assert "_set_wall_fx" in seq and "tgt_nodes" in seq
+    names = [l["name"] for l in h["template"][0]["light"]] + [s["name"] for s in h["template"][1]["switch"]]
+    assert names == ["Hex target", "Hex target manual color"]
+    assert "tile" not in json.dumps(h["input_select"]["hex_wall_target"]).lower()
