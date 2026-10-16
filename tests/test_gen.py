@@ -150,3 +150,22 @@ def test_rotation_order_validation(field, val):
 def test_ha_rainbow_axes():
     txt = open(os.path.join(ROOT, "ha/hex_wall.generated.yaml")).read()
     assert "ringU" in txt and "angleU" in txt
+
+def test_hexsync_interface_matches_hardware():
+    import json, yaml
+    import gen_ha
+    assert gen_ha.WALL_FX["ripple"] == 1 and gen_ha.WALL_FX["breathe"] == 3
+    assert [gen_ha.WALL_FX[n] for n in ("random_ripple", "twinkle", "color_cycle", "snake")] == [7, 8, 9, 10]
+    h = yaml.safe_load(open(os.path.join(ROOT, "ha/hex_wall.generated.yaml")))
+    assert set(gen_ha.WALL_FX) <= set(h["input_select"]["hex_wall_fx"]["options"])
+    assert h["input_select"]["hex_wall_axis"]["options"] == ["x", "y", "ring", "angle"]
+    n = h["input_number"]["hex_wall_led_count"]; assert (n["min"], n["max"], n["initial"]) == (1, 60, 44)
+    txt = open(os.path.join(ROOT, "ha/hex_wall.generated.yaml")).read()
+    assert "select.hex_c0_wall_wipe_axis" in txt and "10000] | min" in txt
+    cat = json.load(open(os.path.join(ROOT, "effects.json")))
+    fo = {e["name"] for e in cat["effects"] if e.get("firmwareOnly")}
+    assert fo == {"random_ripple", "twinkle", "color_cycle", "snake"}
+    tpl = open(os.path.join(ROOT, "esphome/templates/tile-common.yaml")).read()
+    if "set_wall_fx" in tpl:   # Hardware's template present: names must line up
+        for k in ("effect", "palette", "speed", "scale", "hue", "saturation", "value", "start_delay_ms"):
+            assert f"{k}: int" in tpl

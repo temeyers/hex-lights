@@ -13,9 +13,19 @@ INTERFACE = {
     "fx_action": "esphome.{master}_set_wall_fx",    # proposed v2 action on any tile
     "legacy_action": "esphome.{master}_set_wall_effect",  # existing action
     "light_effect": "HexSync",
+    # master-only firmware entities (Hardware df1ad9b); the service above stays the primary path
+    "wall_speed_number": "number.{master}_wall_speed",      # 0..10000 milli-cycles/s
+    "wall_effect_select": "select.{master}_wall_effect",
+    "wall_palette_select": "select.{master}_wall_palette",
+    "wall_axis_select": "select.{master}_wall_wipe_axis",  # x|y|ring|angle
 }
+LED_COUNT_RANGE = (1, 60)          # firmware number range
+MAX_START_DELAY_MS = 10000         # firmware cap
+# our name -> HexSync id (firmware names: 1 radial_wave, 3 pulse; 7-10 firmware-only)
 WALL_FX = {"solid": 0, "ripple": 1, "rainbow_sweep": 2, "breathe": 3,
-           "chase": 4, "wipe": 5, "rainbow_flow": 6}
+           "chase": 4, "wipe": 5, "rainbow_flow": 6, "random_ripple": 7,
+           "twinkle": 8, "color_cycle": 9, "snake": 10}
+AXES = ["x", "y", "ring", "angle"]
 PALETTES = ["rainbow", "ocean", "sunset", "forest", "fire", "mono"]
 
 
@@ -221,6 +231,7 @@ def wall_block(d, node, master):
     J = json.dumps
     mnode = node(d, master)
     fx_action = I["fx_action"].format(master=mnode)
+    axis_sel = I["wall_axis_select"].format(master=mnode)
     numbers = [I["led_count_number"].format(node=node(d, t)) for t in d["tiles"]]
     per_tile = {I["led_count_number"].format(node=node(d, t)): t["leds"] for t in d["tiles"]
                 if "ledCount" in t}
@@ -244,12 +255,18 @@ def wall_block(d, node, master):
         data:
           effect: "{{{{ fx_ids[fx] }}}}"
           palette: "{{{{ pal_ids[states('input_select.hex_wall_palette')] }}}}"
-          speed: "{{{{ (states('input_number.hex_wall_speed') | float(1) * 1000) | int }}}}"
+          speed: "{{{{ [[(states('input_number.hex_wall_speed') | float(1) * 1000) | int, 0] | max, 10000] | min }}}}"
           scale: 100
           hue: 18
           saturation: 215
           value: 255
-          start_delay_ms: 300
+          start_delay_ms: {min(300, MAX_START_DELAY_MS)}
+      - if: "{{{{ has_value('{axis_sel}') }}}}"
+        then:
+          - action: select.select_option
+            continue_on_error: true
+            target: {{entity_id: {axis_sel}}}
+            data: {{option: "{{{{ states('input_select.hex_wall_axis') }}}}"}}
       - action: light.turn_on
         target: {{entity_id: light.hex_wall}}
         data: {{effect: {eff}}}
@@ -276,18 +293,22 @@ input_select:
     name: Hex wall palette
     options: {J(PALETTES)}
     initial: rainbow
+  hex_wall_axis:
+    name: Hex wall wipe/sweep axis
+    options: {J(AXES)}
+    initial: x
 input_number:
   hex_wall_speed:
     name: Hex wall speed
-    min: 0.05
-    max: 5
+    min: 0
+    max: 10
     step: 0.05
     initial: 1
     mode: slider
   hex_wall_led_count:
     name: Hex wall LEDs per tile
-    min: 1
-    max: {d["led"].get("maxCount", d["led"]["count"])}
+    min: {LED_COUNT_RANGE[0]}
+    max: {min(LED_COUNT_RANGE[1], d["led"].get("maxCount", d["led"]["count"]))}
     step: 1
     initial: {d["led"]["count"]}
     mode: box
@@ -298,7 +319,7 @@ automation:
     mode: restart
     triggers:
       - trigger: state
-        entity_id: [input_select.hex_wall_fx, input_select.hex_wall_palette, input_number.hex_wall_speed]
+        entity_id: [input_select.hex_wall_fx, input_select.hex_wall_palette, input_select.hex_wall_axis, input_number.hex_wall_speed]
     actions:
       - delay: {{milliseconds: 300}}
       - action: script.hex_wall_fx_apply

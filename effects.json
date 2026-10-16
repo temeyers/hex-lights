@@ -38,7 +38,8 @@
     }
    },
    "formula": "k = 0.5 - 0.5*cos(2*pi*t/(periodS*1000)); rgb = round(color*k)",
-   "hexsyncId": 3
+   "hexsyncId": 3,
+   "hexsyncName": "pulse"
   },
   {
    "name": "rainbow_sweep",
@@ -115,7 +116,8 @@
     }
    },
    "formula": "d = hexDistance(tile, origin); P = maxD + 2; ph = (t/1000*speed) mod P; k = max(0, 1 - |ph - d|); rgb = round(pal(palette, d/max(1,maxD))*k)  (mono -> color)",
-   "hexsyncId": 1
+   "hexsyncId": 1,
+   "hexsyncName": "radial_wave"
   },
   {
    "name": "spiral",
@@ -292,6 +294,118 @@
     }
    },
    "formula": "u = ((x + y)/2)*scale - t/1000*speed; rgb = pal(palette, u)"
+  },
+  {
+   "name": "random_ripple",
+   "label": "Random ripple",
+   "hexsyncId": 7,
+   "firmwareOnly": true,
+   "params": {
+    "speed": {
+     "type": "number",
+     "min": 0,
+     "max": 10,
+     "default": 1,
+     "unit": "cycles/s"
+    },
+    "palette": {
+     "type": "enum",
+     "options": [
+      "rainbow",
+      "ocean",
+      "sunset",
+      "forest",
+      "fire",
+      "mono"
+     ],
+     "default": "rainbow"
+    }
+   },
+   "formula": "firmware-only (see esphome/tools/effects-ref.js); not in tools/effects.js"
+  },
+  {
+   "name": "twinkle",
+   "label": "Twinkle",
+   "hexsyncId": 8,
+   "firmwareOnly": true,
+   "params": {
+    "speed": {
+     "type": "number",
+     "min": 0,
+     "max": 10,
+     "default": 1,
+     "unit": "cycles/s"
+    },
+    "palette": {
+     "type": "enum",
+     "options": [
+      "rainbow",
+      "ocean",
+      "sunset",
+      "forest",
+      "fire",
+      "mono"
+     ],
+     "default": "rainbow"
+    }
+   },
+   "formula": "firmware-only (see esphome/tools/effects-ref.js); not in tools/effects.js"
+  },
+  {
+   "name": "color_cycle",
+   "label": "Color cycle",
+   "hexsyncId": 9,
+   "firmwareOnly": true,
+   "params": {
+    "speed": {
+     "type": "number",
+     "min": 0,
+     "max": 10,
+     "default": 1,
+     "unit": "cycles/s"
+    },
+    "palette": {
+     "type": "enum",
+     "options": [
+      "rainbow",
+      "ocean",
+      "sunset",
+      "forest",
+      "fire",
+      "mono"
+     ],
+     "default": "rainbow"
+    }
+   },
+   "formula": "firmware-only (see esphome/tools/effects-ref.js); not in tools/effects.js"
+  },
+  {
+   "name": "snake",
+   "label": "Snake",
+   "hexsyncId": 10,
+   "firmwareOnly": true,
+   "params": {
+    "speed": {
+     "type": "number",
+     "min": 0,
+     "max": 10,
+     "default": 1,
+     "unit": "cycles/s"
+    },
+    "palette": {
+     "type": "enum",
+     "options": [
+      "rainbow",
+      "ocean",
+      "sunset",
+      "forest",
+      "fire",
+      "mono"
+     ],
+     "default": "rainbow"
+    }
+   },
+   "formula": "firmware-only (see esphome/tools/effects-ref.js); not in tools/effects.js"
   }
  ],
  "palettes": {

@@ -7,7 +7,7 @@ const cat = JSON.parse(readFileSync(new URL("../effects.json", import.meta.url))
 const tiles = lay.tiles;
 assert.deepEqual(hsv(0), [255, 0, 0]); assert.deepEqual(hsv(120), [0, 255, 0]); assert.deepEqual(hsv(240), [0, 0, 255]);
 assert.equal(hexDistance({ q: 0, r: 0 }, { q: 2, r: -1 }), 2);
-for (const e of cat.effects) {
+for (const e of cat.effects.filter((x) => !x.firmwareOnly)) {
   for (const tMs of [0, 123, 5000]) {
     const f = frame(e.name, {}, tiles, tMs);
     assert.equal(Object.keys(f).length, tiles.length, e.name);

@@ -218,7 +218,7 @@ script:
     alias: Hex wall apply synced effect
     mode: restart
     variables:
-      fx_ids: {"solid": 0, "ripple": 1, "rainbow_sweep": 2, "breathe": 3, "chase": 4, "wipe": 5, "rainbow_flow": 6}
+      fx_ids: {"solid": 0, "ripple": 1, "rainbow_sweep": 2, "breathe": 3, "chase": 4, "wipe": 5, "rainbow_flow": 6, "random_ripple": 7, "twinkle": 8, "color_cycle": 9, "snake": 10}
       pal_ids: {"rainbow": 0, "ocean": 1, "sunset": 2, "forest": 3, "fire": 4, "mono": 5}
       fx: "{{ states('input_select.hex_wall_fx') }}"
     sequence:
@@ -232,12 +232,18 @@ script:
         data:
           effect: "{{ fx_ids[fx] }}"
           palette: "{{ pal_ids[states('input_select.hex_wall_palette')] }}"
-          speed: "{{ (states('input_number.hex_wall_speed') | float(1) * 1000) | int }}"
+          speed: "{{ [[(states('input_number.hex_wall_speed') | float(1) * 1000) | int, 0] | max, 10000] | min }}"
           scale: 100
           hue: 18
           saturation: 215
           value: 255
           start_delay_ms: 300
+      - if: "{{ has_value('select.hex_c0_wall_wipe_axis') }}"
+        then:
+          - action: select.select_option
+            continue_on_error: true
+            target: {entity_id: select.hex_c0_wall_wipe_axis}
+            data: {option: "{{ states('input_select.hex_wall_axis') }}"}
       - action: light.turn_on
         target: {entity_id: light.hex_wall}
         data: {effect: HexSync}
@@ -258,17 +264,21 @@ script:
 input_select:
   hex_wall_fx:
     name: Hex wall synced effect
-    options: ["off", "solid", "ripple", "rainbow_sweep", "breathe", "chase", "wipe", "rainbow_flow"]
+    options: ["off", "solid", "ripple", "rainbow_sweep", "breathe", "chase", "wipe", "rainbow_flow", "random_ripple", "twinkle", "color_cycle", "snake"]
     initial: "off"
   hex_wall_palette:
     name: Hex wall palette
     options: ["rainbow", "ocean", "sunset", "forest", "fire", "mono"]
     initial: rainbow
+  hex_wall_axis:
+    name: Hex wall wipe/sweep axis
+    options: ["x", "y", "ring", "angle"]
+    initial: x
 input_number:
   hex_wall_speed:
     name: Hex wall speed
-    min: 0.05
-    max: 5
+    min: 0
+    max: 10
     step: 0.05
     initial: 1
     mode: slider
@@ -285,7 +295,7 @@ automation:
     mode: restart
     triggers:
       - trigger: state
-        entity_id: [input_select.hex_wall_fx, input_select.hex_wall_palette, input_number.hex_wall_speed]
+        entity_id: [input_select.hex_wall_fx, input_select.hex_wall_palette, input_select.hex_wall_axis, input_number.hex_wall_speed]
     actions:
       - delay: {milliseconds: 300}
       - action: script.hex_wall_fx_apply
