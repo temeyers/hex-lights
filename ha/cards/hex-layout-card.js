@@ -82,7 +82,8 @@ class HexLayoutCard extends HTMLElement {
     cells.forEach(c => { const p = this._px(c.q, c.r); svg += `<polygon class="cell" points="${this._poly(p.x, p.y, 0)}"/>`; });
     placed.forEach(e => {
       const p = this._px(T[e].q, T[e].r), c = this._color(e), rot = T[e].rot || 0, sel = this._sel.has(e);
-      svg += `<g class="tile${sel ? " sel" : ""}" data-e="${e}">`;
+      const tg = this._tgt(), isT = tg && tg !== "All" && this._hexName(e) === tg;
+      svg += `<g class="tile${sel ? " sel" : ""}${isT ? " tgt" : ""}" data-e="${e}">`;
       if (c.on) svg += `<polygon points="${this._poly(p.x, p.y, rot)}" fill="${c.fill}" opacity="${(c.op * 0.8).toFixed(2)}" filter="url(#glow)"/>`;
       svg += `<polygon class="hex" points="${this._poly(p.x, p.y, rot)}" fill="${c.fill}" fill-opacity="${c.on ? c.op.toFixed(2) : 1}"/>`;
       svg += `<text x="${p.x}" y="${p.y + 4}" class="${c.on && c.b > 150 ? "dark" : ""}">${this._name(e)}</text></g>`;
@@ -95,7 +96,7 @@ class HexLayoutCard extends HTMLElement {
     let html = `<style>${HexLayoutCard.css}</style><ha-card>
       <div class="head"><span class="title">${this._config.title || "Hex layout"}</span>
       <button class="btn" id="edit">${this._edit ? "Done" : "Edit layout"}</button></div>
-      <div class="chips">${chip("All", "all", anyOn)}${groups.map((g, i) => chip(g.name, i, gOn(g))).join("")}</div>
+      <div class="chips">${chip(this._tgtEnt() ? (this._tgt() === "All" ? "● All" : "All") : "All", "all", anyOn)}${this._tgtEnt() ? `<button class="chip pwr" id="pwr" title="On/off for the selected target">⏻ ${this._tgt()}</button>` : ""}${groups.map((g, i) => chip(g.name, i, gOn(g))).join("")}</div>
       <div class="stage">${svg}</div>`;
     if (this._edit) {
       html += `<div class="edit">
@@ -129,9 +130,18 @@ class HexLayoutCard extends HTMLElement {
     $("edit").onclick = () => { if (this._edit && this._dirty) this._save(); this._edit = !this._edit; this._sel.clear(); this._render(); };
     this.shadowRoot.querySelectorAll(".chip").forEach(b => b.onclick = () => {
       const g = b.dataset.g, ents = g === "all" ? this._lights() : this._layout.groups[+g].entities;
+      const toggle = () => {
+        const on = ents.some(e => this._hass.states[e] && this._hass.states[e].state === "on");
+        this._hass.callService("light", on ? "turn_off" : "turn_on", { entity_id: ents });
+      };
+      if (g === "all" && this._tgtEnt()) this._tap("chip-all", () => this._setTgt("All"), toggle); else toggle();
+    });
+    const pw = $("pwr");
+    if (pw) pw.onclick = () => {
+      const tg = this._tgt(), ents = !tg || tg === "All" ? this._lights() : this._lights().filter(e => this._hexName(e) === tg);
       const on = ents.some(e => this._hass.states[e] && this._hass.states[e].state === "on");
       this._hass.callService("light", on ? "turn_off" : "turn_on", { entity_id: ents });
-    });
+    };
     this.shadowRoot.querySelectorAll(".tile").forEach(t => {
       const e = t.dataset.e; let timer, long = false, down = null, moved = false;
       t.onpointerdown = ev => {
@@ -143,7 +153,11 @@ class HexLayoutCard extends HTMLElement {
       t.onpointerup = ev => {
         clearTimeout(timer);
         if (this._edit) { this._drag = null; if (moved) this._place(e, ev); else { this._sel.has(e) ? this._sel.delete(e) : this._sel.add(e); } this._render(); }
-        else if (!long && !moved) this._hass.callService("light", "toggle", { entity_id: e });
+        else if (!long && !moved) {
+          const n = this._hexName(e), toggle = () => this._hass.callService("light", "toggle", { entity_id: e });
+          if (this._tgtEnt() && n) this._tap(e, () => this._setTgt(this._tgt() === n ? "All" : n), toggle);
+          else toggle();
+        }
         down = null;
       };
       t.oncontextmenu = ev => ev.preventDefault();
@@ -172,6 +186,16 @@ class HexLayoutCard extends HTMLElement {
     this.shadowRoot.querySelectorAll("[data-gdel]").forEach(a => a.onclick = () => { this._layout.groups.splice(+a.dataset.gdel, 1); this._dirty = true; this._render(); });
   }
 
+  _tgtEnt() { const te = this._config.target_entity || "input_select.hex_wall_target"; return this._hass && this._hass.states[te] ? te : null; }
+  _tgt() { const te = this._tgtEnt(); return te ? this._hass.states[te].state : null; }
+  _hexName(e) { const m = e.match(/^light\.hex_(\d+)_light$/); return m ? `Hex ${m[1]}` : null; }
+  _setTgt(opt) { const te = this._tgtEnt(); if (te) this._hass.callService("input_select", "select_option", { entity_id: te, option: opt }); }
+  // single tap = select target (tap the selected hex again = All), double tap = on/off
+  _tap(key, single, dbl) {
+    this._taps = this._taps || {};
+    if (this._taps[key]) { clearTimeout(this._taps[key]); delete this._taps[key]; dbl(); return; }
+    this._taps[key] = setTimeout(() => { delete this._taps[key]; single(); }, 280);
+  }
   _moreInfo(e) { this.dispatchEvent(new CustomEvent("hass-more-info", { detail: { entityId: e }, bubbles: true, composed: true })); }
 
   // Persist: write the layout into this card's own config in the dashboard (shared across devices).
@@ -204,7 +228,7 @@ ha-card{display:block;background:rgba(255,255,255,0.08);backdrop-filter:blur(14p
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}.chip.on{background:rgba(255,200,90,0.35);border-color:rgba(255,210,120,0.7)}
 .stage{width:100%;height:260px;touch-action:none}svg{width:100%;height:100%;user-select:none}
 .cell{fill:rgba(255,255,255,0.03);stroke:rgba(255,255,255,0.18);stroke-dasharray:3 3}
-.hex{stroke:rgba(255,255,255,0.45);stroke-width:1.5}.tile{cursor:pointer}.tile.sel .hex{stroke:#4fc3f7;stroke-width:3.5}
+.hex{stroke:rgba(255,255,255,0.45);stroke-width:1.5}.tile{cursor:pointer}.tile.sel .hex{stroke:#4fc3f7;stroke-width:3.5}.tile.tgt .hex{stroke:#fff;stroke-width:4;stroke-dasharray:none}
 text{fill:#fff;font-size:11px;text-anchor:middle;pointer-events:none;font-family:inherit}text.dark{fill:rgba(0,0,0,0.75)}
 .edit{border-top:1px solid rgba(255,255,255,0.15);margin-top:8px;padding-top:8px;font-size:13px}.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:5px 0}
 .tray{background:rgba(79,195,247,0.25);border:1px solid rgba(79,195,247,0.6);border-radius:10px;padding:4px 10px;cursor:grab;touch-action:none}
