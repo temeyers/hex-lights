@@ -5,6 +5,19 @@ import json
 
 EFFECTS = ["solid", "breathe", "rainbow_sweep", "ripple", "spiral", "sparkle"]
 
+# ---- Firmware interface: ALL names in one spot (PROPOSED to Hardware, 2026-10-16).
+# Override any key with layout.json "ha": {...}. {node} = hex_<id with _>.
+INTERFACE = {
+    "light": "light.{node}_light",                 # template: light name "Light"
+    "led_count_number": "number.{node}_led_count",  # per-tile runtime LED count (proposed)
+    "fx_action": "esphome.{master}_set_wall_fx",    # proposed v2 action on any tile
+    "legacy_action": "esphome.{master}_set_wall_effect",  # existing action
+    "light_effect": "HexSync",
+}
+WALL_FX = {"solid": 0, "ripple": 1, "rainbow_sweep": 2, "breathe": 3,
+           "chase": 4, "wipe": 5, "rainbow_flow": 6}
+PALETTES = ["rainbow", "ocean", "sunset", "forest", "fire", "mono"]
+
 
 def render(d, node, light_entity):
     tiles = d["tiles"]
@@ -197,4 +210,103 @@ script:
                       brightness: "{{{{ 255 if range(1000) | random < dens * 1000 else 1 }}}}"
             - delay: {{seconds: "{{{{ dt }}}}"}}
 """
+    out += wall_block(d, node, master)
     return "\n".join(l.rstrip() for l in out.splitlines() if l.strip() != "") + "\n"
+
+
+def wall_block(d, node, master):
+    I = {**INTERFACE, **(d.get("ha") or {})}
+    J = json.dumps
+    mnode = node(d, master)
+    fx_action = I["fx_action"].format(master=mnode)
+    numbers = [I["led_count_number"].format(node=node(d, t)) for t in d["tiles"]]
+    per_tile = {I["led_count_number"].format(node=node(d, t)): t["leds"] for t in d["tiles"]
+                if "ledCount" in t}
+    eff = I["light_effect"]
+    return f"""
+  hex_wall_fx_apply:
+    alias: Hex wall apply synced effect
+    mode: restart
+    variables:
+      fx_ids: {J(WALL_FX)}
+      pal_ids: {J({p: i for i, p in enumerate(PALETTES)})}
+      fx: "{{{{ states('input_select.hex_wall_fx') }}}}"
+    sequence:
+      - if: "{{{{ fx == 'off' }}}}"
+        then:
+          - action: light.turn_off
+            target: {{entity_id: light.hex_wall}}
+          - stop: "off"
+      - action: {fx_action}
+        continue_on_error: true
+        data:
+          effect: "{{{{ fx_ids[fx] }}}}"
+          palette: "{{{{ pal_ids[states('input_select.hex_wall_palette')] }}}}"
+          speed: "{{{{ (states('input_number.hex_wall_speed') | float(1) * 1000) | int }}}}"
+          scale: 100
+          hue: 18
+          saturation: 215
+          value: 255
+          start_delay_ms: 300
+      - action: light.turn_on
+        target: {{entity_id: light.hex_wall}}
+        data: {{effect: {eff}}}
+  hex_wall_led_count_apply:
+    alias: Hex wall push LED count to tiles
+    variables:
+      targets: {J(numbers)}
+      overrides: {J(per_tile)}
+      n: "{{{{ states('input_number.hex_wall_led_count') | int(44) }}}}"
+    sequence:
+      - repeat:
+          for_each: "{{{{ targets | select('has_value') | list }}}}"
+          sequence:
+            - action: number.set_value
+              target: {{entity_id: "{{{{ repeat.item }}}}"}}
+              data: {{value: "{{{{ overrides.get(repeat.item, n) }}}}"}}
+# ---- Whole-wall (HexSync v2) effects. Interface names: tools/gen_ha.py INTERFACE.
+input_select:
+  hex_wall_fx:
+    name: Hex wall synced effect
+    options: {J(["off"] + list(WALL_FX))}
+    initial: "off"
+  hex_wall_palette:
+    name: Hex wall palette
+    options: {J(PALETTES)}
+    initial: rainbow
+input_number:
+  hex_wall_speed:
+    name: Hex wall speed
+    min: 0.05
+    max: 5
+    step: 0.05
+    initial: 1
+    mode: slider
+  hex_wall_led_count:
+    name: Hex wall LEDs per tile
+    min: 1
+    max: 120
+    step: 1
+    initial: {d["led"]["count"]}
+    mode: box
+
+automation:
+  - id: hex_wall_fx_changed
+    alias: Hex wall - synced effect / palette / speed changed
+    mode: restart
+    triggers:
+      - trigger: state
+        entity_id: [input_select.hex_wall_fx, input_select.hex_wall_palette, input_number.hex_wall_speed]
+    actions:
+      - delay: {{milliseconds: 300}}
+      - action: script.hex_wall_fx_apply
+  - id: hex_wall_led_count_changed
+    alias: Hex wall - LED count changed
+    mode: restart
+    triggers:
+      - trigger: state
+        entity_id: input_number.hex_wall_led_count
+    actions:
+      - delay: {{seconds: 1}}
+      - action: script.hex_wall_led_count_apply
+"""

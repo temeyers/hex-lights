@@ -1,29 +1,407 @@
 {
-  "version": 1,
-  "notes": "Pure functions of (params, tile, tMs). Tile fields come from out/layout.json: x, y in 0..1, ring, angle (deg from master, 0 = +x (right), increasing clockwise on screen since y points down), index, q, r. hsv(h,1,1) is standard HSV->RGB with h in degrees. Output per tile is [r,g,b] 0..255. Reference implementation: tools/effects.js.",
-  "effects": [
-    {"name": "solid", "label": "Solid color",
-     "params": {"color": {"type": "color", "default": [255, 140, 40]}},
-     "formula": "rgb = color"},
-    {"name": "breathe", "label": "Breathe",
-     "params": {"color": {"type": "color", "default": [255, 140, 40]},
-                "periodS": {"type": "number", "min": 0.5, "max": 30, "default": 4}},
-     "formula": "k = 0.5 - 0.5*cos(2*pi*t/(periodS*1000)); rgb = round(color*k)"},
-    {"name": "rainbow_sweep", "label": "Rainbow sweep",
-     "params": {"speed": {"type": "number", "min": 0.01, "max": 5, "default": 0.25, "unit": "cycles/s"},
-                "axis": {"type": "enum", "options": ["x", "y"], "default": "x"}},
-     "formula": "h = (tile[axis]*360 + t/1000*speed*360) mod 360; rgb = hsv(h,1,1)"},
-    {"name": "ripple", "label": "Ripple",
-     "params": {"color": {"type": "color", "default": [40, 120, 255]},
-                "speed": {"type": "number", "min": 0.1, "max": 10, "default": 2, "unit": "rings/s"},
-                "origin": {"type": "tileId", "default": null, "note": "null = master"}},
-     "formula": "d = hexDistance(tile, origin); P = maxD + 2; ph = (t/1000*speed) mod P; k = max(0, 1 - |ph - d|); rgb = round(color*k)"},
-    {"name": "spiral", "label": "Spiral",
-     "params": {"speed": {"type": "number", "min": 0.01, "max": 5, "default": 0.2, "unit": "rev/s"}},
-     "formula": "h = (tile.angle + tile.ring*30 + t/1000*speed*360) mod 360; rgb = hsv(h,1,1)"},
-    {"name": "sparkle", "label": "Sparkle",
-     "params": {"color": {"type": "color", "default": [255, 255, 255]},
-                "density": {"type": "number", "min": 0, "max": 1, "default": 0.15}},
-     "formula": "frameN = floor(t/100); u = hash01(tile.index, frameN) with hash01(a,b) = (((a*73856093) xor (b*19349663)) mod 1000003)/1000003 using 32-bit unsigned ints; rgb = u < density ? color : [0,0,0]"}
-  ]
+ "version": 1,
+ "notes": "Pure functions of (params, tile, tMs). Tile fields come from out/layout.json: x, y in 0..1, ring, angle (deg from master, 0 = +x (right), increasing clockwise on screen since y points down), index, q, r. hsv(h,1,1) is standard HSV->RGB with h in degrees. Output per tile is [r,g,b] 0..255. Reference implementation: tools/effects.js.",
+ "effects": [
+  {
+   "name": "solid",
+   "label": "Solid color",
+   "params": {
+    "color": {
+     "type": "color",
+     "default": [
+      255,
+      140,
+      40
+     ]
+    }
+   },
+   "formula": "rgb = color",
+   "hexsyncId": 0
+  },
+  {
+   "name": "breathe",
+   "label": "Breathe",
+   "params": {
+    "color": {
+     "type": "color",
+     "default": [
+      255,
+      140,
+      40
+     ]
+    },
+    "periodS": {
+     "type": "number",
+     "min": 0.5,
+     "max": 30,
+     "default": 4
+    }
+   },
+   "formula": "k = 0.5 - 0.5*cos(2*pi*t/(periodS*1000)); rgb = round(color*k)",
+   "hexsyncId": 3
+  },
+  {
+   "name": "rainbow_sweep",
+   "label": "Rainbow sweep",
+   "params": {
+    "speed": {
+     "type": "number",
+     "min": 0.01,
+     "max": 5,
+     "default": 0.25,
+     "unit": "cycles/s"
+    },
+    "axis": {
+     "type": "enum",
+     "options": [
+      "x",
+      "y"
+     ],
+     "default": "x"
+    },
+    "palette": {
+     "type": "enum",
+     "options": [
+      "rainbow",
+      "ocean",
+      "sunset",
+      "forest",
+      "fire",
+      "mono"
+     ],
+     "default": "rainbow"
+    }
+   },
+   "formula": "h = (tile[axis]*360 + t/1000*speed*360) mod 360; rgb = pal(palette, h/360)",
+   "hexsyncId": 2
+  },
+  {
+   "name": "ripple",
+   "label": "Ripple",
+   "params": {
+    "color": {
+     "type": "color",
+     "default": [
+      40,
+      120,
+      255
+     ]
+    },
+    "speed": {
+     "type": "number",
+     "min": 0.1,
+     "max": 10,
+     "default": 2,
+     "unit": "rings/s"
+    },
+    "origin": {
+     "type": "tileId",
+     "default": null,
+     "note": "null = master"
+    },
+    "palette": {
+     "type": "enum",
+     "options": [
+      "rainbow",
+      "ocean",
+      "sunset",
+      "forest",
+      "fire",
+      "mono"
+     ],
+     "default": "mono"
+    }
+   },
+   "formula": "d = hexDistance(tile, origin); P = maxD + 2; ph = (t/1000*speed) mod P; k = max(0, 1 - |ph - d|); rgb = round(pal(palette, d/max(1,maxD))*k)  (mono -> color)",
+   "hexsyncId": 1
+  },
+  {
+   "name": "spiral",
+   "label": "Spiral",
+   "params": {
+    "speed": {
+     "type": "number",
+     "min": 0.01,
+     "max": 5,
+     "default": 0.2,
+     "unit": "rev/s"
+    },
+    "palette": {
+     "type": "enum",
+     "options": [
+      "rainbow",
+      "ocean",
+      "sunset",
+      "forest",
+      "fire",
+      "mono"
+     ],
+     "default": "rainbow"
+    }
+   },
+   "formula": "h = (tile.angle + tile.ring*30 + t/1000*speed*360) mod 360; rgb = pal(palette, h/360)"
+  },
+  {
+   "name": "sparkle",
+   "label": "Sparkle",
+   "params": {
+    "color": {
+     "type": "color",
+     "default": [
+      255,
+      255,
+      255
+     ]
+    },
+    "density": {
+     "type": "number",
+     "min": 0,
+     "max": 1,
+     "default": 0.15
+    }
+   },
+   "formula": "frameN = floor(t/100); u = hash01(tile.index, frameN) with hash01(a,b) = (((a*73856093) xor (b*19349663)) mod 1000003)/1000003 using 32-bit unsigned ints; rgb = u < density ? color : [0,0,0]"
+  },
+  {
+   "name": "chase",
+   "label": "Chase (tile to tile)",
+   "hexsyncId": 4,
+   "params": {
+    "speed": {
+     "type": "number",
+     "min": 0.2,
+     "max": 20,
+     "default": 3,
+     "unit": "tiles/s"
+    },
+    "tail": {
+     "type": "number",
+     "min": 1,
+     "max": 10,
+     "default": 3,
+     "unit": "tiles"
+    },
+    "palette": {
+     "type": "enum",
+     "options": [
+      "rainbow",
+      "ocean",
+      "sunset",
+      "forest",
+      "fire",
+      "mono"
+     ],
+     "default": "rainbow"
+    },
+    "color": {
+     "type": "color",
+     "default": [
+      255,
+      140,
+      40
+     ]
+    }
+   },
+   "formula": "N = tiles; head = (t/1000*speed) mod N; d = (head - index) mod N; k = max(0, 1 - d/tail); rgb = round(pal(palette, index/N)*k)"
+  },
+  {
+   "name": "wipe",
+   "label": "Wipe",
+   "hexsyncId": 5,
+   "params": {
+    "speed": {
+     "type": "number",
+     "min": 0.05,
+     "max": 5,
+     "default": 0.3,
+     "unit": "cycles/s"
+    },
+    "axis": {
+     "type": "enum",
+     "options": [
+      "x",
+      "y",
+      "ring",
+      "angle"
+     ],
+     "default": "x"
+    },
+    "palette": {
+     "type": "enum",
+     "options": [
+      "rainbow",
+      "ocean",
+      "sunset",
+      "forest",
+      "fire",
+      "mono"
+     ],
+     "default": "rainbow"
+    },
+    "color": {
+     "type": "color",
+     "default": [
+      255,
+      140,
+      40
+     ]
+    }
+   },
+   "formula": "u = x | y | ring/maxRing | angle/360; ph = (t/1000*speed) mod 2; on = ph < 1 ? u <= ph : u > ph - 1; rgb = on ? pal(palette, u) : [0,0,0]"
+  },
+  {
+   "name": "rainbow_flow",
+   "label": "Rainbow flow",
+   "hexsyncId": 6,
+   "params": {
+    "speed": {
+     "type": "number",
+     "min": 0.01,
+     "max": 5,
+     "default": 0.2,
+     "unit": "cycles/s"
+    },
+    "scale": {
+     "type": "number",
+     "min": 0.1,
+     "max": 5,
+     "default": 1,
+     "unit": "cycles across wall"
+    },
+    "palette": {
+     "type": "enum",
+     "options": [
+      "rainbow",
+      "ocean",
+      "sunset",
+      "forest",
+      "fire",
+      "mono"
+     ],
+     "default": "rainbow"
+    },
+    "color": {
+     "type": "color",
+     "default": [
+      255,
+      140,
+      40
+     ]
+    }
+   },
+   "formula": "u = ((x + y)/2)*scale - t/1000*speed; rgb = pal(palette, u)"
+  }
+ ],
+ "palettes": {
+  "rainbow": {
+   "id": 0,
+   "stops": "hsv(u*360,1,1)"
+  },
+  "ocean": {
+   "id": 1,
+   "stops": [
+    [
+     0,
+     40,
+     120
+    ],
+    [
+     0,
+     160,
+     200
+    ],
+    [
+     40,
+     220,
+     180
+    ],
+    [
+     0,
+     40,
+     120
+    ]
+   ]
+  },
+  "sunset": {
+   "id": 2,
+   "stops": [
+    [
+     255,
+     60,
+     0
+    ],
+    [
+     255,
+     0,
+     80
+    ],
+    [
+     120,
+     0,
+     160
+    ],
+    [
+     255,
+     60,
+     0
+    ]
+   ]
+  },
+  "forest": {
+   "id": 3,
+   "stops": [
+    [
+     10,
+     80,
+     10
+    ],
+    [
+     60,
+     180,
+     20
+    ],
+    [
+     180,
+     220,
+     40
+    ],
+    [
+     10,
+     80,
+     10
+    ]
+   ]
+  },
+  "fire": {
+   "id": 4,
+   "stops": [
+    [
+     120,
+     0,
+     0
+    ],
+    [
+     255,
+     60,
+     0
+    ],
+    [
+     255,
+     180,
+     20
+    ],
+    [
+     120,
+     0,
+     0
+    ]
+   ]
+  },
+  "mono": {
+   "id": 5,
+   "stops": "color param (or [255,140,40])"
+  }
+ },
+ "paletteFormula": "pal(name,u): u = frac(u); rainbow -> hsv(u*360); mono -> color; else stops are evenly spaced at k/(n-1) and linearly interpolated, rounded.",
+ "perLed": "frameLeds(effect, params, tiles, tMs) -> {tileId: [[r,g,b] x leds]}; leds = tile.leds or 44; every LED of a tile gets the tile colour (v1)."
 }

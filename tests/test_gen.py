@@ -69,7 +69,7 @@ def test_substitution_map():
     d = g.derive(lay()); t = {x["id"]: x for x in d["tiles"]}
     s = g.substitutions(d, t["r1-e"])
     assert s == {"tile_id": "r1-e", "tile_num": 2, "q": 1, "r": 0, "rotation": 0,
-                 "led_pin": "GPIO4", "num_leds": 44, "static_leader": 0, "leader_priority": 3}
+                 "led_pin": "GPIO4", "num_leds": 44, "led_count": 44, "static_leader": 0, "leader_priority": 3}
     assert g.substitutions(d, t["c0"])["leader_priority"] == 1
     assert g.substitutions(d, t["r1-e"], pin_leader=True)["static_leader"] == 1
     assert g.substitutions(d, t["r3-a"])["num_leds"] == 42
@@ -103,3 +103,28 @@ def test_ha_entities():
 def test_master_not_first_warns():
     L = lay(); L["master"] = "r1-e"
     assert any("not the first tile" in w for w in g.validate(L))
+
+def test_led_max_count():
+    L = lay(); L["led"]["maxCount"] = 64; d = g.derive(L)
+    s = g.substitutions(d, d["tiles"][0]); assert (s["num_leds"], s["led_count"]) == (64, 44)
+    L["led"]["maxCount"] = 10
+    with pytest.raises(g.LayoutError, match="maxCount"): g.validate(L)
+
+def test_ha_wall_interface():
+    import yaml
+    h = yaml.safe_load(open(os.path.join(ROOT, "ha/hex_wall.generated.yaml")))
+    assert "chase" in h["input_select"]["hex_wall_fx"]["options"]
+    assert h["input_number"]["hex_wall_led_count"]["initial"] == 44
+    txt = open(os.path.join(ROOT, "ha/hex_wall.generated.yaml")).read()
+    assert "number.hex_c0_led_count" in txt and "esphome.hex_c0_set_wall_fx" in txt
+
+def test_ha_yaml_no_duplicate_keys():
+    import yaml
+    class U(yaml.SafeLoader): pass
+    def m(l, n, deep=False):
+        ks = [l.construct_object(k) for k, _ in n.value]
+        assert len(ks) == len(set(ks)), [k for k in ks if ks.count(k) > 1]
+        return yaml.SafeLoader.construct_mapping(l, n, deep)
+    U.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, m)
+    for f in ("ha/hex_wall.generated.yaml", "ha/packages/hex_wall.yaml"):
+        yaml.load(open(os.path.join(ROOT, f)), U)

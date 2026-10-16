@@ -214,3 +214,87 @@ script:
                       transition: "{{ dt / 2 }}"
                       brightness: "{{ 255 if range(1000) | random < dens * 1000 else 1 }}"
             - delay: {seconds: "{{ dt }}"}
+  hex_wall_fx_apply:
+    alias: Hex wall apply synced effect
+    mode: restart
+    variables:
+      fx_ids: {"solid": 0, "ripple": 1, "rainbow_sweep": 2, "breathe": 3, "chase": 4, "wipe": 5, "rainbow_flow": 6}
+      pal_ids: {"rainbow": 0, "ocean": 1, "sunset": 2, "forest": 3, "fire": 4, "mono": 5}
+      fx: "{{ states('input_select.hex_wall_fx') }}"
+    sequence:
+      - if: "{{ fx == 'off' }}"
+        then:
+          - action: light.turn_off
+            target: {entity_id: light.hex_wall}
+          - stop: "off"
+      - action: esphome.hex_c0_set_wall_fx
+        continue_on_error: true
+        data:
+          effect: "{{ fx_ids[fx] }}"
+          palette: "{{ pal_ids[states('input_select.hex_wall_palette')] }}"
+          speed: "{{ (states('input_number.hex_wall_speed') | float(1) * 1000) | int }}"
+          scale: 100
+          hue: 18
+          saturation: 215
+          value: 255
+          start_delay_ms: 300
+      - action: light.turn_on
+        target: {entity_id: light.hex_wall}
+        data: {effect: HexSync}
+  hex_wall_led_count_apply:
+    alias: Hex wall push LED count to tiles
+    variables:
+      targets: ["number.hex_c0_led_count", "number.hex_r1_e_led_count", "number.hex_r1_ne_led_count", "number.hex_r1_nw_led_count", "number.hex_r1_w_led_count", "number.hex_r1_sw_led_count", "number.hex_r1_se_led_count", "number.hex_r2_a_led_count", "number.hex_r2_b_led_count", "number.hex_r2_c_led_count", "number.hex_r2_d_led_count", "number.hex_r2_e_led_count", "number.hex_r2_f_led_count", "number.hex_r2_g_led_count", "number.hex_r2_h_led_count", "number.hex_r2_i_led_count", "number.hex_r2_j_led_count", "number.hex_r2_k_led_count", "number.hex_r2_l_led_count", "number.hex_r3_a_led_count"]
+      overrides: {"number.hex_r3_a_led_count": 42}
+      n: "{{ states('input_number.hex_wall_led_count') | int(44) }}"
+    sequence:
+      - repeat:
+          for_each: "{{ targets | select('has_value') | list }}"
+          sequence:
+            - action: number.set_value
+              target: {entity_id: "{{ repeat.item }}"}
+              data: {value: "{{ overrides.get(repeat.item, n) }}"}
+# ---- Whole-wall (HexSync v2) effects. Interface names: tools/gen_ha.py INTERFACE.
+input_select:
+  hex_wall_fx:
+    name: Hex wall synced effect
+    options: ["off", "solid", "ripple", "rainbow_sweep", "breathe", "chase", "wipe", "rainbow_flow"]
+    initial: "off"
+  hex_wall_palette:
+    name: Hex wall palette
+    options: ["rainbow", "ocean", "sunset", "forest", "fire", "mono"]
+    initial: rainbow
+input_number:
+  hex_wall_speed:
+    name: Hex wall speed
+    min: 0.05
+    max: 5
+    step: 0.05
+    initial: 1
+    mode: slider
+  hex_wall_led_count:
+    name: Hex wall LEDs per tile
+    min: 1
+    max: 120
+    step: 1
+    initial: 44
+    mode: box
+automation:
+  - id: hex_wall_fx_changed
+    alias: Hex wall - synced effect / palette / speed changed
+    mode: restart
+    triggers:
+      - trigger: state
+        entity_id: [input_select.hex_wall_fx, input_select.hex_wall_palette, input_number.hex_wall_speed]
+    actions:
+      - delay: {milliseconds: 300}
+      - action: script.hex_wall_fx_apply
+  - id: hex_wall_led_count_changed
+    alias: Hex wall - LED count changed
+    mode: restart
+    triggers:
+      - trigger: state
+        entity_id: input_number.hex_wall_led_count
+    actions:
+      - delay: {seconds: 1}
+      - action: script.hex_wall_led_count_apply

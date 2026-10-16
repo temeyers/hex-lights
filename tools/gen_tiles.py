@@ -74,6 +74,8 @@ def validate(lay):
     if not isinstance(led["count"], int) or led["count"] < 1:
         raise LayoutError("led.count must be a positive int")
     check_pin(led["pin"], "led.pin")
+    if "maxCount" in led and (not isinstance(led["maxCount"], int) or led["maxCount"] < led["count"]):
+        raise LayoutError("led.maxCount must be an int >= led.count")
     if "budgetMa" in led and (not isinstance(led["budgetMa"], int) or led["budgetMa"] < 1):
         raise LayoutError("led.budgetMa must be a positive int")
     if "maxScale" in led and not (isinstance(led["maxScale"], (int, float)) and 0 < led["maxScale"] <= 1):
@@ -186,7 +188,10 @@ def substitutions(lay, t, pin_leader=False):
         "q": t["q"], "r": t["r"],
         "rotation": t["rot"],
         "led_pin": t.get("pin", led["pin"]),
-        "num_leds": t["leds"],
+        # num_leds = compile-time strip length (max); led_count = runtime default
+        # for the per-tile number entity (PROPOSED, Hardware to confirm).
+        "num_leds": max(t["leds"], lay["led"].get("maxCount", t["leds"])),
+        "led_count": t["leds"],
         # "0" keeps hexsync automatic failover; --pin-leader pins the master.
         "static_leader": master["index"] + 1 if pin_leader else 0,
     }
