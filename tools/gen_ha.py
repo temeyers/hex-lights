@@ -87,7 +87,7 @@ def render(d, node, light_entity):
     master = next(t for t in tiles if t["isMaster"])
     action = f"esphome.{node(d, master)}_set_wall_effect"
     data = [{"e": light_entity(d, t), "id": str(t["id"]), "x": t["x"], "y": t["y"], "q": t["q"],
-             "r": t["r"], "ring": t["ring"], "angle": t["angle"], "i": t["index"],
+             "r": t["r"], "ring": t["ring"], "angle": t["angle"], "i": t["index"], "nn": f"Hex {t['index'] + 1:02d}",
              "ringU": round(t["ring"] / max(1, max(x["ring"] for x in tiles)), 4),
              "angleU": round(t["angle"] / 360, 4)} for t in tiles]
     tj = json.dumps(data, separators=(",", ":"))
@@ -205,12 +205,12 @@ script:
   hex_wall_ripple:
     alias: Hex wall ripple
     mode: restart
-    fields: {fields_yaml(dict(color=_rgb("ripple colour", [40, 120, 255]), speed=_num("rings per second", 0.1, 10, 0.1, 2, "rings/s"), origin=_sel("ripple origin tile id (default: master)", [str(t["id"]) for t in tiles], str(master["id"]))))}
+    fields: {fields_yaml(dict(color=_rgb("ripple colour", [40, 120, 255]), speed=_num("rings per second", 0.1, 10, 0.1, 2, "rings/s"), origin=_sel("tile the ripple starts from (default: the master, Hex 01)", [f"Hex {t['index'] + 1:02d}" for t in tiles], f"Hex {master['index'] + 1:02d}")))}
     variables:
       tiles: {tj}
       c: "{{{{ color | default([40,120,255]) }}}}"
       sp: "{{{{ speed | default(2) | float }}}}"
-      o: "{{{{ (tiles | selectattr('id', 'eq', origin | default('{master['id']}')) | list + [tiles[{master['index']}]])[0] }}}}"
+      o: "{{{{ (tiles | selectattr('nn', 'eq', origin | default('Hex {master['index'] + 1:02d}')) | list + [tiles[{master['index']}]])[0] }}}}"
       dists: >-
         {{%- set ns = namespace(d=[]) -%}}
         {{%- for tt in tiles -%}}
@@ -499,7 +499,7 @@ def render_dashboard(d, node):
     rows = []
     for t in d["tiles"]:
         n = node(d, t)
-        rows.append({"type": "glance", "title": f"Hex {n[4:]} ({t.get('name') or t['id']})", "show_name": True,
+        rows.append({"type": "glance", "title": f"Hex {n[4:]}", "show_name": True,
                      "entities": [{"entity": I["sync_source_sensor"].format(node=n), "name": "Source"},
                                   {"entity": I["sync_jitter_sensor"].format(node=n), "name": "Jitter"},
                                   {"entity": I["sync_offset_sensor"].format(node=n), "name": "Offset"},

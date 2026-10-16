@@ -26,7 +26,7 @@
      "cards": [
       {
        "type": "glance",
-       "title": "Hex 01 (Center)",
+       "title": "Hex 01",
        "show_name": true,
        "entities": [
         {
@@ -61,7 +61,7 @@
       },
       {
        "type": "glance",
-       "title": "Hex 02 (Ring1 E)",
+       "title": "Hex 02",
        "show_name": true,
        "entities": [
         {
@@ -96,7 +96,7 @@
       },
       {
        "type": "glance",
-       "title": "Hex 03 (Ring1 NE)",
+       "title": "Hex 03",
        "show_name": true,
        "entities": [
         {
@@ -131,7 +131,7 @@
       },
       {
        "type": "glance",
-       "title": "Hex 04 (Ring1 NW)",
+       "title": "Hex 04",
        "show_name": true,
        "entities": [
         {
@@ -166,7 +166,7 @@
       },
       {
        "type": "glance",
-       "title": "Hex 05 (Ring1 W)",
+       "title": "Hex 05",
        "show_name": true,
        "entities": [
         {
@@ -201,7 +201,7 @@
       },
       {
        "type": "glance",
-       "title": "Hex 06 (Ring1 SW)",
+       "title": "Hex 06",
        "show_name": true,
        "entities": [
         {
@@ -236,7 +236,7 @@
       },
       {
        "type": "glance",
-       "title": "Hex 07 (Ring1 SE)",
+       "title": "Hex 07",
        "show_name": true,
        "entities": [
         {
@@ -271,7 +271,7 @@
       },
       {
        "type": "glance",
-       "title": "Hex 08 (Ring2 A)",
+       "title": "Hex 08",
        "show_name": true,
        "entities": [
         {
@@ -306,7 +306,7 @@
       },
       {
        "type": "glance",
-       "title": "Hex 09 (Ring2 B)",
+       "title": "Hex 09",
        "show_name": true,
        "entities": [
         {
@@ -341,7 +341,7 @@
       },
       {
        "type": "glance",
-       "title": "Hex 10 (Ring2 C)",
+       "title": "Hex 10",
        "show_name": true,
        "entities": [
         {
@@ -376,7 +376,7 @@
       },
       {
        "type": "glance",
-       "title": "Hex 11 (Ring2 D)",
+       "title": "Hex 11",
        "show_name": true,
        "entities": [
         {
@@ -411,7 +411,7 @@
       },
       {
        "type": "glance",
-       "title": "Hex 12 (Ring2 E)",
+       "title": "Hex 12",
        "show_name": true,
        "entities": [
         {
@@ -446,7 +446,7 @@
       },
       {
        "type": "glance",
-       "title": "Hex 13 (Ring2 F)",
+       "title": "Hex 13",
        "show_name": true,
        "entities": [
         {
@@ -481,7 +481,7 @@
       },
       {
        "type": "glance",
-       "title": "Hex 14 (Ring2 G)",
+       "title": "Hex 14",
        "show_name": true,
        "entities": [
         {
@@ -516,7 +516,7 @@
       },
       {
        "type": "glance",
-       "title": "Hex 15 (Ring2 H)",
+       "title": "Hex 15",
        "show_name": true,
        "entities": [
         {
@@ -551,7 +551,7 @@
       },
       {
        "type": "glance",
-       "title": "Hex 16 (Ring2 I)",
+       "title": "Hex 16",
        "show_name": true,
        "entities": [
         {
@@ -586,7 +586,7 @@
       },
       {
        "type": "glance",
-       "title": "Hex 17 (Ring2 J)",
+       "title": "Hex 17",
        "show_name": true,
        "entities": [
         {
@@ -621,7 +621,7 @@
       },
       {
        "type": "glance",
-       "title": "Hex 18 (Ring2 K)",
+       "title": "Hex 18",
        "show_name": true,
        "entities": [
         {
@@ -656,7 +656,7 @@
       },
       {
        "type": "glance",
-       "title": "Hex 19 (Ring2 L)",
+       "title": "Hex 19",
        "show_name": true,
        "entities": [
         {
@@ -691,7 +691,7 @@
       },
       {
        "type": "glance",
-       "title": "Hex 20 (Ring3 A)",
+       "title": "Hex 20",
        "show_name": true,
        "entities": [
         {

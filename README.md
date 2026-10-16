@@ -79,6 +79,7 @@ Each tile has `number.hex_NN_max_brightness` (0-100 %, default 100, restored aft
 
 ### Displayed colour (Hardware-confirmed)
 - Per tile: `sensor.hex_NN_displayed_color` (an ESPHome text_sensor "Displayed color", `#RRGGBB`, 1–2 Hz). There's no separate RGB sensor: the light readback is the `rgb_color` attribute of `light.hex_NN_light`.
+- **Naming rule:** users only ever see "Hex NN". Tile ids (c0, r2-a) stay internal, and a test scans every user-facing HA string for them. The ripple origin field is a select of Hex 01..Hex 20.
 - **For the layout editor:** `group.hex_wall_displayed_colors`, plus `out/ha_entities.json` (tile id → node/hexNN/light/displayedColor/`lightRgb: {entity, attribute: rgb_color}`/...). The dashboard shows the displayed colour on each tile card and has a "Light RGB readback" card of `rgb_color` attribute rows.
 - **Recorder:** `ha/packages/hex_wall_recorder.yaml` excludes `sensor.hex_*_displayed_color` with `entity_globs`. **Caveat:** HA packages can't merge a duplicate key, so if `configuration.yaml` or another package already has `recorder: exclude:`, HA rejects this package ("duplicate key 'exclude'"). In that case delete this file and add the glob to your existing `recorder: exclude: entity_globs:`. A `recorder:` block that has no `exclude:` (for example only `purge_keep_days`) merges fine.
 

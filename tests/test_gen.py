@@ -334,3 +334,38 @@ def test_light_color_palette():
     tpl = open(os.path.join(ROOT, "esphome/templates/tile-common.yaml")).read()
     if "light color]" in tpl:
         assert "options: [rainbow, ocean, sunset, forest, fire, mono, light color]" in tpl
+
+def test_no_axial_ids_user_facing():
+    """Terry's naming rule: users only ever see 'Hex NN', never tile ids like c0 / r2-a."""
+    import re, yaml
+    ids = {str(t["id"]) for t in lay()["tiles"]}
+    pat = re.compile(r"(?<![\w-])(" + "|".join(re.escape(i) for i in sorted(ids, key=len, reverse=True)) + r")(?![\w-])")
+    INTERNAL = ("variables", "sequence", "entity_id", "entity", "entities", "target", "triggers", "conditions",
+                "actions", "id", "action", "data", "attribute", "path")
+    hits = []
+    def walk(o, path):
+        if isinstance(o, dict):
+            for k, v in o.items():
+                if k in INTERNAL:
+                    continue
+                walk(v, f"{path}.{k}")
+        elif isinstance(o, list):
+            for i, v in enumerate(o):
+                walk(v, f"{path}[{i}]")
+        elif isinstance(o, str) and pat.search(o):
+            hits.append((path, o))
+    for f in ("ha/hex_wall.generated.yaml", "ha/packages/hex_wall.yaml",
+              "ha/hex_wall_dashboard.generated.yaml", "ha/packages/hex_wall_recorder.yaml"):
+        walk(yaml.safe_load(open(os.path.join(ROOT, f))), f)
+    assert hits == []
+    # the notification text is user-facing even though it sits under actions
+    h = yaml.safe_load(open(os.path.join(ROOT, "ha/hex_wall.generated.yaml")))
+    for a in h["automation"]:
+        for act in a["actions"]:
+            for k in ("title", "message"):
+                v = (act.get("data") or {}).get(k, "")
+                assert not pat.search(v), (a["id"], v)
+    o = h["script"]["hex_wall_ripple"]["fields"]["origin"]
+    assert o["selector"]["select"]["options"][0] == "Hex 01" and o["selector"]["select"]["options"][-1] == "Hex 20"
+    assert o["default"] == "Hex 01" and o["example"] == "Hex 01"
+    assert "selectattr('nn', 'eq', origin" in h["script"]["hex_wall_ripple"]["variables"]["o"]
