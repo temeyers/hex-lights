@@ -443,7 +443,8 @@ template:
       - name: Hex target manual color
         unique_id: hex_target_manual_color
         icon: mdi:palette
-        state: {J(T + "{{ is_state(" + TS[len(T) + 3:-3] + ", 'on') }}")}
+        # All: on when any live tile's switch is on (the master may be off/unavailable); Hex NN: that tile.
+        state: {J(T + "{% set l = " + TSW[len(T) + 3:-3] + " %}{{ l | select('is_state', 'on') | list | length > 0 }}")}
         turn_on:
           - action: switch.turn_on
             target: {{entity_id: {J(TSW)}}}
@@ -553,12 +554,12 @@ def wall_block(d, node, master):
               - action: switch.turn_off
                 target: {{entity_id: "{{{{ live }}}}"}}
 """
-    mc = [I["manual_color_switch"].format(master=mnode)]
+    mc = None  # every live tile, not just the master (the master may be off)
     limit_scripts += TB_SCRIPT
     limit_scripts += f"""  hex_wall_manual_color_apply:
-    alias: Hex wall manual colour (master switch; followers sync over ESP-NOW)
+    alias: Hex wall manual colour (every live tile's switch)
     variables:
-      targets: {J(mc)}
+      targets: "{{{{ {dyn('switch', 'manual_color')} }}}}"
     sequence:
       - variables:
           live: "{{{{ targets | select('has_value') | list }}}}"

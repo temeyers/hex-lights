@@ -242,9 +242,9 @@ script:
         target: {entity_id: "{% set t = states('input_select.hex_wall_target') %}{{ ['number.hex_' ~ t[4:] ~ '_white_temperature'] if t[:4] == 'Hex ' else states.number | map(attribute='entity_id') | select('match', '^number[.]hex_[0-9]+_white_temperature$') | select('has_value') | list }}"}
         data: {value: "{{ [2000, [6500, kelvin | int(4000)] | min] | max }}"}
   hex_wall_manual_color_apply:
-    alias: Hex wall manual colour (master switch; followers sync over ESP-NOW)
+    alias: Hex wall manual colour (every live tile's switch)
     variables:
-      targets: ["switch.hex_01_manual_color"]
+      targets: "{{ (states.switch | map(attribute='entity_id') | select('match', '^switch[.]hex_[0-9]+_manual_color$') | sort | select('has_value') | list) }}"
     sequence:
       - variables:
           live: "{{ targets | select('has_value') | list }}"
@@ -546,7 +546,8 @@ template:
       - name: Hex target manual color
         unique_id: hex_target_manual_color
         icon: mdi:palette
-        state: "{% set t = states('input_select.hex_wall_target') %}{{ is_state('switch.hex_' ~ t[4:] ~ '_manual_color' if t[:4] == 'Hex ' else 'switch.hex_01_manual_color', 'on') }}"
+        # All: on when any live tile's switch is on (the master may be off/unavailable); Hex NN: that tile.
+        state: "{% set t = states('input_select.hex_wall_target') %}{% set l = ['switch.hex_' ~ t[4:] ~ '_manual_color'] if t[:4] == 'Hex ' else states.switch | map(attribute='entity_id') | select('match', '^switch[.]hex_[0-9]+_manual_color$') | select('has_value') | list %}{{ l | select('is_state', 'on') | list | length > 0 }}"
         turn_on:
           - action: switch.turn_on
             target: {entity_id: "{% set t = states('input_select.hex_wall_target') %}{{ ['switch.hex_' ~ t[4:] ~ '_manual_color'] if t[:4] == 'Hex ' else states.switch | map(attribute='entity_id') | select('match', '^switch[.]hex_[0-9]+_manual_color$') | select('has_value') | list }}"}
