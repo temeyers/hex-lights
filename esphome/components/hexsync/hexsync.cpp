@@ -718,7 +718,8 @@ static inline int hexdist(int q1, int r1, int q2, int r2) {
 
 static const float SQ3 = 1.7320508f;
 static const float SPIRAL = 0.5f;
-static const float GRID_CORE = 0.52f;  // grid_check half-width of the flat core (~4 pixel pitches of 0.13)
+static const float GRID_CORE = 0.13f;  // grid_check half-width of the flat core (2 pixel pitches full, ~4 lit incl. edges)
+static const float GRID_R = 6.0f;      // grid_check sweeps a FIXED wall range [-R, R] (wall units, origin = (0,0) tile)
 static const float GRID_EDGE = 0.13f;  // grid_check soft edge (1 pixel pitch)
 static const float GRID_SPEED = 0.25f;  // grid_check: wall units/s per 1.0 of wall speed (slow)
 static const float LED_INSET = 0.95f;   // strip sits just inside the hex edge
@@ -907,13 +908,11 @@ void HexSync::render(light::AddressableLight &it) {
         // straight line crosses tile borders continuously; a misplaced/rotated tile breaks it.
         // Tilted ~10 deg off the axis so the line never lines up with the flat top/bottom edges.
         const float cs = 0.98480775f, sn = 0.17364818f;
-        const float wx = px - minx, wy = py - miny, sx = maxx - minx, sy = maxy - miny;
-        float u, span;
-        if (params_.axis == AX_Y) { u = wy * cs + (sx - wx) * sn; span = sy * cs + sx * sn; }
-        else { u = wx * cs + wy * sn; span = sx * cs + sy * sn; }
-        // Flat full-intensity core (~8 pixel pitches wide) + 1-pixel soft edge each side.
-        float per = span + 2 * (GRID_CORE + GRID_EDGE) + 1.0f;
-        float pos = fmodf(t_s * std::max(spd, 0.05f) * GRID_SPEED, per) - (GRID_CORE + GRID_EDGE);
+        // Absolute wall coordinates (no live-peer bounding box): every tile computes the same line even if it
+        // currently hears only some peers, and a tile holding frame 0 (clock not yet synced) shows nothing.
+        float u = params_.axis == AX_Y ? (py * cs - px * sn) : (px * cs + py * sn);
+        float per = 2 * GRID_R + 2 * (GRID_CORE + GRID_EDGE);
+        float pos = fmodf(t_s * std::max(spd, 0.05f) * GRID_SPEED, per) - GRID_R - (GRID_CORE + GRID_EDGE);
         float d = fabsf(u - pos);
         float k = d <= GRID_CORE ? 1.0f : (d < GRID_CORE + GRID_EDGE ? 1.0f - (d - GRID_CORE) / GRID_EDGE : 0.0f);
         c = Color(255 * k, 255 * k, 255 * k);
