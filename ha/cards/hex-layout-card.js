@@ -1,5 +1,5 @@
 /* hex-layout-card v1 - honeycomb layout for Hex lights. No build step. */
-const HLC_VERSION = "7";
+const HLC_VERSION = "8";
 const SQ3 = Math.sqrt(3);
 
 class HexLayoutCard extends HTMLElement {
@@ -7,7 +7,9 @@ class HexLayoutCard extends HTMLElement {
   setConfig(config) {
     this._config = Object.assign({ layout_id: "hex_layout_quin", pattern: "^light\\.hex_.*_light$", size: 34, orientation: "flat" }, config || {});
     const l = this._config.layout || {};
-    this._layout = { tiles: Object.assign({}, l.tiles || {}), groups: (l.groups || []).map(g => ({ name: g.name, entities: [...(g.entities || [])] })) };
+    this._layout = { tiles: Object.assign({}, l.tiles || {}), groups: (l.groups || []).map(g => ({ name: g.name, entities: [...(g.entities || [])] })),
+      blockouts: (l.blockouts || []).filter(b => b && Number.isFinite(b.q) && Number.isFinite(b.r)).map(b => ({ q: b.q, r: b.r })) };
+    this._bsel = new Set();
     this._edit = this._edit || false; this._sel = new Set(); this._dirty = false;
     if (!this.shadowRoot) this.attachShadow({ mode: "open" });
     this._render();
@@ -70,7 +72,8 @@ class HexLayoutCard extends HTMLElement {
     const lights = this._lights(), T = this._layout.tiles;
     const placed = lights.filter(e => T[e]), unplaced = lights.filter(e => !T[e]);
     // bounds
-    const pts = placed.map(e => this._px(T[e].q, T[e].r));
+    const B = this._layout.blockouts;
+    const pts = placed.map(e => this._px(T[e].q, T[e].r)).concat(B.map(b => this._px(b.q, b.r)));
     const cells = [];
     if (this._edit) { const R = 4; for (let q = -R; q <= R; q++) for (let r = -R; r <= R; r++) if (Math.abs(q + r) <= R) cells.push({ q, r }); cells.forEach(c => pts.push(this._px(c.q, c.r))); }
     if (!this._edit) { const c0 = pts.length ? pts.reduce((a, p) => ({ x: a.x + p.x / pts.length, y: a.y + p.y / pts.length }), { x: 0, y: 0 }) : { x: 0, y: 0 }; const m = this._config.size * 3; pts.push({ x: c0.x - m, y: c0.y - m * 0.6 }, { x: c0.x + m, y: c0.y + m * 0.6 }); }
@@ -81,6 +84,8 @@ class HexLayoutCard extends HTMLElement {
     this._vb = { minX, minY, w: maxX - minX, h: maxY - minY };
     let svg = `<svg id="svg" viewBox="${minX} ${minY} ${maxX - minX} ${maxY - minY}" preserveAspectRatio="xMidYMid meet"><defs><filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="${s * 0.22}"/></filter></defs>`;
     cells.forEach(c => { const p = this._px(c.q, c.r); svg += `<polygon class="cell" points="${this._poly(p.x, p.y, 0)}"/>`; });
+    // blockouts: UI-only black spots (no entity, never a light)
+    B.forEach((b, i) => { const p = this._px(b.q, b.r); svg += `<g class="blk${this._edit ? " ed" : ""}${this._bsel.has(i) ? " sel" : ""}" data-b="${i}"><polygon class="bhex" points="${this._poly(p.x, p.y, 0)}"/></g>`; });
     placed.forEach(e => {
       const p = this._px(T[e].q, T[e].r), c = this._color(e), rot = T[e].rot || 0, sel = this._sel.has(e);
       const tg = this._tgt(), isT = tg && tg !== "All" && this._hexName(e) === tg;
@@ -102,9 +107,11 @@ class HexLayoutCard extends HTMLElement {
     if (this._edit) {
       html += `<div class="edit">
         <div class="row"><b>Tray</b> ${unplaced.length ? unplaced.map(e => `<span class="tray" data-tray="${e}">${this._name(e)}</span>`).join("") : "<i>All lights placed</i>"}</div>
-        <div class="row hint">Drag a light from the tray or a placed hex onto a cell. Tap placed hexes to select.</div>
+        <div class="row hint">Drag a light from the tray or a placed hex onto a cell. Tap placed hexes to select. Blockouts are black spots with no light.</div>
         <div class="row"><button class="btn" id="rot" ${this._sel.size ? "" : "disabled"}>Rotate</button>
-        <button class="btn" id="rem" ${this._sel.size ? "" : "disabled"}>Remove</button></div>
+        <button class="btn" id="rem" ${this._sel.size ? "" : "disabled"}>Remove</button>
+        <button class="btn" id="badd">Add blockout</button>
+        <button class="btn" id="bdel" ${this._bsel.size ? "" : "disabled"}>Delete blockout</button></div>
         ${groups.length ? `<div class="row">${groups.map((g, i) => `<span class="gl">${g.name} (${g.entities.length}) <a data-gdel="${i}">✕</a></span>`).join("")}</div>` : ""}
         <div class="row status">${this._status || (this._dirty ? "Unsaved changes – press Done to save" : "")}</div></div>`;
     }
@@ -118,7 +125,8 @@ class HexLayoutCard extends HTMLElement {
     const sc = Math.min(r.width / vb.w, r.height / vb.h), ox = (r.width - vb.w * sc) / 2, oy = (r.height - vb.h * sc) / 2;
     return { x: (ev.clientX - r.left - ox) / sc + vb.minX, y: (ev.clientY - r.top - oy) / sc + vb.minY };
   }
-  _occupied(q, r, except) { return Object.entries(this._layout.tiles).find(([e, t]) => e !== except && t.q === q && t.r === r); }
+  _occupied(q, r, except, exceptB) { return Object.entries(this._layout.tiles).find(([e, t]) => e !== except && t.q === q && t.r === r) || this._layout.blockouts.find((b, i) => i !== exceptB && b.q === q && b.r === r); }
+  _freeCell() { const cs=[]; for (let q=-4;q<=4;q++) for (let r=-4;r<=4;r++) if (Math.abs(q+r)<=4) cs.push({q,r,d:(Math.abs(q)+Math.abs(r)+Math.abs(q+r))/2}); cs.sort((x,y)=>x.d-y.d); return cs.find(c=>!this._occupied(c.q,c.r)); }
   _place(e, ev) {
     const p = this._svgPt(ev), c = this._cell(p.x, p.y);
     if (this._occupied(c.q, c.r, e)) { this._status = "That cell is taken"; return; }
@@ -127,7 +135,7 @@ class HexLayoutCard extends HTMLElement {
 
   _bind() {
     const $ = id => this.shadowRoot.getElementById(id);
-    $("edit").onclick = () => { if (this._edit && this._dirty) this._save(); this._edit = !this._edit; this._sel.clear(); this._render(); };
+    $("edit").onclick = () => { if (this._edit && this._dirty) this._save(); this._edit = !this._edit; this._sel.clear(); this._bsel.clear(); this._render(); };
     this.shadowRoot.querySelectorAll(".chip").forEach(b => b.onclick = () => {
       const g = b.dataset.g, ents = g === "all" ? this._lights() : this._layout.groups[+g].entities;
       const toggle = () => {
@@ -178,6 +186,19 @@ class HexLayoutCard extends HTMLElement {
       };
     });
     if (!this._edit) return;
+    this.shadowRoot.querySelectorAll(".blk").forEach(t => {
+      const i = +t.dataset.b; let down = null, moved = false;
+      t.onpointerdown = ev => { down = ev; moved = false; this._drag = "blk" + i; t.setPointerCapture(ev.pointerId); };
+      t.onpointermove = ev => { if (down && Math.hypot(ev.clientX - down.clientX, ev.clientY - down.clientY) > 6) moved = true; };
+      t.onpointerup = ev => {
+        this._drag = null;
+        if (moved) { const p = this._svgPt(ev), c = this._cell(p.x, p.y); if (this._occupied(c.q, c.r, null, i)) this._status = "That cell is taken"; else { this._layout.blockouts[i] = { q: c.q, r: c.r }; this._dirty = true; this._status = ""; } }
+        else this._bsel.has(i) ? this._bsel.delete(i) : this._bsel.add(i);
+        down = null; this._render();
+      };
+    });
+    $("badd").onclick = () => { const c = this._freeCell(); if (!c) { this._status = "No free cell"; } else { this._layout.blockouts.push({ q: c.q, r: c.r }); this._bsel.clear(); this._bsel.add(this._layout.blockouts.length - 1); this._dirty = true; this._status = ""; } this._render(); };
+    $("bdel").onclick = () => { this._layout.blockouts = this._layout.blockouts.filter((b, i) => !this._bsel.has(i)); this._bsel.clear(); this._dirty = true; this._render(); };
     $("rot").onclick = () => { this._sel.forEach(e => { const t = this._layout.tiles[e]; t.rot = ((t.rot || 0) + 60) % 360; }); this._dirty = true; this._render(); };
     $("rem").onclick = () => { this._sel.forEach(e => { delete this._layout.tiles[e]; this._layout.groups.forEach(g => g.entities = g.entities.filter(x => x !== e)); }); this._sel.clear(); this._dirty = true; this._render(); };
     this.shadowRoot.querySelectorAll("[data-gdel]").forEach(a => a.onclick = () => { this._layout.groups.splice(+a.dataset.gdel, 1); this._dirty = true; this._render(); });
@@ -224,6 +245,7 @@ ha-card{display:block;background:rgba(255,255,255,0.08);backdrop-filter:blur(14p
 .btn[disabled]{opacity:.4;cursor:default}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}.chip.on{background:rgba(255,200,90,0.35);border-color:rgba(255,210,120,0.7)}.chip.tgtchip{border:2px solid #fff;font-weight:600}
 .stage{width:100%;height:260px;touch-action:none}svg{width:100%;height:100%;user-select:none}
+.bhex{fill:#050608;fill-opacity:.92;stroke:rgba(255,255,255,0.22);stroke-width:1.2}.blk{pointer-events:none}.blk.ed{pointer-events:auto;cursor:grab}.blk.sel .bhex{stroke:#4fc3f7;stroke-width:3}
 .cell{fill:rgba(255,255,255,0.03);stroke:rgba(255,255,255,0.18);stroke-dasharray:3 3}
 .hex{stroke:rgba(255,255,255,0.45);stroke-width:1.5}.tile{cursor:pointer}.tile.sel .hex{stroke:#4fc3f7;stroke-width:3.5}.tile.tgt .hex{stroke:#fff;stroke-width:4;stroke-dasharray:none}
 text{fill:#fff;font-size:11px;text-anchor:middle;pointer-events:none;font-family:inherit}text.dark{fill:rgba(0,0,0,0.75)}
