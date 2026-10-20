@@ -20,7 +20,7 @@ substitutions:
   # Full output by default: 100% on the slider = full LED drive. Runtime ceiling = HA number "Max brightness".
   # WARNING: full white ~= 44 x 60 mA ~= 2.6 A per tile (~53 A wall). Feed the strip directly (not via the
   # S3 Super Mini 5V pin); keep 3 A per-tile fuses and the 60 A PSU. See README / DESIGN.md.
-  boot_brightness: "30%"    # light brightness applied on every boot (on_boot -100)
+  boot_brightness: "30%"    # unused since restore build (light restores its own brightness); kept for old tile files
   led_gamma: "2.8"          # ESPHome default; gamma never lowers 255 but dims mid levels (value 180 -> ~38 %)
   max_scale: "1.0"          # first-boot value for hexsync's current model (Max brightness overrides at boot)
   tile_budget_ma: "1200"    # hexsync effect current budget per tile (ESTIMATED model); OFF unless "Current limit" switch is on
@@ -31,7 +31,7 @@ esphome:
   min_version: 2025.9.0
   project:
     name: temeyers.hex-lights
-    version: "17304e3"   # firmware source commit (bump on every firmware change)
+    version: "diag-restore"   # firmware source commit (bump on every firmware change)
   on_boot:
     # Restore (numbers/switches) fires BEFORE the light is set up: touching the light there crashed 85cf36d
     # (update_state -> schedule_show -> null LightState). Apply brightness/limit here, after every setup().
@@ -68,11 +68,9 @@ esphome:
             ESP_LOGI("hexsync", "brightness: max_brightness=%.0f%% (max_scale %.2f), current_limit=%s (budget %d mA), effect value=%d/255, gamma=%s, transition 0s",
                      pct, id(hex_sync).max_scale(), id(hex_sync).budget_enabled() ? "ON" : "off",
                      id(hex_sync).budget_ma(), id(hex_sync).effect_value(), "${led_gamma}");
-        # Power-on brightness: 30% every boot (light + hexsync are set up by now; LightCall is safe here).
-        # Keeps the restored colour/effect; Max brightness stays a separate ceiling (default 100%).
-        - light.turn_on:
-            id: tile_leds
-            brightness: ${boot_brightness}
+        # No forced boot brightness: the light restores on/off, brightness, colour and effect from flash
+        # (fallback when HA is unreachable). HA reapplies its current desired state when the tile reconnects
+        # (automation hex_wall_resync_on_reconnect), and HA always wins.
 
 globals:
   # Wall controls persisted on the master (template select/number with a lambda can't take restore_value).
@@ -215,7 +213,7 @@ light:
     default_transition_length: 0s
     gamma_correct: ${led_gamma}
     # No compile-time cap: the "Max brightness" number sets the correction (ceiling) at runtime.
-    restore_mode: RESTORE_AND_ON   # colour + effect restored, always comes up on (brightness forced to 30% in on_boot)
+    restore_mode: RESTORE_DEFAULT_ON   # on/off, brightness, colour + effect restored from flash; first boot: on
     effects:
       - addressable_lambda:
           name: HexSync
@@ -290,6 +288,11 @@ sensor:
     lambda: 'return id(hex_sync).pulse_offset_ms();'
   - platform: wifi_signal
     name: Wi-Fi signal
+    update_interval: 60s
+  # Crash-vs-Wi-Fi diagnostics: uptime resets only on reboot; reset reason says why.
+  - platform: uptime
+    name: Uptime
+    entity_category: diagnostic
     update_interval: 60s
 
 # Runtime layout. Values persist in flash inside hexsync (template numbers can't
@@ -501,6 +504,10 @@ interval:
           if (id(manual_color).state != m) id(manual_color).publish_state(m);  // on_turn_* -> set_manual_color no-op
 
 text_sensor:
+  - platform: debug
+    reset_reason:
+      name: Reset reason
+      entity_category: diagnostic
   # Average colour the LEDs are showing ('#RRGGBB', 2 Hz, published only on change). Read-only: never fed back
   # into the light or the "light color" palette. Not updated before on_boot(-100).
   - platform: template
@@ -528,6 +535,10 @@ text_sensor:
     entity_category: diagnostic
     update_interval: 5s
     lambda: 'return id(hex_sync).neighbor_list();'
+
+# debug component: needed for the Reset reason text sensor (no sensors of its own here)
+debug:
+  update_interval: 60s
 
 binary_sensor:
   - platform: template
