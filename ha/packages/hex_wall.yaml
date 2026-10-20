@@ -572,7 +572,10 @@ automation:
     conditions:
       - "{{ trigger.from_state is not none and trigger.to_state is not none }}"
       - "{{ trigger.from_state.state not in ['unavailable', 'unknown'] and trigger.to_state.state not in ['unavailable', 'unknown'] }}"
-      - "{{ not held }}"
+      # Only changes HA asked for (a user, or an automation/script: context has user_id or parent_id). A tile's own
+      # pushes (boot/flash restore, reconnect) carry a bare context and are never recorded. No time window, so an HA
+      # change right after a reconnect is kept (the old 25 s hold dropped one: hex_04 at 9:17 PM CT).
+      - "{{ trigger.to_state.context.user_id is not none or trigger.to_state.context.parent_id is not none }}"
     actions:
       - variables:
           l: "light.{{ key }}_light"
