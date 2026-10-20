@@ -718,7 +718,8 @@ static inline int hexdist(int q1, int r1, int q2, int r2) {
 
 static const float SQ3 = 1.7320508f;
 static const float SPIRAL = 0.5f;
-static const float GRID_W = 0.12f;      // grid_check half-width (wall units; a few cm on the tile)
+static const float GRID_CORE = 0.52f;  // grid_check half-width of the flat core (~4 pixel pitches of 0.13)
+static const float GRID_EDGE = 0.13f;  // grid_check soft edge (1 pixel pitch)
 static const float GRID_SPEED = 0.25f;  // grid_check: wall units/s per 1.0 of wall speed (slow)
 static const float LED_INSET = 0.95f;   // strip sits just inside the hex edge
 
@@ -904,18 +905,17 @@ void HexSync::render(light::AddressableLight &it) {
       if (params_.effect == FX_GRID_CHECK) {
         // One narrow white band on black sweeping the whole wall in wall units (1 = hex circumradius), so a
         // straight line crosses tile borders continuously; a misplaced/rotated tile breaks it.
+        // Tilted ~10 deg off the axis so the line never lines up with the flat top/bottom edges.
+        const float cs = 0.98480775f, sn = 0.17364818f;
+        const float wx = px - minx, wy = py - miny, sx = maxx - minx, sy = maxy - miny;
         float u, span;
-        switch (params_.axis) {
-          case AX_Y: u = py - miny; span = maxy - miny; break;
-          case AX_RING: u = sqrtf(px * px + py * py); span = max_ringw * SQ3; break;
-          case AX_ANGLE: u = angle / 360.0f * 12.566371f; span = 12.566371f; break;
-          default: u = px - minx; span = maxx - minx; break;
-        }
-        const float w = GRID_W;
-        float per = span + 4 * w;
-        float pos = fmodf(t_s * std::max(spd, 0.05f) * GRID_SPEED, per) - 2 * w;
+        if (params_.axis == AX_Y) { u = wy * cs + (sx - wx) * sn; span = sy * cs + sx * sn; }
+        else { u = wx * cs + wy * sn; span = sx * cs + sy * sn; }
+        // Flat full-intensity core (~8 pixel pitches wide) + 1-pixel soft edge each side.
+        float per = span + 2 * (GRID_CORE + GRID_EDGE) + 1.0f;
+        float pos = fmodf(t_s * std::max(spd, 0.05f) * GRID_SPEED, per) - (GRID_CORE + GRID_EDGE);
         float d = fabsf(u - pos);
-        float k = d < w ? 1.0f - d / w : 0.0f;
+        float k = d <= GRID_CORE ? 1.0f : (d < GRID_CORE + GRID_EDGE ? 1.0f - (d - GRID_CORE) / GRID_EDGE : 0.0f);
         c = Color(255 * k, 255 * k, 255 * k);
       } else {
         c = pixel_(i, n, t_eff, order_, count, xn, yn, ringw, max_ringw, angle, od, max_od, head_d);
