@@ -24,8 +24,8 @@ static const int HX_MAX_LEN = 250;  // ESP-NOW v1 payload limit
 // Ids 0-6 match Back End effects.json / tools/gen_ha.py WALL_FX.
 enum HxEffect : uint8_t {
   FX_SOLID = 0, FX_RADIAL_WAVE = 1, FX_RAINBOW_SWEEP = 2, FX_PULSE = 3, FX_CHASE = 4,
-  FX_WIPE = 5, FX_RAINBOW_FLOW = 6, FX_RIPPLE = 7, FX_TWINKLE = 8, FX_COLOR_CYCLE = 9, FX_SNAKE = 10,
-  FX_COUNT = 11
+  FX_WIPE = 5, FX_RAINBOW_FLOW = 6, FX_RIPPLE = 7, FX_TWINKLE = 8, FX_COLOR_CYCLE = 9, FX_SNAKE = 10, FX_GRID_CHECK = 11,
+  FX_COUNT = 12
 };
 enum HxPalette : uint8_t { PAL_RAINBOW = 0, PAL_OCEAN = 1, PAL_SUNSET = 2, PAL_FOREST = 3, PAL_FIRE = 4, PAL_MONO = 5, PAL_LIGHT = 6, PAL_COUNT = 7 };
 // PAL_LIGHT ("light color"): shades of the MASTER light's user-chosen RGB, synced in the packet (HxParams::rgb).
@@ -207,6 +207,7 @@ class HexSync : public Component {
   // Pure tile/LED colour, exposed so it can be unit-tested against tools/effects-ref.js.
   // Per-LED geometry: xn/yn/ringw/angle/od are for THIS LED (position on the tile's ring), so every
   // effect animates within a single tile, not just tile-to-tile.
+  void led_local_(int i, int n, float &x, float &y);
   Color pixel_(int led, int n, float t_s, int index, int count, float xn, float yn, float ringw, float max_ringw,
                float angle, float od, float max_od, int head_d);
 

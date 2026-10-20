@@ -581,7 +581,7 @@ std::string HexSync::layout_string() const {
 
 // ---------------- wall controls ----------------
 static const char *const FX_NAMES[FX_COUNT] = {"solid", "radial_wave", "rainbow_sweep", "pulse", "chase", "wipe",
-                                               "rainbow_flow", "random_ripple", "twinkle", "color_cycle", "snake"};
+                                               "rainbow_flow", "random_ripple", "twinkle", "color_cycle", "snake", "grid_check"};
 static const char *const PAL_NAMES[PAL_COUNT] = {"rainbow", "ocean", "sunset", "forest", "fire", "mono", "light color"};
 
 const char *HexSync::effect_name(int id) { return (id >= 0 && id < FX_COUNT) ? FX_NAMES[id] : "solid"; }
@@ -716,10 +716,27 @@ static inline int hexdist(int q1, int r1, int q2, int r2) {
   return (abs(dq) + abs(dr) + abs(dq + dr)) / 2;
 }
 
-// LED geometry: LED i sits on the tile ring at angle 2*pi*i/n + rotation, radius LED_R (centre spacing sqrt3).
-static const float LED_R = 0.85f;
 static const float SQ3 = 1.7320508f;
-static const float SPIRAL = 0.5f;  // ring/ripple fronts also sweep around each tile (visible on a lone tile)
+static const float SPIRAL = 0.5f;
+static const float GRID_W = 0.12f;      // grid_check half-width (wall units; a few cm on the tile)
+static const float GRID_SPEED = 0.25f;  // grid_check: wall units/s per 1.0 of wall speed (slow)
+static const float LED_INSET = 0.95f;   // strip sits just inside the hex edge
+
+// Flat-top hex, unit circumradius (centre spacing sqrt3), screen coords y down, front view. Pixel 1 (LED 0) is
+// just RIGHT of bottom centre; the strip runs counterclockwise from the front: up the right side, across the
+// top, down the left side, ending at pixel n just LEFT of bottom centre. Even spacing; the gap is at bottom
+// centre. Tile rotation is applied by the caller.
+void HexSync::led_local_(int i, int n, float &x, float &y) {
+  static const float H = 0.8660254f;
+  static const float P[8][2] = {{0, H}, {0.5f, H}, {1, 0}, {0.5f, -H}, {-0.5f, -H}, {-1, 0}, {-0.5f, H}, {0, H}};
+  static const float L[7] = {0.5f, 1, 1, 1, 1, 1, 0.5f};
+  float s = 6.0f * (i + 0.5f) / (n > 0 ? n : 1);
+  int k = 0;
+  while (k < 6 && s > L[k]) { s -= L[k]; k++; }
+  float f = std::min(1.0f, s / L[k]);
+  x = LED_INSET * (P[k][0] + (P[k + 1][0] - P[k][0]) * f);
+  y = LED_INSET * (P[k][1] + (P[k + 1][1] - P[k][1]) * f);
+}  // ring/ripple fronts also sweep around each tile (visible on a lone tile)
 
 // Chase/snake: one comet travels LED-by-LED through tiles in chase order (index*n + led), speed in tiles/s.
 static inline float chase_k(float t_s, float spd, float sc, int index, int count, int led, int n) {
@@ -828,7 +845,7 @@ void HexSync::render(light::AddressableLight &it) {
   float minx = 1e9, maxx = -1e9, miny = 1e9, maxy = -1e9;
   int max_ring = 0, max_order = 0, diam = 0;
   for (int i = 0; i < nt; i++) {
-    float x = SQ3 * (tiles[i].q + tiles[i].r / 2.0f), y = 1.5f * tiles[i].r;
+    float x = 1.5f * tiles[i].q, y = SQ3 * (tiles[i].r + tiles[i].q / 2.0f);  // flat-top axial
     minx = std::min(minx, x); maxx = std::max(maxx, x);
     miny = std::min(miny, y); maxy = std::max(maxy, y);
     max_ring = std::max(max_ring, hexdist(tiles[i].q, tiles[i].r, 0, 0));
@@ -838,7 +855,7 @@ void HexSync::render(light::AddressableLight &it) {
   // pad the bounding box by one tile radius so LEDs of a lone tile still span 0..1
   minx -= 1; maxx += 1; miny -= 1; maxy += 1;
   const int count = std::max(nt, max_order + 1);
-  const float cx = SQ3 * (q_ + r_ / 2.0f), cy = 1.5f * r_;
+  const float cx = 1.5f * q_, cy = SQ3 * (r_ + q_ / 2.0f);  // flat-top, unit circumradius, y down
   const float max_ringw = max_ring + 1.0f;
 
   int32_t tms = (int32_t) (effect_clock() - params_.start_ms);
@@ -853,7 +870,7 @@ void HexSync::render(light::AddressableLight &it) {
     float per = diam + 3;
     uint32_t k = (uint32_t) floorf(t_s * spd / per);
     int oi = (int) (hash01(seed_, k) * nt) % nt;
-    ox = SQ3 * (tiles[oi].q + tiles[oi].r / 2.0f); oy = 1.5f * tiles[oi].r;
+    ox = 1.5f * tiles[oi].q; oy = SQ3 * (tiles[oi].r + tiles[oi].q / 2.0f);
     int md = 0;
     for (int i = 0; i < nt; i++) md = std::max(md, hexdist(tiles[oi].q, tiles[oi].r, tiles[i].q, tiles[i].r));
     max_od = md + 1.0f;
@@ -869,19 +886,39 @@ void HexSync::render(light::AddressableLight &it) {
       if (tiles[i].order == head) head_d = hexdist(q_, r_, tiles[i].q, tiles[i].r);
   }
 
+  const float crot = cosf(rot_deg_ * 0.017453293f), srot = sinf(rot_deg_ * 0.017453293f);
   uint32_t sum = 0;
   for (int i = 0; i < size; i++) {
     Color c(0, 0, 0);  // pixels beyond LED count stay black
     if (i < n) {
       float lf = (float) i / n;
-      float th = 6.2831853f * lf + rot_deg_ * 0.017453293f;
-      float px = cx + LED_R * cosf(th), py = cy + LED_R * sinf(th);
+      float lx, ly;
+      led_local_(i, n, lx, ly);  // real strip position on the hex perimeter, then tile rotation
+      float px = cx + lx * crot - ly * srot, py = cy + lx * srot + ly * crot;
       float xn = (px - minx) / (maxx - minx), yn = (py - miny) / (maxy - miny);
       float ringw = sqrtf(px * px + py * py) / SQ3 + SPIRAL * lf;
       float angle = atan2f(py, px) * 57.29578f;  // screen y down -> clockwise
       if (angle < 0) angle += 360.0f;
       float od = sqrtf((px - ox) * (px - ox) + (py - oy) * (py - oy)) / SQ3 + SPIRAL * lf;
-      c = pixel_(i, n, t_eff, order_, count, xn, yn, ringw, max_ringw, angle, od, max_od, head_d);
+      if (params_.effect == FX_GRID_CHECK) {
+        // One narrow white band on black sweeping the whole wall in wall units (1 = hex circumradius), so a
+        // straight line crosses tile borders continuously; a misplaced/rotated tile breaks it.
+        float u, span;
+        switch (params_.axis) {
+          case AX_Y: u = py - miny; span = maxy - miny; break;
+          case AX_RING: u = sqrtf(px * px + py * py); span = max_ringw * SQ3; break;
+          case AX_ANGLE: u = angle / 360.0f * 12.566371f; span = 12.566371f; break;
+          default: u = px - minx; span = maxx - minx; break;
+        }
+        const float w = GRID_W;
+        float per = span + 4 * w;
+        float pos = fmodf(t_s * std::max(spd, 0.05f) * GRID_SPEED, per) - 2 * w;
+        float d = fabsf(u - pos);
+        float k = d < w ? 1.0f - d / w : 0.0f;
+        c = Color(255 * k, 255 * k, 255 * k);
+      } else {
+        c = pixel_(i, n, t_eff, order_, count, xn, yn, ringw, max_ringw, angle, od, max_od, head_d);
+      }
     }
     it[i] = c;
     sum += c.r + c.g + c.b;

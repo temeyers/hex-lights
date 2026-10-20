@@ -444,7 +444,7 @@ select:
   - platform: template
     name: Wall effect
     internal: ${wall_controls_internal}
-    options: [solid, radial_wave, rainbow_sweep, pulse, chase, wipe, rainbow_flow, random_ripple, twinkle, color_cycle, snake]
+    options: [solid, radial_wave, rainbow_sweep, pulse, chase, wipe, rainbow_flow, random_ripple, twinkle, color_cycle, snake, grid_check]
     update_interval: 2s
     lambda: 'return std::string(hexsync::HexSync::effect_name(id(hex_sync).wall_effect()));'
     set_action:
