@@ -1,10 +1,12 @@
 /* hex-layout-card v1 - honeycomb layout for Hex lights. No build step. */
-const HLC_VERSION = "8";
+const HLC_VERSION = "10";
 const SQ3 = Math.sqrt(3);
 
 class HexLayoutCard extends HTMLElement {
   static getStubConfig() { return { layout_id: "hex_layout_quin", layout: { tiles: {}, groups: [] } }; }
   setConfig(config) {
+    // While editing, the layout is a local draft: HA re-sends config (e.g. after any dashboard save) and that must not wipe it.
+    if (this._edit && this._layout) { this._config = Object.assign({}, this._config, config || {}, { layout: this._config.layout }); return; }
     this._config = Object.assign({ layout_id: "hex_layout_quin", pattern: "^light\\.hex_.*_light$", size: 34, orientation: "flat" }, config || {});
     const l = this._config.layout || {};
     this._layout = { tiles: Object.assign({}, l.tiles || {}), groups: (l.groups || []).map(g => ({ name: g.name, entities: [...(g.entities || [])] })),
@@ -14,7 +16,8 @@ class HexLayoutCard extends HTMLElement {
     if (!this.shadowRoot) this.attachShadow({ mode: "open" });
     this._render();
   }
-  set hass(h) { const first = !this._hass; this._hass = h; if (first || !this._drag) this._render(); }
+  // In edit mode, state updates don't re-render: rebuilding the DOM between pointerdown/up ate taps, clicks and drags.
+  set hass(h) { const first = !this._hass; this._hass = h; if (first || (!this._drag && !this._edit)) this._render(); }
   getCardSize() { return 5; }
   getGridOptions() { return { columns: 12, min_rows: 4 }; }
 
@@ -83,7 +86,7 @@ class HexLayoutCard extends HTMLElement {
     const minY = Math.min(...pts.map(p => p.y)) - pad, maxY = Math.max(...pts.map(p => p.y)) + pad;
     this._vb = { minX, minY, w: maxX - minX, h: maxY - minY };
     let svg = `<svg id="svg" viewBox="${minX} ${minY} ${maxX - minX} ${maxY - minY}" preserveAspectRatio="xMidYMid meet"><defs><filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="${s * 0.22}"/></filter></defs>`;
-    cells.forEach(c => { const p = this._px(c.q, c.r); svg += `<polygon class="cell" points="${this._poly(p.x, p.y, 0)}"/>`; });
+    const cs = this._cellSel; cells.forEach(c => { const p = this._px(c.q, c.r), on = cs && cs.q === c.q && cs.r === c.r; svg += `<polygon class="cell${on ? " csel" : ""}" data-q="${c.q}" data-r="${c.r}" points="${this._poly(p.x, p.y, 0)}"/>`; });
     // blockouts: UI-only black spots (no entity, never a light)
     B.forEach((b, i) => { const p = this._px(b.q, b.r); svg += `<g class="blk${this._edit ? " ed" : ""}${this._bsel.has(i) ? " sel" : ""}" data-b="${i}"><polygon class="bhex" points="${this._poly(p.x, p.y, 0)}"/></g>`; });
     placed.forEach(e => {
@@ -101,19 +104,19 @@ class HexLayoutCard extends HTMLElement {
     const gOn = g => g.entities.some(e => this._hass && this._hass.states[e] && this._hass.states[e].state === "on");
     let html = `<style>${HexLayoutCard.css}</style><ha-card>
       <div class="head"><span class="title">${this._config.title || "Hex layout"}</span>
-      <button class="btn" id="edit">${this._edit ? "Done" : "Edit layout"}</button></div>
+      <button class="btn" id="edit">${this._edit ? "Save" : "Edit layout"}</button></div>
       <div class="chips">${this._tgtEnt() ? `<button class="chip${this._tgt() === "All" ? " tgtchip" : ""}" data-g="all" title="Target: whole wall">All</button><button class="chip pwr${anyOn ? " on" : ""}" id="pwr" title="Turn the selected target on/off">⏻ ${this._tgt() === "All" ? "All" : this._tgt()} on/off</button>` : chip("All", "all", anyOn)}${groups.map((g, i) => chip(g.name, i, gOn(g))).join("")}</div>
       <div class="stage">${svg}</div>`;
     if (this._edit) {
       html += `<div class="edit">
         <div class="row"><b>Tray</b> ${unplaced.length ? unplaced.map(e => `<span class="tray" data-tray="${e}">${this._name(e)}</span>`).join("") : "<i>All lights placed</i>"}</div>
-        <div class="row hint">Drag a light from the tray or a placed hex onto a cell. Tap placed hexes to select. Blockouts are black spots with no light.</div>
+        <div class="row hint">Drag a light from the tray or a placed hex onto a cell. Tap placed hexes to select. To add a blockout (a black spot with no light), tap an empty cell, then Add blockout. Drag it to move it.</div>
         <div class="row"><button class="btn" id="rot" ${this._sel.size ? "" : "disabled"}>Rotate</button>
         <button class="btn" id="rem" ${this._sel.size ? "" : "disabled"}>Remove</button>
         <button class="btn" id="badd">Add blockout</button>
         <button class="btn" id="bdel" ${this._bsel.size ? "" : "disabled"}>Delete blockout</button></div>
         ${groups.length ? `<div class="row">${groups.map((g, i) => `<span class="gl">${g.name} (${g.entities.length}) <a data-gdel="${i}">✕</a></span>`).join("")}</div>` : ""}
-        <div class="row status">${this._status || (this._dirty ? "Unsaved changes – press Done to save" : "")}</div></div>`;
+        <div class="row status">${this._status || (this._dirty ? "Unsaved changes – press Save to save all" : "")}</div></div>`;
     }
     html += `</ha-card>`;
     this.shadowRoot.innerHTML = html;
@@ -127,6 +130,7 @@ class HexLayoutCard extends HTMLElement {
   }
   _occupied(q, r, except, exceptB) { return Object.entries(this._layout.tiles).find(([e, t]) => e !== except && t.q === q && t.r === r) || this._layout.blockouts.find((b, i) => i !== exceptB && b.q === q && b.r === r); }
   _freeCell() { const cs=[]; for (let q=-4;q<=4;q++) for (let r=-4;r<=4;r++) if (Math.abs(q+r)<=4) cs.push({q,r,d:(Math.abs(q)+Math.abs(r)+Math.abs(q+r))/2}); cs.sort((x,y)=>x.d-y.d); return cs.find(c=>!this._occupied(c.q,c.r)); }
+  _follow(g, down, ev) { const a = this._svgPt(down), b = this._svgPt(ev); g.setAttribute("transform", `translate(${(b.x - a.x).toFixed(1)},${(b.y - a.y).toFixed(1)})`); g.classList.add("dragging"); }
   _place(e, ev) {
     const p = this._svgPt(ev), c = this._cell(p.x, p.y);
     if (this._occupied(c.q, c.r, e)) { this._status = "That cell is taken"; return; }
@@ -135,7 +139,7 @@ class HexLayoutCard extends HTMLElement {
 
   _bind() {
     const $ = id => this.shadowRoot.getElementById(id);
-    $("edit").onclick = () => { if (this._edit && this._dirty) this._save(); this._edit = !this._edit; this._sel.clear(); this._bsel.clear(); this._render(); };
+    $("edit").onclick = () => { const was = this._edit; this._edit = !was; if (was && this._dirty) this._save(); this._sel.clear(); this._bsel.clear(); this._cellSel = null; this._render(); };
     this.shadowRoot.querySelectorAll(".chip").forEach(b => b.onclick = () => {
       const g = b.dataset.g, ents = g === "all" ? this._lights() : this._layout.groups[+g].entities;
       const toggle = () => {
@@ -158,7 +162,8 @@ class HexLayoutCard extends HTMLElement {
         if (this._edit) { this._drag = e; t.setPointerCapture(ev.pointerId); return; }
         timer = setTimeout(() => { long = true; this._moreInfo(e); }, 550);
       };
-      t.onpointermove = ev => { if (down && Math.hypot(ev.clientX - down.clientX, ev.clientY - down.clientY) > 6) { moved = true; clearTimeout(timer); } };
+      t.onpointermove = ev => { if (down && Math.hypot(ev.clientX - down.clientX, ev.clientY - down.clientY) > 6) { moved = true; clearTimeout(timer); } if (moved && this._edit) this._follow(t, down, ev); };
+      t.onpointercancel = () => { this._drag = null; down = null; this._render(); };
       t.onpointerup = ev => {
         clearTimeout(timer);
         if (this._edit) { this._drag = null; if (moved) this._place(e, ev); else { this._sel.has(e) ? this._sel.delete(e) : this._sel.add(e); } this._render(); }
@@ -188,8 +193,9 @@ class HexLayoutCard extends HTMLElement {
     if (!this._edit) return;
     this.shadowRoot.querySelectorAll(".blk").forEach(t => {
       const i = +t.dataset.b; let down = null, moved = false;
-      t.onpointerdown = ev => { down = ev; moved = false; this._drag = "blk" + i; t.setPointerCapture(ev.pointerId); };
-      t.onpointermove = ev => { if (down && Math.hypot(ev.clientX - down.clientX, ev.clientY - down.clientY) > 6) moved = true; };
+      t.onpointerdown = ev => { ev.preventDefault(); down = ev; moved = false; this._drag = "blk" + i; this._cellSel = null; t.setPointerCapture(ev.pointerId); };
+      t.onpointermove = ev => { if (down && Math.hypot(ev.clientX - down.clientX, ev.clientY - down.clientY) > 6) moved = true; if (moved) this._follow(t, down, ev); };
+      t.onpointercancel = () => { this._drag = null; down = null; this._render(); };
       t.onpointerup = ev => {
         this._drag = null;
         if (moved) { const p = this._svgPt(ev), c = this._cell(p.x, p.y); if (this._occupied(c.q, c.r, null, i)) this._status = "That cell is taken"; else { this._layout.blockouts[i] = { q: c.q, r: c.r }; this._dirty = true; this._status = ""; } }
@@ -197,7 +203,8 @@ class HexLayoutCard extends HTMLElement {
         down = null; this._render();
       };
     });
-    $("badd").onclick = () => { const c = this._freeCell(); if (!c) { this._status = "No free cell"; } else { this._layout.blockouts.push({ q: c.q, r: c.r }); this._bsel.clear(); this._bsel.add(this._layout.blockouts.length - 1); this._dirty = true; this._status = ""; } this._render(); };
+    this.shadowRoot.querySelectorAll(".cell").forEach(el => el.onpointerup = () => { const q = +el.dataset.q, r = +el.dataset.r, cs = this._cellSel; this._cellSel = cs && cs.q === q && cs.r === r ? null : { q, r }; this._status = this._occupied(q, r) ? "That cell is taken" : ""; this._render(); });
+    $("badd").onclick = () => { const cs = this._cellSel, c = cs && !this._occupied(cs.q, cs.r) ? cs : this._freeCell(); this._cellSel = null; if (!c) { this._status = "No free cell"; } else { this._layout.blockouts.push({ q: c.q, r: c.r }); this._bsel.clear(); this._bsel.add(this._layout.blockouts.length - 1); this._dirty = true; this._status = ""; } this._render(); };
     $("bdel").onclick = () => { this._layout.blockouts = this._layout.blockouts.filter((b, i) => !this._bsel.has(i)); this._bsel.clear(); this._dirty = true; this._render(); };
     $("rot").onclick = () => { this._sel.forEach(e => { const t = this._layout.tiles[e]; t.rot = ((t.rot || 0) + 60) % 360; }); this._dirty = true; this._render(); };
     $("rem").onclick = () => { this._sel.forEach(e => { delete this._layout.tiles[e]; this._layout.groups.forEach(g => g.entities = g.entities.filter(x => x !== e)); }); this._sel.clear(); this._dirty = true; this._render(); };
@@ -246,7 +253,8 @@ ha-card{display:block;background:rgba(255,255,255,0.08);backdrop-filter:blur(14p
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}.chip.on{background:rgba(255,200,90,0.35);border-color:rgba(255,210,120,0.7)}.chip.tgtchip{border:2px solid #fff;font-weight:600}
 .stage{width:100%;height:260px;touch-action:none}svg{width:100%;height:100%;user-select:none}
 .bhex{fill:#050608;fill-opacity:.92;stroke:rgba(255,255,255,0.22);stroke-width:1.2}.blk{pointer-events:none}.blk.ed{pointer-events:auto;cursor:grab}.blk.sel .bhex{stroke:#4fc3f7;stroke-width:3}
-.cell{fill:rgba(255,255,255,0.03);stroke:rgba(255,255,255,0.18);stroke-dasharray:3 3}
+.cell{fill:rgba(255,255,255,0.03);stroke:rgba(255,255,255,0.18);stroke-dasharray:3 3;cursor:pointer}.cell.csel{fill:rgba(79,195,247,0.22);stroke:#4fc3f7;stroke-width:2;stroke-dasharray:none}.dragging{opacity:.85}
+.blk,.tile,.tray,.cell{touch-action:none}
 .hex{stroke:rgba(255,255,255,0.45);stroke-width:1.5}.tile{cursor:pointer}.tile.sel .hex{stroke:#4fc3f7;stroke-width:3.5}.tile.tgt .hex{stroke:#fff;stroke-width:4;stroke-dasharray:none}
 text{fill:#fff;font-size:11px;text-anchor:middle;pointer-events:none;font-family:inherit}text.dark{fill:rgba(0,0,0,0.75)}
 .edit{border-top:1px solid rgba(255,255,255,0.15);margin-top:8px;padding-top:8px;font-size:13px}.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:5px 0}
@@ -256,4 +264,4 @@ input{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.22);b
 customElements.get("hex-layout-card") || customElements.define("hex-layout-card", HexLayoutCard);
 window.customCards = window.customCards || [];
 window.customCards.push({ type: "hex-layout-card", name: "Hex layout", description: "Honeycomb layout for Hex lights" });
-console.info("hex-layout-card " + HLC_VERSION);
+console.info("hex-layout-card " + HLC_VERSION); window.HEX_LAYOUT_CARD_VERSION = HLC_VERSION;
