@@ -57,11 +57,7 @@ script:
               then:
                 - action: script.hex_ota_install_one
                   data: {nn: "{{ repeat.item }}"}
-                # one at a time: wait for this tile's result before the next
-                - wait_for_trigger:
-                    - trigger: event
-                      event_type: hex_ota_result
-                  timeout: {minutes: 20}
+                # one at a time: hex_ota_install_one returns only after this tile's install finished
   hex_ota_install_one:
     alias: Hex OTA - install one tile (waits for any update in progress)
     fields: {"nn": {"description": "tile number", "example": "05"}}
@@ -321,7 +317,7 @@ script:
     alias: Hex wall apply synced effect
     mode: restart
     variables:
-      fx_ids: {"solid": 0, "radial_wave": 1, "rainbow_sweep": 2, "pulse": 3, "chase": 4, "wipe": 5, "rainbow_flow": 6, "random_ripple": 7, "twinkle": 8, "color_cycle": 9, "snake": 10}
+      fx_ids: {"solid": 0, "radial_wave": 1, "rainbow_sweep": 2, "pulse": 3, "chase": 4, "wipe": 5, "rainbow_flow": 6, "random_ripple": 7, "twinkle": 8, "color_cycle": 9, "snake": 10, "grid_check": 11}
       pal_ids: {"rainbow": 0, "ocean": 1, "sunset": 2, "forest": 3, "fire": 4, "mono": 5}
       fx: "{{ states('input_select.hex_wall_fx') }}"
       tgt_nodes: "{% set t = states('input_select.hex_wall_target') %}{% if t[:4] == 'Hex ' %}{{ ['hex_' ~ t[4:]] }}{% else %}{{ (states.light | map(attribute='entity_id') | select('match', '^light[.]hex_[0-9]+_light$') | sort | select('has_value') | list) | map('replace', 'light.', '') | map('replace', '_light', '') | list }}{% endif %}"
@@ -373,7 +369,7 @@ input_select:
     options: ["All"]   # seed only; hex_wall_target_options adds 'Hex NN' for every light.hex_NN_light
   hex_wall_fx:
     name: Hex wall synced effect
-    options: ["off", "solid", "radial_wave", "rainbow_sweep", "pulse", "chase", "wipe", "rainbow_flow", "random_ripple", "twinkle", "color_cycle", "snake"]
+    options: ["off", "solid", "radial_wave", "rainbow_sweep", "pulse", "chase", "wipe", "rainbow_flow", "random_ripple", "twinkle", "color_cycle", "snake", "grid_check"]
     initial: "off"
   hex_wall_palette:
     name: Hex wall palette
@@ -626,12 +622,12 @@ automation:
                   then:
                     - action: "switch.turn_{{ 'on' if d.mc else 'off' }}"
                       target: {entity_id: "switch.{{ key }}_manual_color"}
-            - if: "{{ fx in ['solid', 'radial_wave', 'rainbow_sweep', 'pulse', 'chase', 'wipe', 'rainbow_flow', 'random_ripple', 'twinkle', 'color_cycle', 'snake'] and has_value(l) }}"
+            - if: "{{ fx in ['solid', 'radial_wave', 'rainbow_sweep', 'pulse', 'chase', 'wipe', 'rainbow_flow', 'random_ripple', 'twinkle', 'color_cycle', 'snake', 'grid_check'] and has_value(l) }}"
               then:
                 - action: "esphome.{{ key }}_set_wall_fx"
                   continue_on_error: true
                   data:
-                    effect: "{{ {'solid': 0, 'radial_wave': 1, 'rainbow_sweep': 2, 'pulse': 3, 'chase': 4, 'wipe': 5, 'rainbow_flow': 6, 'random_ripple': 7, 'twinkle': 8, 'color_cycle': 9, 'snake': 10}[fx] }}"
+                    effect: "{{ {'solid': 0, 'radial_wave': 1, 'rainbow_sweep': 2, 'pulse': 3, 'chase': 4, 'wipe': 5, 'rainbow_flow': 6, 'random_ripple': 7, 'twinkle': 8, 'color_cycle': 9, 'snake': 10, 'grid_check': 11}[fx] }}"
                     palette: "{{ {'rainbow': 0, 'ocean': 1, 'sunset': 2, 'forest': 3, 'fire': 4, 'mono': 5}.get(states('input_select.hex_wall_palette'), 0) }}"
                     speed: "{{ [[(states('input_number.hex_wall_speed') | float(1) * 1000) | int, 0] | max, 10000] | min }}"
                     scale: 100
