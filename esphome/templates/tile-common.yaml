@@ -520,6 +520,11 @@ text_sensor:
       if (s.empty()) return {};
       return s;
   - platform: template
+    name: Lit pixels   # diagnostic: "count first-last" of the last frame (pixel 1 = right of bottom centre)
+    entity_category: diagnostic
+    update_interval: 1s
+    lambda: 'return id(hex_sync).lit_pixels();'
+  - platform: template
     name: Sync source
     entity_category: diagnostic
     update_interval: 5s

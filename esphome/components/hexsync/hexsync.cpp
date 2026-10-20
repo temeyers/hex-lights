@@ -886,6 +886,7 @@ void HexSync::render(light::AddressableLight &it) {
       if (tiles[i].order == head) head_d = hexdist(q_, r_, tiles[i].q, tiles[i].r);
   }
 
+  int ln = 0, lf0 = 0, ll = 0;
   const float crot = cosf(rot_deg_ * 0.017453293f), srot = sinf(rot_deg_ * 0.017453293f);
   uint32_t sum = 0;
   for (int i = 0; i < size; i++) {
@@ -922,6 +923,7 @@ void HexSync::render(light::AddressableLight &it) {
     }
     it[i] = c;
     sum += c.r + c.g + c.b;
+    if (c.r + c.g + c.b > 30) { if (ln == 0) lf0 = i + 1; ll = i + 1; ln++; }
     dc_sum_[0] += c.r; dc_sum_[1] += c.g; dc_sum_[2] += c.b;
   }
   // Current cap (ESTIMATED linear model) over the N active LEDs.
@@ -934,6 +936,7 @@ void HexSync::render(light::AddressableLight &it) {
     }
   }
   last_ma_ = est * k;
+  lit_n_ = ln; lit_first_ = lf0; lit_last_ = ll;
   dc_frames_++;
 }
 

@@ -8,6 +8,7 @@
 #include <freertos/queue.h>
 #include <cstdint>
 #include <cmath>
+#include <cstdio>
 
 namespace esphome {
 namespace hexsync {
@@ -189,6 +190,8 @@ class HexSync : public Component {
   // is the synced user colour x brightness. Returns "" when unchanged. Never written to the LightState.
   void set_light_level(float k) { light_level_ = k < 0 ? 0 : (k > 1 ? 1 : k); }
   std::string displayed_color();
+  // Diagnostic: 'lit N first-last' for the last rendered frame (pixel numbers 1..n, lit = sum > 30).
+  std::string lit_pixels() const { char b[24]; snprintf(b, sizeof(b), "%d %d-%d", lit_n_, lit_first_, lit_last_); return b; }
   bool budget_enabled() const { return budget_enabled_; }
   float max_scale() const { return max_scale_; }
   int effect_value() const { return params_.value; }
@@ -273,6 +276,7 @@ class HexSync : public Component {
   uint32_t dc_sum_[3]{0, 0, 0};
   uint32_t dc_frames_{0};
   std::string dc_last_;
+  int lit_n_{0}, lit_first_{0}, lit_last_{0};
   uint32_t rgb_sent_ms_{0};
   uint32_t beacon_ms_{100}, timeout_ms_{1500};
 
